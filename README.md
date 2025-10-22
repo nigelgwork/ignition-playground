@@ -4,19 +4,20 @@
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![Version](https://img.shields.io/badge/version-1.0.1-blue.svg)](VERSION)
 
 ## 🎯 Overview
 
-A modern, Docker-free automation toolkit for Ignition SCADA with:
+A modern, Docker-free automation toolkit for Ignition SCADA with complete playbook-driven workflows:
 
-- **Gateway Automation**: REST API client for modules, projects, tags, backups
-- **Playbook System**: YAML-based reusable workflows with step-by-step execution
-- **Real-Time Control**: Pause, resume, skip steps during execution
-- **Browser Automation**: Live Playwright viewing for web-based operations
-- **Secure Credentials**: Encrypted local storage, never committed to git
+- **Gateway Automation**: REST API client for modules, projects, system operations
+- **Playbook System**: YAML-based reusable workflows with 15+ step types
+- **Real-Time Control**: Pause, resume, skip steps during execution via WebSocket
+- **Browser Automation**: Playwright integration for web-based operations
+- **Secure Credentials**: Fernet-encrypted local storage, never committed to git
 - **Import/Export**: Share playbooks as JSON with colleagues
-- **AI-Ready**: Integration points for AI-assisted testing steps
-- **Web UI**: React-based interface for control and monitoring
+- **AI-Ready**: Integration scaffolding for AI-assisted testing steps
+- **Web UI**: Modern dark-theme interface with Warp terminal colors
 
 ## 🚀 Quick Start
 
@@ -30,60 +31,70 @@ A modern, Docker-free automation toolkit for Ignition SCADA with:
 
 ```bash
 # Clone repository
-git clone <repo-url>
+git clone git@github.com:nigelgwork/ignition-playground.git
 cd ignition-playground
 
 # Install in development mode
 pip install -e .
 
+# Install Playwright browsers
+playwright install chromium
+
 # Initialize credential vault
 ignition-toolkit init
 
 # Start server
-ignition-toolkit serve
+ignition-toolkit serve --port 8080
 ```
 
-Access the web UI at http://localhost:5000
+Access the web UI at http://localhost:8080
 
 ### Your First Playbook
 
 ```bash
-# Run example module upgrade playbook
-ignition-toolkit run playbooks/gateway/module_upgrade.yaml \
-  --config my-gateway-config
+# Add Gateway credentials
+ignition-toolkit credential add gateway_admin
+# Enter username and password when prompted
+
+# Run example health check playbook
+ignition-toolkit playbook run playbooks/examples/simple_health_check.yaml \
+  --param gateway_url=http://localhost:8088 \
+  --param gateway_credential=gateway_admin
 ```
 
 ## 📚 Documentation
 
-- [Getting Started Guide](docs/getting_started.md)
-- [Playbook Syntax](docs/playbook_syntax.md)
-- [Gateway API Reference](docs/gateway_api.md)
-- [Credential Management](docs/credentials.md)
-- [AI Integration](docs/ai_integration.md)
+- [Getting Started Guide](docs/getting_started.md) - Installation and first steps
+- [Running Playbooks](docs/RUNNING_PLAYBOOKS.md) - Complete guide with examples
+- [Playbook Syntax](docs/playbook_syntax.md) - YAML reference and step types
+- [Testing Guide](docs/TESTING_GUIDE.md) - Test suite and coverage
+- [Versioning Guide](docs/VERSIONING_GUIDE.md) - Release management
 
 ## 🏗️ Architecture
 
 ```
 ┌─────────────────────────────────────┐
-│     Web UI (React + Material-UI)    │
-│        http://localhost:5000         │
+│   Web UI (HTML/CSS/JS + Material)   │
+│        http://localhost:8080         │
+│      Warp Terminal Dark Theme        │
 └──────────────┬──────────────────────┘
                │ WebSocket + REST API
                ▼
 ┌─────────────────────────────────────┐
 │    FastAPI Backend                   │
-│  • Playbook Engine                   │
-│  • Gateway Client                    │
-│  • Browser Automation                │
-│  • Credential Vault                  │
+│  • Playbook Engine (15+ step types) │
+│  • Gateway Client (async httpx)     │
+│  • Browser Automation (Playwright)  │
+│  • Credential Vault (Fernet)        │
 └──────────────┬──────────────────────┘
                │
                ▼
 ┌─────────────────────────────────────┐
 │  SQLite + Local File Storage         │
 │  • Execution History                 │
-│  • Encrypted Credentials (~/.ignition-toolkit/)
-│  • Playbook Library                  │
+│  • Encrypted Credentials             │
+│    (~/.ignition-toolkit/)            │
+│  • Playbook Library (YAML)           │
 └─────────────────────────────────────┘
                │
                ▼
@@ -98,16 +109,26 @@ ignition-toolkit run playbooks/gateway/module_upgrade.yaml \
 ```
 ignition-playground/
 ├── ignition_toolkit/          # Main Python package
-│   ├── gateway/               # Gateway REST API client
-│   ├── playbook/              # Execution engine
-│   ├── browser/               # Browser automation
-│   ├── credentials/           # Secure credential storage
-│   ├── api/                   # FastAPI server
-│   └── storage/               # Data persistence
-├── playbooks/                 # Playbook library (YAML)
-├── frontend/                  # React UI
-├── tests/                     # Test suite
-└── docs/                      # Documentation
+│   ├── gateway/               # Gateway REST API client (httpx)
+│   ├── playbook/              # Playbook engine & step executor
+│   ├── browser/               # Playwright browser automation
+│   ├── credentials/           # Fernet encrypted credential vault
+│   ├── api/                   # FastAPI server + WebSocket
+│   ├── storage/               # SQLite database models
+│   ├── ai/                    # AI integration scaffolding
+│   └── cli.py                 # Command-line interface
+├── playbooks/                 # YAML playbook library
+│   ├── gateway/               # Gateway automation workflows
+│   ├── browser/               # Browser automation workflows
+│   ├── ai/                    # AI-assisted workflows
+│   └── examples/              # Example playbooks
+├── frontend/                  # Web UI (HTML/CSS/JS)
+├── tests/                     # Test suite (46 tests)
+├── docs/                      # Documentation
+├── .claude/                   # Claude Code instructions
+├── CHANGELOG.md               # Version history
+├── VERSION                    # Current version (1.0.1)
+└── pyproject.toml             # Package configuration
 ```
 
 ## 🔑 Key Features
@@ -213,11 +234,39 @@ Contributions welcome! This project uses:
 
 MIT License - see [LICENSE](LICENSE) file
 
+## 📊 Project Status
+
+**Current Version:** 1.0.1 (October 2025)
+**Status:** ✅ Production Ready
+**Test Coverage:** 46 automated tests across all components
+
+### Completed Features (8/8 Phases)
+
+✅ Phase 1: Foundation (packaging, credentials, database, CLI)
+✅ Phase 2: Gateway Client (async REST API, authentication)
+✅ Phase 3: Playbook Engine (YAML parser, execution, state management)
+✅ Phase 4: Import/Export (JSON sharing with credential stripping)
+✅ Phase 5: API & Frontend (FastAPI, WebSocket, dark-theme UI)
+✅ Phase 6: Browser Automation (Playwright integration)
+✅ Phase 7: AI Scaffolding (integration hooks, placeholder steps)
+✅ Phase 8: Testing & Documentation (comprehensive test suite)
+
+### Available Playbooks
+
+- **Gateway Automation:** Module upgrade, backup & restart, trial reset, health checks
+- **Browser Automation:** Web login tests, screenshot audits, Ignition web testing
+- **AI-Assisted:** AI test generation (requires Anthropic API key)
+- **Examples:** Simple health check workflow
+
+See [CHANGELOG.md](CHANGELOG.md) for detailed release history.
+
 ## 🙏 Acknowledgments
 
 - [Inductive Automation](https://inductiveautomation.com/) - Ignition SCADA Platform
 - Built for automation engineers and test teams
+- Developed with [Claude Code](https://claude.com/claude-code)
 
 ---
 
+**Repository:** https://github.com/nigelgwork/ignition-playground
 **Questions or Issues?** Open an issue on GitHub
