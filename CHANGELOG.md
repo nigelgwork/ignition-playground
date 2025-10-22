@@ -5,6 +5,21 @@ All notable changes to the Ignition Automation Toolkit will be documented in thi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.1] - 2025-10-22
+
+### Changed
+- Redesigned web UI with Warp terminal dark theme colors
+- Updated color scheme to match Warp terminal aesthetic (#01050d background, #58a6ff primary, #3fb950 success)
+- Changed app bar from bright blue to dark surface theme
+- Moved stat cards from main content to compact sidebar display
+- Updated branding from "Ignition Auto" to "Ignition Playground"
+- Reduced sidebar header font size for better fit
+- Made UI default to dark mode on first load
+
+### Fixed
+- SQLAlchemy reserved name conflict (renamed `metadata` to `execution_metadata` in storage models)
+- Import errors in `__init__.py` (changed `Step` to `PlaybookStep`, `Execution` to `ExecutionState`)
+
 ## [1.0.0] - 2025-10-22
 
 ### Added - Initial Release

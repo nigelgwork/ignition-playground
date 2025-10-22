@@ -26,7 +26,7 @@ class ExecutionModel(Base):
     completed_at = Column(DateTime, nullable=True)
     error_message = Column(Text, nullable=True)
     config_data = Column(JSON, nullable=True)  # Runtime parameter values
-    metadata = Column(JSON, nullable=True)  # Additional execution metadata
+    execution_metadata = Column(JSON, nullable=True)  # Additional execution metadata
 
     # Relationships
     step_results = relationship("StepResultModel", back_populates="execution", cascade="all, delete-orphan")
@@ -42,7 +42,7 @@ class ExecutionModel(Base):
             "completed_at": self.completed_at.isoformat() if self.completed_at else None,
             "error_message": self.error_message,
             "config_data": self.config_data,
-            "metadata": self.metadata,
+            "execution_metadata": self.execution_metadata,
             "step_results": [step.to_dict() for step in self.step_results],
         }
 

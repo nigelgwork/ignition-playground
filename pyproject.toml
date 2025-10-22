@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ignition-toolkit"
-version = "1.0.0"  # Updated: 2025-10-22 - Initial release (all 8 phases complete)
+version = "1.0.1"  # Updated: 2025-10-22 - UI improvements with Warp terminal theme
 description = "Lightweight automation toolkit for Ignition SCADA Gateway operations"
 readme = "README.md"
 requires-python = ">=3.10"
