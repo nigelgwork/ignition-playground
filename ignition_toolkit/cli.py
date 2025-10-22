@@ -237,7 +237,7 @@ def playbook_run(
                 console.print(
                     f"[yellow]Required credential parameter:[/yellow] {param_def.name}"
                 )
-                console.print("Use: --param {param_def.name}=<credential_name>\n")
+                console.print(f"Use: --param {param_def.name}=<credential_name>\n")
                 return
             else:
                 value = click.prompt(

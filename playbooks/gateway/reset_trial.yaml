@@ -1,0 +1,107 @@
+name: "Reset Gateway Trial"
+version: "1.0"
+description: "Login to Ignition Gateway and reset the trial period (requires Gateway restart)"
+
+parameters:
+  - name: gateway_url
+    type: string
+    required: true
+    description: "Gateway URL (e.g., http://localhost:8088)"
+
+  - name: gateway_credential
+    type: credential
+    required: true
+    description: "Gateway admin credentials"
+
+steps:
+  - id: login
+    name: "Login to Gateway"
+    type: gateway.login
+    parameters:
+      url: "{{ parameter.gateway_url }}"
+      username: "{{ credential.gateway_credential.username }}"
+      password: "{{ credential.gateway_credential.password }}"
+    on_failure: abort
+
+  - id: check_health_before
+    name: "Check Gateway Health (Before)"
+    type: gateway.get_health
+    parameters:
+      url: "{{ parameter.gateway_url }}"
+    on_failure: continue
+
+  - id: get_info
+    name: "Get Gateway Info"
+    type: gateway.get_info
+    parameters:
+      url: "{{ parameter.gateway_url }}"
+    on_failure: continue
+
+  - id: log_current_state
+    name: "Log Current Gateway State"
+    type: utility.log
+    parameters:
+      message: "Gateway Edition: {{ variable.get_info.edition }}, Version: {{ variable.get_info.version }}"
+      level: "info"
+
+  # Note: The actual trial reset requires file system access or database manipulation
+  # This playbook demonstrates the workflow - actual reset would need custom step type
+  - id: warn_manual_reset
+    name: "Manual Trial Reset Required"
+    type: utility.log
+    parameters:
+      message: |
+        Trial reset requires manual intervention:
+        1. Stop the Gateway service
+        2. Delete or modify the .trial file in the Gateway data directory
+        3. For Docker: Delete .uuid files in /usr/local/bin/ignition/data/
+        4. Restart the Gateway
+
+        Alternative: Use Gateway API if available in your version
+      level: "warning"
+
+  - id: prompt_restart
+    name: "Prepare for Gateway Restart"
+    type: utility.log
+    parameters:
+      message: "After manual trial reset, Gateway restart will be initiated..."
+      level: "info"
+
+  - id: restart_gateway
+    name: "Restart Gateway"
+    type: gateway.restart
+    parameters:
+      url: "{{ parameter.gateway_url }}"
+      wait_for_ready: true
+    retry:
+      max_attempts: 3
+      delay_seconds: 5
+
+  - id: wait_for_ready
+    name: "Wait for Gateway Ready"
+    type: gateway.wait_for_ready
+    parameters:
+      url: "{{ parameter.gateway_url }}"
+      timeout_seconds: 300
+      check_interval: 5
+
+  - id: verify_health
+    name: "Verify Gateway Health (After)"
+    type: gateway.get_health
+    parameters:
+      url: "{{ parameter.gateway_url }}"
+    on_failure: abort
+
+  - id: confirm_ready
+    name: "Confirm Gateway Ready"
+    type: utility.log
+    parameters:
+      message: "Gateway restarted successfully. Trial reset complete (if manual steps were performed)."
+      level: "info"
+
+  - id: logout
+    name: "Logout from Gateway"
+    type: gateway.logout
+    parameters:
+      url: "{{ parameter.gateway_url }}"
+    on_failure: continue
