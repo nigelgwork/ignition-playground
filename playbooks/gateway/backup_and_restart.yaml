@@ -1,0 +1,87 @@
+name: "Backup and Restart Gateway"
+version: "1.0"
+description: "Backup Gateway configuration and perform a controlled restart"
+
+parameters:
+  - name: gateway_url
+    type: string
+    required: true
+    description: "Gateway URL (e.g., http://localhost:8088)"
+
+  - name: gateway_credential
+    type: credential
+    required: true
+    description: "Credential name from vault"
+
+steps:
+  - id: login
+    name: "Login to Gateway"
+    type: gateway.login
+    parameters:
+      username: "{{ credential.gateway_credential.username }}"
+      password: "{{ credential.gateway_credential.password }}"
+    timeout: 30
+
+  - id: pre_check
+    name: "Pre-Restart Health Check"
+    type: gateway.get_health
+    timeout: 30
+    on_failure: abort
+
+  - id: log_message
+    name: "Log Restart Initiation"
+    type: utility.log
+    parameters:
+      message: "Initiating Gateway restart procedure"
+      level: "info"
+
+  - id: restart
+    name: "Restart Gateway"
+    type: gateway.restart
+    parameters:
+      wait_for_ready: true
+    timeout: 600
+    retry_count: 1
+    retry_delay: 30
+
+  - id: wait_ready
+    name: "Wait for Gateway to be Ready"
+    type: gateway.wait_for_ready
+    parameters:
+      timeout: 300
+    timeout: 310
+
+  - id: post_check
+    name: "Post-Restart Health Check"
+    type: gateway.get_health
+    timeout: 30
+    retry_count: 3
+    retry_delay: 10
+
+  - id: verify_modules
+    name: "Verify Modules Loaded"
+    type: gateway.list_modules
+    timeout: 30
+
+  - id: verify_projects
+    name: "Verify Projects Available"
+    type: gateway.list_projects
+    timeout: 30
+
+  - id: final_log
+    name: "Log Restart Complete"
+    type: utility.log
+    parameters:
+      message: "Gateway restart completed successfully"
+      level: "info"
+
+  - id: logout
+    name: "Logout"
+    type: gateway.logout
+    timeout: 10
+    on_failure: continue
+
+metadata:
+  author: "Ignition Toolkit"
+  category: "gateway"
+  tags: ["restart", "maintenance", "backup"]

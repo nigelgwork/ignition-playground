@@ -1,0 +1,86 @@
+name: "Module Upgrade"
+version: "1.0"
+description: "Upload and install an Ignition module, then restart the Gateway"
+
+parameters:
+  - name: gateway_url
+    type: string
+    required: true
+    description: "Gateway URL (e.g., http://localhost:8088)"
+
+  - name: gateway_credential
+    type: credential
+    required: true
+    description: "Credential name from vault"
+
+  - name: module_file
+    type: file
+    required: true
+    description: "Path to .modl file"
+
+  - name: module_name
+    type: string
+    required: true
+    description: "Module name (e.g., Perspective)"
+
+steps:
+  - id: login
+    name: "Login to Gateway"
+    type: gateway.login
+    parameters:
+      username: "{{ credential.gateway_credential.username }}"
+      password: "{{ credential.gateway_credential.password }}"
+    timeout: 30
+
+  - id: list_modules_before
+    name: "List Modules Before Upload"
+    type: gateway.list_modules
+    timeout: 30
+    on_failure: continue
+
+  - id: upload_module
+    name: "Upload Module File"
+    type: gateway.upload_module
+    parameters:
+      file: "{{ parameter.module_file }}"
+    timeout: 300
+    retry_count: 2
+    retry_delay: 10
+
+  - id: wait_installation
+    name: "Wait for Module Installation"
+    type: gateway.wait_for_module_installation
+    parameters:
+      module_name: "{{ parameter.module_name }}"
+      timeout: 300
+    timeout: 310
+
+  - id: list_modules_after
+    name: "List Modules After Installation"
+    type: gateway.list_modules
+    timeout: 30
+
+  - id: restart
+    name: "Restart Gateway"
+    type: gateway.restart
+    parameters:
+      wait_for_ready: true
+    timeout: 600
+
+  - id: verify_health
+    name: "Verify Gateway Health"
+    type: gateway.get_health
+    timeout: 30
+    retry_count: 3
+    retry_delay: 5
+
+  - id: logout
+    name: "Logout"
+    type: gateway.logout
+    timeout: 10
+    on_failure: continue
+
+metadata:
+  author: "Ignition Toolkit"
+  category: "gateway"
+  tags: ["module", "upgrade", "maintenance"]

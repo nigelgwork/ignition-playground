@@ -1,0 +1,214 @@
+"""
+Browser manager - Playwright browser automation
+
+Handles browser lifecycle and basic operations.
+"""
+
+import asyncio
+import logging
+from pathlib import Path
+from typing import Optional
+from playwright.async_api import async_playwright, Browser, BrowserContext, Page
+
+logger = logging.getLogger(__name__)
+
+
+class BrowserManager:
+    """
+    Manage Playwright browser instances
+
+    Example:
+        async with BrowserManager() as manager:
+            page = await manager.get_page()
+            await page.goto("https://example.com")
+            await page.screenshot(path="screenshot.png")
+    """
+
+    def __init__(
+        self,
+        headless: bool = False,
+        slow_mo: int = 0,
+        screenshots_dir: Optional[Path] = None,
+    ):
+        """
+        Initialize browser manager
+
+        Args:
+            headless: Run browser in headless mode
+            slow_mo: Slow down operations by milliseconds
+            screenshots_dir: Directory for saving screenshots
+        """
+        self.headless = headless
+        self.slow_mo = slow_mo
+        self.screenshots_dir = screenshots_dir or Path("./data/screenshots")
+        self.screenshots_dir.mkdir(parents=True, exist_ok=True)
+
+        self._playwright = None
+        self._browser: Optional[Browser] = None
+        self._context: Optional[BrowserContext] = None
+        self._page: Optional[Page] = None
+
+    async def __aenter__(self):
+        """Async context manager entry"""
+        await self.start()
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        """Async context manager exit"""
+        await self.stop()
+
+    async def start(self) -> None:
+        """Start browser instance"""
+        if self._browser is not None:
+            logger.warning("Browser already started")
+            return
+
+        logger.info("Starting Playwright browser...")
+        self._playwright = await async_playwright().start()
+
+        # Launch browser
+        self._browser = await self._playwright.chromium.launch(
+            headless=self.headless,
+            slow_mo=self.slow_mo,
+        )
+
+        # Create context
+        self._context = await self._browser.new_context(
+            viewport={"width": 1920, "height": 1080},
+            ignore_https_errors=True,
+        )
+
+        # Create page
+        self._page = await self._context.new_page()
+
+        logger.info("Browser started successfully")
+
+    async def stop(self) -> None:
+        """Stop browser instance"""
+        if self._page:
+            await self._page.close()
+            self._page = None
+
+        if self._context:
+            await self._context.close()
+            self._context = None
+
+        if self._browser:
+            await self._browser.close()
+            self._browser = None
+
+        if self._playwright:
+            await self._playwright.stop()
+            self._playwright = None
+
+        logger.info("Browser stopped")
+
+    async def get_page(self) -> Page:
+        """
+        Get current page
+
+        Returns:
+            Playwright Page object
+
+        Raises:
+            RuntimeError: If browser not started
+        """
+        if self._page is None:
+            raise RuntimeError("Browser not started. Call start() first.")
+        return self._page
+
+    async def navigate(self, url: str, wait_until: str = "load") -> None:
+        """
+        Navigate to URL
+
+        Args:
+            url: URL to navigate to
+            wait_until: When to consider navigation successful
+                       (load, domcontentloaded, networkidle)
+        """
+        page = await self.get_page()
+        logger.info(f"Navigating to: {url}")
+        await page.goto(url, wait_until=wait_until)
+
+    async def click(self, selector: str, timeout: int = 30000) -> None:
+        """
+        Click element
+
+        Args:
+            selector: CSS selector
+            timeout: Timeout in milliseconds
+        """
+        page = await self.get_page()
+        logger.info(f"Clicking: {selector}")
+        await page.click(selector, timeout=timeout)
+
+    async def fill(self, selector: str, value: str, timeout: int = 30000) -> None:
+        """
+        Fill input field
+
+        Args:
+            selector: CSS selector
+            value: Value to fill
+            timeout: Timeout in milliseconds
+        """
+        page = await self.get_page()
+        logger.info(f"Filling {selector} with: {value}")
+        await page.fill(selector, value, timeout=timeout)
+
+    async def wait_for_selector(self, selector: str, timeout: int = 30000) -> None:
+        """
+        Wait for selector to appear
+
+        Args:
+            selector: CSS selector
+            timeout: Timeout in milliseconds
+        """
+        page = await self.get_page()
+        logger.info(f"Waiting for selector: {selector}")
+        await page.wait_for_selector(selector, timeout=timeout)
+
+    async def screenshot(self, name: str, full_page: bool = False) -> Path:
+        """
+        Take screenshot
+
+        Args:
+            name: Screenshot name (without extension)
+            full_page: Capture full scrollable page
+
+        Returns:
+            Path to screenshot file
+        """
+        page = await self.get_page()
+        screenshot_path = self.screenshots_dir / f"{name}.png"
+        logger.info(f"Taking screenshot: {screenshot_path}")
+        await page.screenshot(path=str(screenshot_path), full_page=full_page)
+        return screenshot_path
+
+    async def get_text(self, selector: str) -> str:
+        """
+        Get element text content
+
+        Args:
+            selector: CSS selector
+
+        Returns:
+            Text content
+        """
+        page = await self.get_page()
+        element = await page.query_selector(selector)
+        if element is None:
+            raise ValueError(f"Element not found: {selector}")
+        return await element.text_content() or ""
+
+    async def evaluate(self, script: str) -> any:
+        """
+        Execute JavaScript
+
+        Args:
+            script: JavaScript code
+
+        Returns:
+            Script result
+        """
+        page = await self.get_page()
+        return await page.evaluate(script)

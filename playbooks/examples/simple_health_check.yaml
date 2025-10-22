@@ -1,0 +1,53 @@
+name: "Simple Health Check"
+version: "1.0"
+description: "Basic health check for Ignition Gateway"
+
+parameters:
+  - name: gateway_url
+    type: string
+    required: true
+    description: "Gateway URL (e.g., http://localhost:8088)"
+
+  - name: gateway_credential
+    type: credential
+    required: true
+    description: "Credential name from vault"
+
+steps:
+  - id: login
+    name: "Login to Gateway"
+    type: gateway.login
+    parameters:
+      username: "{{ credential.gateway_credential.username }}"
+      password: "{{ credential.gateway_credential.password }}"
+    timeout: 30
+
+  - id: ping
+    name: "Ping Gateway"
+    type: gateway.ping
+    timeout: 10
+
+  - id: get_info
+    name: "Get Gateway Info"
+    type: gateway.get_info
+    timeout: 30
+
+  - id: get_health
+    name: "Check Gateway Health"
+    type: gateway.get_health
+    timeout: 30
+
+  - id: list_modules
+    name: "List Installed Modules"
+    type: gateway.list_modules
+    timeout: 30
+
+  - id: list_projects
+    name: "List Projects"
+    type: gateway.list_projects
+    timeout: 30
+
+  - id: logout
+    name: "Logout"
+    type: gateway.logout
+    timeout: 10

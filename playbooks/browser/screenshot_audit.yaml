@@ -1,0 +1,57 @@
+name: "Screenshot Audit"
+version: "1.0"
+description: "Capture screenshots of multiple pages for visual regression testing"
+
+parameters:
+  - name: base_url
+    type: string
+    required: true
+    description: "Base URL to audit"
+
+  - name: pages
+    type: list
+    required: false
+    default: ["/", "/about", "/contact"]
+    description: "List of page paths to capture"
+
+steps:
+  - id: log_start
+    name: "Log Audit Start"
+    type: utility.log
+    parameters:
+      message: "Starting screenshot audit"
+      level: "info"
+
+  - id: navigate_page1
+    name: "Navigate to Homepage"
+    type: browser.navigate
+    parameters:
+      url: "{{ parameter.base_url }}"
+      wait_until: "networkidle"
+    timeout: 30
+
+  - id: screenshot_page1
+    name: "Screenshot Homepage"
+    type: browser.screenshot
+    parameters:
+      name: "audit_homepage"
+      full_page: true
+    timeout: 10
+
+  - id: wait1
+    name: "Wait Between Pages"
+    type: utility.sleep
+    parameters:
+      seconds: 2
+
+  - id: log_end
+    name: "Log Audit Complete"
+    type: utility.log
+    parameters:
+      message: "Screenshot audit completed"
+      level: "info"
+
+metadata:
+  author: "Ignition Toolkit"
+  category: "browser"
+  tags: ["browser", "screenshot", "audit", "visual-regression"]
