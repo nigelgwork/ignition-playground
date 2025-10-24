@@ -33,6 +33,8 @@ export function Layout() {
               bgcolor: isWSConnected ? 'success.main' : 'error.main',
               mr: 1,
             }}
+            role="status"
+            aria-label={isWSConnected ? 'WebSocket connected' : 'WebSocket disconnected'}
           />
           <Typography variant="body2" color="inherit">
             {isWSConnected ? 'Connected' : 'Disconnected'}
@@ -53,7 +55,7 @@ export function Layout() {
       >
         <Toolbar />
         <Box sx={{ overflow: 'auto' }}>
-          <List>
+          <List aria-label="Main navigation">
             {navItems.map((item) => (
               <ListItemButton
                 key={item.path}

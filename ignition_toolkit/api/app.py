@@ -14,7 +14,7 @@ from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, Back
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, validator
 
 from ignition_toolkit.playbook.loader import PlaybookLoader
 from ignition_toolkit.playbook.engine import PlaybookEngine
@@ -85,6 +85,38 @@ class ExecutionRequest(BaseModel):
     playbook_path: str
     parameters: Dict[str, str]
     gateway_url: Optional[str] = None
+
+    @validator('parameters')
+    def validate_parameters(cls, v):
+        """Validate parameters to prevent injection attacks and DoS"""
+        # Limit number of parameters
+        if len(v) > 50:
+            raise ValueError('Too many parameters (max 50)')
+
+        # Limit value length to prevent DoS
+        for key, value in v.items():
+            if len(key) > 255:
+                raise ValueError(f'Parameter name too long (max 255 chars)')
+            if len(value) > 10000:
+                raise ValueError(f'Parameter "{key}" value too long (max 10000 chars)')
+
+            # Check for potentially dangerous characters
+            dangerous_chars = [';', '--', '/*', '*/', '<?', '?>']
+            for char in dangerous_chars:
+                if char in value:
+                    logger.warning(f'Potentially dangerous characters in parameter "{key}": {char}')
+
+        return v
+
+    @validator('gateway_url')
+    def validate_gateway_url(cls, v):
+        """Validate gateway URL format"""
+        if v is not None:
+            if not v.startswith(('http://', 'https://')):
+                raise ValueError('Gateway URL must start with http:// or https://')
+            if len(v) > 500:
+                raise ValueError('Gateway URL too long (max 500 chars)')
+        return v
 
 
 class ExecutionResponse(BaseModel):
@@ -668,6 +700,15 @@ async def broadcast_execution_state(state: ExecutionState):
 async def startup_event():
     """Initialize on startup"""
     logger.info("Ignition Automation Toolkit API started")
+
+    # Security warning for default WebSocket API key
+    ws_api_key = os.getenv("WEBSOCKET_API_KEY", "dev-key-change-in-production")
+    if ws_api_key == "dev-key-change-in-production":
+        logger.warning("=" * 80)
+        logger.warning("SECURITY WARNING: Using default WebSocket API key!")
+        logger.warning("Set WEBSOCKET_API_KEY environment variable for production")
+        logger.warning("See SECURITY.md for production deployment guidelines")
+        logger.warning("=" * 80)
 
     # Start periodic cleanup task
     async def periodic_cleanup():

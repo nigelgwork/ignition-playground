@@ -64,6 +64,7 @@ export function PlaybookCard({ playbook, onExecute }: PlaybookCardProps) {
           startIcon={<PlayIcon />}
           onClick={() => onExecute(playbook)}
           fullWidth
+          aria-label={`Execute ${playbook.name} playbook`}
         >
           Execute
         </Button>

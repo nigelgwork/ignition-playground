@@ -50,7 +50,7 @@ export function Playbooks() {
       {/* Loading state */}
       {isLoading && (
         <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
-          <CircularProgress />
+          <CircularProgress aria-label="Loading playbooks" />
         </Box>
       )}
 

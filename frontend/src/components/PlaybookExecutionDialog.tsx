@@ -10,10 +10,6 @@ import {
   DialogActions,
   Button,
   TextField,
-  FormControl,
-  FormLabel,
-  Select,
-  MenuItem,
   Box,
   Typography,
   Alert,
@@ -21,6 +17,7 @@ import {
 } from '@mui/material';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { api } from '../api/client';
+import { ParameterInput } from './ParameterInput';
 import type { PlaybookInfo, CredentialInfo } from '../types/api';
 
 interface PlaybookExecutionDialogProps {
@@ -123,52 +120,13 @@ export function PlaybookExecutionDialog({
             </Typography>
 
             {playbook.parameters.map((param) => (
-              <FormControl key={param.name} fullWidth>
-                <FormLabel sx={{ mb: 0.5, fontSize: '0.875rem' }}>
-                  {param.name}
-                  {param.required && ' *'}
-                </FormLabel>
-
-                {param.type === 'credential' ? (
-                  <Select
-                    value={parameters[param.name] || ''}
-                    onChange={(e) => handleParameterChange(param.name, e.target.value)}
-                    displayEmpty
-                    size="small"
-                  >
-                    <MenuItem value="" disabled>
-                      Select credential...
-                    </MenuItem>
-                    {credentials.map((cred) => (
-                      <MenuItem key={cred.name} value={cred.name}>
-                        {cred.name} ({cred.username})
-                      </MenuItem>
-                    ))}
-                  </Select>
-                ) : param.type === 'file' ? (
-                  <TextField
-                    value={parameters[param.name] || ''}
-                    onChange={(e) => handleParameterChange(param.name, e.target.value)}
-                    placeholder="Enter file path..."
-                    size="small"
-                    fullWidth
-                  />
-                ) : (
-                  <TextField
-                    value={parameters[param.name] || ''}
-                    onChange={(e) => handleParameterChange(param.name, e.target.value)}
-                    placeholder={param.default || `Enter ${param.name}...`}
-                    size="small"
-                    fullWidth
-                  />
-                )}
-
-                {param.description && (
-                  <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5 }}>
-                    {param.description}
-                  </Typography>
-                )}
-              </FormControl>
+              <ParameterInput
+                key={param.name}
+                parameter={param}
+                value={parameters[param.name] || ''}
+                credentials={credentials}
+                onChange={handleParameterChange}
+              />
             ))}
           </Box>
         )}
