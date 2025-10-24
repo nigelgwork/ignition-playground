@@ -112,22 +112,24 @@ export function PlaybookExecutionDialog({
           helperText="Ignition Gateway base URL"
         />
 
-        {/* Parameter inputs */}
-        {playbook.parameters.length > 0 && (
+        {/* Parameter inputs - filter out gateway_url since it's shown above */}
+        {playbook.parameters.filter(p => p.name !== 'gateway_url').length > 0 && (
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
             <Typography variant="subtitle2" color="text.secondary">
               Parameters
             </Typography>
 
-            {playbook.parameters.map((param) => (
-              <ParameterInput
-                key={param.name}
-                parameter={param}
-                value={parameters[param.name] || ''}
-                credentials={credentials}
-                onChange={handleParameterChange}
-              />
-            ))}
+            {playbook.parameters
+              .filter(param => param.name !== 'gateway_url')
+              .map((param) => (
+                <ParameterInput
+                  key={param.name}
+                  parameter={param}
+                  value={parameters[param.name] || ''}
+                  credentials={credentials}
+                  onChange={handleParameterChange}
+                />
+              ))}
           </Box>
         )}
 

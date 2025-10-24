@@ -19,31 +19,57 @@ import {
   Tooltip,
 } from '@mui/material';
 import {
-  PlayArrow as PlayIcon,
+  Settings as ConfigureIcon,
   ExpandMore as ExpandMoreIcon,
   CheckCircle as CheckIcon,
   Warning as WarningIcon,
+  Lock as LockIcon,
+  LockOpen as LockOpenIcon,
 } from '@mui/icons-material';
 import type { PlaybookInfo } from '../types/api';
 
 interface PlaybookCardProps {
   playbook: PlaybookInfo;
-  onExecute: (playbook: PlaybookInfo) => void;
+  onConfigure: (playbook: PlaybookInfo) => void;
+}
+
+// Get enabled playbooks from localStorage
+function getEnabledPlaybooks(): Set<string> {
+  const stored = localStorage.getItem('enabledPlaybooks');
+  return stored ? new Set(JSON.parse(stored)) : new Set();
+}
+
+// Save enabled playbooks to localStorage
+function saveEnabledPlaybooks(enabled: Set<string>) {
+  localStorage.setItem('enabledPlaybooks', JSON.stringify(Array.from(enabled)));
 }
 
 // Determine test status based on playbook path
 function getTestStatus(path: string): 'tested' | 'untested' | 'example' {
   if (path.includes('/examples/')) return 'example';
-  if (path.includes('/gateway/simple_health_check')) return 'tested';
-  if (path.includes('/gateway/module_upgrade')) return 'tested';
-  if (path.includes('/gateway/backup_and_restart')) return 'tested';
+  // Only Reset Gateway Trial is tested
+  if (path.includes('/gateway/reset_gateway_trial')) return 'tested';
   return 'untested'; // Default to untested for safety
 }
 
-export function PlaybookCard({ playbook, onExecute }: PlaybookCardProps) {
+export function PlaybookCard({ playbook, onConfigure }: PlaybookCardProps) {
   const [expanded, setExpanded] = useState(false);
+  const [enabledPlaybooks, setEnabledPlaybooks] = useState<Set<string>>(getEnabledPlaybooks());
+
   const testStatus = getTestStatus(playbook.path);
-  const isDisabled = testStatus === 'untested';
+  const isManuallyEnabled = enabledPlaybooks.has(playbook.path);
+  const isDisabled = testStatus === 'untested' && !isManuallyEnabled;
+
+  const handleToggleEnabled = () => {
+    const newEnabled = new Set(enabledPlaybooks);
+    if (isManuallyEnabled) {
+      newEnabled.delete(playbook.path);
+    } else {
+      newEnabled.add(playbook.path);
+    }
+    setEnabledPlaybooks(newEnabled);
+    saveEnabledPlaybooks(newEnabled);
+  };
 
   return (
     <Card
@@ -205,28 +231,38 @@ export function PlaybookCard({ playbook, onExecute }: PlaybookCardProps) {
         </Collapse>
       </CardContent>
 
-      <CardActions sx={{ pt: 0 }}>
-        <Tooltip
-          title={
-            isDisabled
-              ? 'This playbook has not been tested yet. Enable with caution.'
-              : 'Execute this playbook'
-          }
-        >
-          <span style={{ width: '100%' }}>
+      <CardActions sx={{ pt: 0, gap: 1 }}>
+        {/* Configure Button */}
+        <Tooltip title="Configure and execute this playbook">
+          <span style={{ flexGrow: 1 }}>
             <Button
               size="small"
               variant="contained"
-              startIcon={<PlayIcon />}
-              onClick={() => onExecute(playbook)}
+              startIcon={<ConfigureIcon />}
+              onClick={() => onConfigure(playbook)}
               fullWidth
               disabled={isDisabled}
-              aria-label={`Execute ${playbook.name} playbook`}
+              aria-label={`Configure ${playbook.name} playbook`}
             >
-              {isDisabled ? 'Not Tested' : 'Execute'}
+              Configure
             </Button>
           </span>
         </Tooltip>
+
+        {/* Enable/Disable Button for Untested */}
+        {testStatus === 'untested' && (
+          <Tooltip title={isManuallyEnabled ? 'Disable this playbook' : 'Enable this playbook for testing'}>
+            <Button
+              size="small"
+              variant="outlined"
+              onClick={handleToggleEnabled}
+              sx={{ minWidth: 40, px: 1 }}
+              aria-label={isManuallyEnabled ? 'Disable playbook' : 'Enable playbook'}
+            >
+              {isManuallyEnabled ? <LockOpenIcon fontSize="small" /> : <LockIcon fontSize="small" />}
+            </Button>
+          </Tooltip>
+        )}
       </CardActions>
     </Card>
   );
