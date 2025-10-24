@@ -36,10 +36,9 @@ steps:
 
   - id: step1c_wait_for_form
     name: "Step 1c: Wait for login form"
-    type: browser.verify
+    type: browser.wait
     parameters:
       selector: "input[type='text'], input[name='username'], input[placeholder*='username' i]"
-      text: ""
     timeout: 10
 
   - id: step2_login
