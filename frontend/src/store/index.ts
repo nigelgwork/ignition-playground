@@ -5,6 +5,12 @@
 import { create } from 'zustand';
 import type { ExecutionUpdate } from '../types/api';
 
+// Initialize theme from localStorage or default to 'dark'
+const getInitialTheme = (): 'dark' | 'light' => {
+  const stored = localStorage.getItem('theme');
+  return (stored === 'light' || stored === 'dark') ? stored : 'dark';
+};
+
 interface AppState {
   // Execution updates from WebSocket
   executionUpdates: Map<string, ExecutionUpdate>;
@@ -13,6 +19,10 @@ interface AppState {
   // WebSocket connection status
   isWSConnected: boolean;
   setWSConnected: (connected: boolean) => void;
+
+  // Theme mode
+  theme: 'dark' | 'light';
+  setTheme: (theme: 'dark' | 'light') => void;
 }
 
 export const useStore = create<AppState>((set) => ({
@@ -26,4 +36,10 @@ export const useStore = create<AppState>((set) => ({
 
   isWSConnected: false,
   setWSConnected: (connected) => set({ isWSConnected: connected }),
+
+  theme: getInitialTheme(),
+  setTheme: (theme) => {
+    localStorage.setItem('theme', theme);
+    set({ theme });
+  },
 }));

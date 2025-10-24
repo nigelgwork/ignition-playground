@@ -2,9 +2,30 @@
  * Main layout with navigation
  */
 
-import { Box, AppBar, Toolbar, Typography, Drawer, List, ListItemButton, ListItemText } from '@mui/material';
+import { useState, useEffect } from 'react';
+import {
+  Box,
+  AppBar,
+  Toolbar,
+  Typography,
+  Drawer,
+  List,
+  ListItemButton,
+  ListItemText,
+  IconButton,
+  Divider,
+  Chip,
+  Paper,
+  Stack,
+} from '@mui/material';
+import {
+  Brightness4 as DarkModeIcon,
+  Brightness7 as LightModeIcon,
+} from '@mui/icons-material';
 import { Link, Outlet, useLocation } from 'react-router-dom';
 import { useStore } from '../store';
+import { api } from '../api/client';
+import type { HealthResponse } from '../types/api';
 
 const DRAWER_WIDTH = 240;
 
@@ -17,14 +38,44 @@ const navItems = [
 export function Layout() {
   const location = useLocation();
   const isWSConnected = useStore((state) => state.isWSConnected);
+  const theme = useStore((state) => state.theme);
+  const setTheme = useStore((state) => state.setTheme);
+  const [version, setVersion] = useState<string>('...');
+  const [health, setHealth] = useState<'healthy' | 'unhealthy'>('healthy');
+
+  // Fetch version and health on mount
+  useEffect(() => {
+    api.health()
+      .then((data: HealthResponse) => {
+        setVersion(data.version);
+        setHealth(data.status === 'healthy' ? 'healthy' : 'unhealthy');
+      })
+      .catch(() => {
+        setHealth('unhealthy');
+      });
+  }, []);
+
+  const toggleTheme = () => {
+    setTheme(theme === 'dark' ? 'light' : 'dark');
+  };
 
   return (
     <Box sx={{ display: 'flex' }}>
       <AppBar position="fixed" sx={{ zIndex: (theme) => theme.zIndex.drawer + 1 }}>
         <Toolbar>
           <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1 }}>
-            Ignition Automation Toolkit
+            ⚡ Ignition Playground
           </Typography>
+
+          {/* Health Badge */}
+          <Chip
+            label={health === 'healthy' ? 'Healthy' : 'Unhealthy'}
+            size="small"
+            color={health === 'healthy' ? 'success' : 'error'}
+            sx={{ mr: 2 }}
+          />
+
+          {/* WebSocket Status */}
           <Box
             sx={{
               width: 12,
@@ -36,9 +87,19 @@ export function Layout() {
             role="status"
             aria-label={isWSConnected ? 'WebSocket connected' : 'WebSocket disconnected'}
           />
-          <Typography variant="body2" color="inherit">
+          <Typography variant="body2" color="inherit" sx={{ mr: 2 }}>
             {isWSConnected ? 'Connected' : 'Disconnected'}
           </Typography>
+
+          {/* Theme Toggle */}
+          <IconButton
+            onClick={toggleTheme}
+            color="inherit"
+            aria-label="Toggle theme"
+            size="small"
+          >
+            {theme === 'dark' ? <LightModeIcon /> : <DarkModeIcon />}
+          </IconButton>
         </Toolbar>
       </AppBar>
 
@@ -50,11 +111,15 @@ export function Layout() {
           '& .MuiDrawer-paper': {
             width: DRAWER_WIDTH,
             boxSizing: 'border-box',
+            display: 'flex',
+            flexDirection: 'column',
           },
         }}
       >
         <Toolbar />
-        <Box sx={{ overflow: 'auto' }}>
+
+        {/* Navigation */}
+        <Box sx={{ flexGrow: 1, overflow: 'auto' }}>
           <List aria-label="Main navigation">
             {navItems.map((item) => (
               <ListItemButton
@@ -67,6 +132,56 @@ export function Layout() {
               </ListItemButton>
             ))}
           </List>
+
+          <Divider sx={{ my: 2 }} />
+
+          {/* Stats Panel */}
+          <Box sx={{ px: 2 }}>
+            <Paper
+              elevation={0}
+              sx={{
+                p: 2,
+                backgroundColor: 'background.default',
+                border: '1px solid',
+                borderColor: 'divider',
+              }}
+            >
+              <Typography variant="caption" color="text.secondary" gutterBottom>
+                System Stats
+              </Typography>
+              <Stack spacing={1} mt={1}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <Typography variant="body2">Status:</Typography>
+                  <Typography variant="body2" color={health === 'healthy' ? 'success.main' : 'error.main'}>
+                    {health === 'healthy' ? '✓' : '✗'}
+                  </Typography>
+                </Box>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <Typography variant="body2">WebSocket:</Typography>
+                  <Typography variant="body2" color={isWSConnected ? 'success.main' : 'error.main'}>
+                    {isWSConnected ? '✓' : '✗'}
+                  </Typography>
+                </Box>
+              </Stack>
+            </Paper>
+          </Box>
+        </Box>
+
+        {/* Footer with Version */}
+        <Box
+          sx={{
+            p: 2,
+            borderTop: '1px solid',
+            borderColor: 'divider',
+            textAlign: 'center',
+          }}
+        >
+          <Typography variant="caption" color="text.secondary">
+            v{version}
+          </Typography>
+          <Typography variant="caption" display="block" color="text.secondary">
+            Ignition Playground
+          </Typography>
         </Box>
       </Drawer>
 

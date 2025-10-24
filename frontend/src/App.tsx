@@ -2,6 +2,7 @@
  * Main App component with routing and providers
  */
 
+import { useMemo } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { CssBaseline, ThemeProvider, createTheme } from '@mui/material';
@@ -23,22 +24,103 @@ const queryClient = new QueryClient({
   },
 });
 
-// Create Material-UI theme
-const theme = createTheme({
-  palette: {
-    mode: 'dark',
-    primary: {
-      main: '#1976d2',
-    },
-    secondary: {
-      main: '#dc004e',
-    },
+// Warp Terminal Color Palette
+const warpColors = {
+  dark: {
+    background: '#01050d',
+    surface: '#161b22',
+    surfaceVariant: '#0d1117',
+    border: '#30363d',
+    primary: '#58a6ff',
+    secondary: '#1f6feb',
+    success: '#3fb950',
+    warning: '#d29922',
+    error: '#f85149',
+    text: '#c9d1d9',
+    textSecondary: '#8b949e',
   },
-});
+  light: {
+    background: '#ffffff',
+    surface: '#f6f8fa',
+    surfaceVariant: '#f0f3f6',
+    border: '#d0d7de',
+    primary: '#0969da',
+    secondary: '#0550ae',
+    success: '#1a7f37',
+    warning: '#9a6700',
+    error: '#cf222e',
+    text: '#24292f',
+    textSecondary: '#57606a',
+  },
+};
 
 function AppContent() {
   const setWSConnected = useStore((state) => state.setWSConnected);
   const setExecutionUpdate = useStore((state) => state.setExecutionUpdate);
+  const themeMode = useStore((state) => state.theme);
+
+  // Create theme based on current mode from store
+  const theme = useMemo(() => {
+    const colors = warpColors[themeMode];
+
+    return createTheme({
+      palette: {
+        mode: themeMode,
+        primary: {
+          main: colors.primary,
+          light: themeMode === 'dark' ? '#79c0ff' : '#54aeff',
+          dark: colors.secondary,
+        },
+        secondary: {
+          main: colors.secondary,
+        },
+        success: {
+          main: colors.success,
+        },
+        warning: {
+          main: colors.warning,
+        },
+        error: {
+          main: colors.error,
+        },
+        background: {
+          default: colors.background,
+          paper: colors.surface,
+        },
+        text: {
+          primary: colors.text,
+          secondary: colors.textSecondary,
+        },
+        divider: colors.border,
+      },
+      components: {
+        MuiAppBar: {
+          styleOverrides: {
+            root: {
+              backgroundColor: colors.surface,
+              borderBottom: `1px solid ${colors.border}`,
+            },
+          },
+        },
+        MuiDrawer: {
+          styleOverrides: {
+            paper: {
+              backgroundColor: colors.surfaceVariant,
+              borderRight: `1px solid ${colors.border}`,
+            },
+          },
+        },
+        MuiCard: {
+          styleOverrides: {
+            root: {
+              backgroundColor: colors.surface,
+              borderColor: colors.border,
+            },
+          },
+        },
+      },
+    });
+  }, [themeMode]);
 
   // Connect to WebSocket for real-time updates
   useWebSocket({
@@ -48,13 +130,16 @@ function AppContent() {
   });
 
   return (
-    <Routes>
-      <Route path="/" element={<Layout />}>
-        <Route index element={<Playbooks />} />
-        <Route path="executions" element={<Executions />} />
-        <Route path="credentials" element={<Credentials />} />
-      </Route>
-    </Routes>
+    <ThemeProvider theme={theme}>
+      <CssBaseline />
+      <Routes>
+        <Route path="/" element={<Layout />}>
+          <Route index element={<Playbooks />} />
+          <Route path="executions" element={<Executions />} />
+          <Route path="credentials" element={<Credentials />} />
+        </Route>
+      </Routes>
+    </ThemeProvider>
   );
 }
 
@@ -62,12 +147,9 @@ export default function App() {
   return (
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
-        <ThemeProvider theme={theme}>
-          <CssBaseline />
-          <BrowserRouter>
-            <AppContent />
-          </BrowserRouter>
-        </ThemeProvider>
+        <BrowserRouter>
+          <AppContent />
+        </BrowserRouter>
       </QueryClientProvider>
     </ErrorBoundary>
   );
