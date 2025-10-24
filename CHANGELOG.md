@@ -5,6 +5,33 @@ All notable changes to the Ignition Automation Toolkit will be documented in thi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.4] - 2025-10-24
+
+### Added
+- **Live Browser Streaming**: Real-time browser screenshot streaming at 2 FPS during playbook execution
+  - BrowserManager screenshot streaming with configurable FPS and quality
+  - WebSocket broadcast of JPEG screenshots (base64 encoded)
+  - LiveBrowserView React component for displaying live browser feed
+  - ExecutionDetail page with split-pane layout (steps + live browser)
+  - ExecutionControls component (Pause/Resume/Skip/Stop buttons)
+  - Pause/resume controls affect both execution AND screenshot streaming
+  - Environment variables: SCREENSHOT_FPS, SCREENSHOT_QUALITY, SCREENSHOT_STREAMING
+
+### Changed
+- **Auto-navigation to Execution Detail**: When executing a playbook, automatically navigate to /executions/{id}
+  - Previously: Dialog closed, user stayed on Playbooks page
+  - Now: Immediately redirected to ExecutionDetail page with live browser streaming
+  - Seamless UX from configuration to execution monitoring
+
+### Fixed
+- Execute button now properly navigates to execution detail page instead of reopening configuration dialog
+
+### Technical Details
+- Backend: Screenshot callback pattern for decoupling BrowserManager from WebSocket
+- Frontend: TypeScript types for ScreenshotFrame messages
+- Performance: 2 FPS @ JPEG 80% quality = ~102 KB/s bandwidth (very feasible)
+- Playwright can handle 13+ FPS, throttled to 2 FPS for optimal bandwidth usage
+
 ## [1.0.1] - 2025-10-22
 
 ### Changed
