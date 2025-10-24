@@ -991,7 +991,8 @@
 
                 console.log('[Playbook] ' + pb.name + ' - Enabled: ' + isResetTrial + ' - Path: ' + pb.path);
 
-                return '<div class="playbook-card elevation-1 fade-in' + disabledClass + '"><div class="playbook-card-content"><h3 class="playbook-card-title">' + pb.name + '</h3><p class="playbook-card-description">' + (pb.description || 'No description available') + '</p><div class="playbook-card-meta"><span class="chip"><span class="material-icons">code</span>v' + pb.version + '</span><span class="chip"><span class="material-icons">settings</span>' + pb.parameter_count + ' params</span><span class="chip"><span class="material-icons">list</span>' + pb.step_count + ' steps</span></div></div><div class="playbook-card-actions"><button class="btn btn-primary" onclick="runPlaybook(\'' + pb.path + '\')" ' + disabledAttr + '><span class="material-icons">play_arrow</span>Run</button><button class="btn btn-outlined" onclick="configurePlaybook(\'' + pb.path + '\')" ' + disabledAttr + '><span class="material-icons">settings</span>Configure</button></div></div>';
+                // Use escapeHtml to prevent XSS
+                return '<div class="playbook-card elevation-1 fade-in' + disabledClass + '"><div class="playbook-card-content"><h3 class="playbook-card-title">' + escapeHtml(pb.name) + '</h3><p class="playbook-card-description">' + escapeHtml(pb.description || 'No description available') + '</p><div class="playbook-card-meta"><span class="chip"><span class="material-icons">code</span>v' + escapeHtml(pb.version) + '</span><span class="chip"><span class="material-icons">settings</span>' + pb.parameter_count + ' params</span><span class="chip"><span class="material-icons">list</span>' + pb.step_count + ' steps</span></div></div><div class="playbook-card-actions"><button class="btn btn-primary" onclick="runPlaybook(\'' + escapeHtml(pb.path) + '\')" ' + disabledAttr + '><span class="material-icons">play_arrow</span>Run</button><button class="btn btn-outlined" onclick="configurePlaybook(\'' + escapeHtml(pb.path) + '\')" ' + disabledAttr + '><span class="material-icons">settings</span>Configure</button></div></div>';
             }).join('');
 
             return '<div class="playbook-section"><div class="section-header" onclick="toggleSection(\'' + sectionId + '\')"><div class="section-header-left"><span>' + title + '</span><span class="section-count">' + playbooks.length + ' playbook' + (playbooks.length !== 1 ? 's' : '') + '</span></div><span class="material-icons section-icon" id="icon-' + sectionId + '">expand_more</span></div><div class="section-content" id="content-' + sectionId + '"><div class="grid">' + cards + '</div></div></div>';
@@ -1065,7 +1066,7 @@
                         const credentials = await response.json();
                         console.log('[Modal] Loaded credentials:', credentials);
                         credentialOptions += credentials.map(cred =>
-                            `<option value="${cred.name}">${cred.name}${cred.description ? ' - ' + cred.description : ''}</option>`
+                            `<option value="${escapeHtml(cred.name)}">${escapeHtml(cred.name)}${cred.description ? ' - ' + escapeHtml(cred.description) : ''}</option>`
                         ).join('');
                     } else {
                         console.error('[Modal] Failed to load credentials:', response.status);
@@ -1094,7 +1095,7 @@
 
             modalContent.innerHTML = `
                 <p style="margin-bottom: 20px; color: var(--text-secondary);">
-                    ${playbook.description || 'No description available'}
+                    ${escapeHtml(playbook.description || 'No description available')}
                 </p>
                 ${parametersHTML}
             `;

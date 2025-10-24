@@ -32,10 +32,13 @@ app = FastAPI(
     version="1.0.1",
 )
 
-# CORS middleware
+# CORS middleware - Restrict to localhost only (secure default)
+import os
+ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "http://localhost:5000,http://127.0.0.1:5000").split(",")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Configure appropriately for production
+    allow_origins=ALLOWED_ORIGINS,  # Restricted to configured origins only
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -177,13 +180,53 @@ async def get_playbook(playbook_path: str):
 
 
 # Execution endpoints
+def validate_playbook_path(path_str: str) -> Path:
+    """
+    Validate playbook path to prevent directory traversal attacks
+
+    Args:
+        path_str: User-provided playbook path
+
+    Returns:
+        Validated absolute Path
+
+    Raises:
+        HTTPException: If path is invalid or outside playbooks directory
+    """
+    playbooks_dir = Path("./playbooks").resolve()
+
+    # Resolve the provided path
+    try:
+        playbook_path = Path(path_str).resolve()
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Invalid path format: {e}")
+
+    # Check if path is within playbooks directory
+    if not playbook_path.is_relative_to(playbooks_dir):
+        raise HTTPException(
+            status_code=400,
+            detail="Playbook path must be within ./playbooks directory"
+        )
+
+    # Check file extension
+    if playbook_path.suffix not in ['.yaml', '.yml']:
+        raise HTTPException(status_code=400, detail="Playbook must be a YAML file")
+
+    # Check file exists
+    if not playbook_path.exists():
+        raise HTTPException(status_code=404, detail="Playbook file not found")
+
+    return playbook_path
+
+
 @app.post("/api/executions", response_model=ExecutionResponse)
 async def start_execution(request: ExecutionRequest, background_tasks: BackgroundTasks):
     """Start playbook execution"""
     try:
-        # Load playbook
+        # Validate and load playbook (prevents path traversal)
+        playbook_path = validate_playbook_path(request.playbook_path)
         loader = PlaybookLoader()
-        playbook = loader.load_from_file(Path(request.playbook_path))
+        playbook = loader.load_from_file(playbook_path)
 
         # Create components
         vault = CredentialVault()
@@ -480,7 +523,18 @@ async def delete_credential(name: str):
 @app.websocket("/ws/executions")
 async def websocket_endpoint(websocket: WebSocket):
     """WebSocket for real-time execution updates"""
+    # Simple authentication: check for API key in query params
+    # In production, use proper token-based auth
+    api_key = websocket.query_params.get("api_key")
+    expected_key = os.getenv("WEBSOCKET_API_KEY", "dev-key-change-in-production")
+
+    if api_key != expected_key:
+        logger.warning(f"Unauthorized WebSocket connection attempt from {websocket.client}")
+        await websocket.close(code=1008, reason="Unauthorized")
+        return
+
     await websocket.accept()
+    logger.info(f"WebSocket connection accepted from {websocket.client}")
     websocket_connections.append(websocket)
 
     try:
