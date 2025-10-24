@@ -46,10 +46,24 @@ app.add_middleware(
 
 # Global state
 active_engines: Dict[str, PlaybookEngine] = {}
+engine_completion_times: Dict[str, datetime] = {}  # Track when engines completed for TTL cleanup
 websocket_connections: List[WebSocket] = []
+
+# Configuration
+EXECUTION_TTL_MINUTES = 30  # Keep completed executions for 30 minutes
 
 
 # Pydantic models for API
+class ParameterInfo(BaseModel):
+    """Parameter definition for frontend"""
+
+    name: str
+    type: str
+    required: bool
+    default: Optional[str] = None
+    description: str = ""
+
+
 class PlaybookInfo(BaseModel):
     """Playbook metadata"""
 
@@ -59,6 +73,7 @@ class PlaybookInfo(BaseModel):
     description: str
     parameter_count: int
     step_count: int
+    parameters: List[ParameterInfo] = []
 
 
 class ExecutionRequest(BaseModel):
@@ -104,6 +119,29 @@ if frontend_path.exists():
         return {"message": "Frontend not available"}
 
 
+# TTL-based execution cleanup
+async def cleanup_old_executions():
+    """Remove completed executions older than TTL from memory"""
+    from datetime import timedelta
+
+    current_time = datetime.now()
+    ttl_delta = timedelta(minutes=EXECUTION_TTL_MINUTES)
+    to_remove = []
+
+    for exec_id, completion_time in engine_completion_times.items():
+        if current_time - completion_time > ttl_delta:
+            to_remove.append(exec_id)
+
+    for exec_id in to_remove:
+        if exec_id in active_engines:
+            logger.info(f"Removing execution {exec_id} (TTL expired)")
+            del active_engines[exec_id]
+        del engine_completion_times[exec_id]
+
+    if to_remove:
+        logger.info(f"Cleaned up {len(to_remove)} old execution(s)")
+
+
 # Health check
 @app.get("/health")
 async def health_check():
@@ -128,6 +166,19 @@ async def list_playbooks():
         try:
             loader = PlaybookLoader()
             playbook = loader.load_from_file(yaml_file)
+
+            # Convert parameters to ParameterInfo models
+            parameters = [
+                ParameterInfo(
+                    name=p.name,
+                    type=p.type.value,
+                    required=p.required,
+                    default=str(p.default) if p.default is not None else None,
+                    description=p.description,
+                )
+                for p in playbook.parameters
+            ]
+
             playbooks.append(
                 PlaybookInfo(
                     name=playbook.name,
@@ -136,6 +187,7 @@ async def list_playbooks():
                     description=playbook.description,
                     parameter_count=len(playbook.parameters),
                     step_count=len(playbook.steps),
+                    parameters=parameters,
                 )
             )
         except Exception as e:
@@ -145,36 +197,39 @@ async def list_playbooks():
     return playbooks
 
 
-@app.get("/api/playbooks/{playbook_path:path}")
+@app.get("/api/playbooks/{playbook_path:path}", response_model=PlaybookInfo)
 async def get_playbook(playbook_path: str):
-    """Get playbook details"""
+    """Get detailed playbook information including full parameter schema"""
     try:
-        loader = PlaybookLoader()
-        playbook = loader.load_from_file(Path(playbook_path))
+        # Validate path for security
+        validated_path = validate_playbook_path(playbook_path)
 
-        return {
-            "name": playbook.name,
-            "version": playbook.version,
-            "description": playbook.description,
-            "parameters": [
-                {
-                    "name": p.name,
-                    "type": p.type.value,
-                    "required": p.required,
-                    "description": p.description,
-                }
-                for p in playbook.parameters
-            ],
-            "steps": [
-                {
-                    "id": s.id,
-                    "name": s.name,
-                    "type": s.type.value,
-                    "timeout": s.timeout,
-                }
-                for s in playbook.steps
-            ],
-        }
+        loader = PlaybookLoader()
+        playbook = loader.load_from_file(validated_path)
+
+        # Convert parameters to ParameterInfo models
+        parameters = [
+            ParameterInfo(
+                name=p.name,
+                type=p.type.value,
+                required=p.required,
+                default=str(p.default) if p.default is not None else None,
+                description=p.description,
+            )
+            for p in playbook.parameters
+        ]
+
+        return PlaybookInfo(
+            name=playbook.name,
+            path=str(validated_path),
+            version=playbook.version,
+            description=playbook.description,
+            parameter_count=len(playbook.parameters),
+            step_count=len(playbook.steps),
+            parameters=parameters,
+        )
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=404, detail=f"Playbook not found: {e}")
 
@@ -278,9 +333,9 @@ async def start_execution(request: ExecutionRequest, background_tasks: Backgroun
             finally:
                 if gateway_client:
                     await gateway_client.__aexit__(None, None, None)
-                # Remove from active engines after execution completes
-                if execution_id in active_engines:
-                    del active_engines[execution_id]
+                # Mark completion time for TTL-based cleanup (don't delete immediately)
+                engine_completion_times[execution_id] = datetime.now()
+                logger.info(f"Execution {execution_id} marked for TTL cleanup")
 
         # Start execution in background
         background_tasks.add_task(run_execution)
@@ -304,6 +359,9 @@ async def list_executions(limit: int = 50, status: Optional[str] = None):
         limit: Maximum number of executions to return (default 50)
         status: Optional filter by status (running, completed, failed, etc.)
     """
+    # Cleanup old executions before listing
+    await cleanup_old_executions()
+
     executions = []
 
     # First, add all active executions
@@ -561,11 +619,17 @@ async def broadcast_execution_state(state: ExecutionState):
             "playbook_name": state.playbook_name,
             "status": state.status.value,
             "current_step_index": state.current_step_index,
+            "error": state.error,  # Overall execution error
+            "started_at": state.started_at.isoformat() if state.started_at else None,
+            "completed_at": state.completed_at.isoformat() if state.completed_at else None,
             "step_results": [
                 {
                     "step_id": r.step_id,
+                    "step_name": r.step_name,
                     "status": r.status.value,
                     "error": r.error,
+                    "started_at": r.started_at.isoformat() if r.started_at else None,
+                    "completed_at": r.completed_at.isoformat() if r.completed_at else None,
                 }
                 for r in state.step_results
             ],
@@ -592,6 +656,17 @@ async def broadcast_execution_state(state: ExecutionState):
 async def startup_event():
     """Initialize on startup"""
     logger.info("Ignition Automation Toolkit API started")
+
+    # Start periodic cleanup task
+    async def periodic_cleanup():
+        while True:
+            await asyncio.sleep(300)  # Run every 5 minutes
+            try:
+                await cleanup_old_executions()
+            except Exception as e:
+                logger.exception(f"Error in periodic cleanup: {e}")
+
+    asyncio.create_task(periodic_cleanup())
 
 
 @app.on_event("shutdown")

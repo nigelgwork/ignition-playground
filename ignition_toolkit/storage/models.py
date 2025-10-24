@@ -3,7 +3,7 @@ SQLAlchemy database models
 """
 
 from datetime import datetime, UTC
-from sqlalchemy import Column, Integer, String, DateTime, Text, ForeignKey, JSON
+from sqlalchemy import Column, Integer, String, DateTime, Text, ForeignKey, JSON, Index
 from sqlalchemy.orm import declarative_base, relationship
 
 Base = declarative_base()
@@ -34,6 +34,14 @@ class ExecutionModel(Base):
 
     # Relationships
     step_results = relationship("StepResultModel", back_populates="execution", cascade="all, delete-orphan")
+
+    # Indexes for performance
+    __table_args__ = (
+        Index('idx_executions_status', 'status'),
+        Index('idx_executions_started_at', 'started_at'),
+        Index('idx_executions_playbook_name', 'playbook_name'),
+        Index('idx_executions_status_started', 'status', 'started_at'),  # Composite index for filtered queries
+    )
 
     def to_dict(self) -> dict:
         """Convert to dictionary"""
@@ -71,6 +79,12 @@ class StepResultModel(Base):
     # Relationships
     execution = relationship("ExecutionModel", back_populates="step_results")
 
+    # Indexes for performance
+    __table_args__ = (
+        Index('idx_step_results_execution_id', 'execution_id'),
+        Index('idx_step_results_status', 'status'),
+    )
+
     def to_dict(self) -> dict:
         """Convert to dictionary"""
         return {
@@ -102,6 +116,12 @@ class PlaybookConfigModel(Base):
     parameters = Column(JSON, nullable=False)  # Saved parameter values
     created_at = Column(DateTime, default=utcnow, nullable=False)
     updated_at = Column(DateTime, default=utcnow, onupdate=utcnow, nullable=False)
+
+    # Indexes for performance
+    __table_args__ = (
+        Index('idx_playbook_configs_playbook_name', 'playbook_name'),
+        Index('idx_playbook_configs_config_name', 'config_name'),
+    )
 
     def to_dict(self) -> dict:
         """Convert to dictionary"""
