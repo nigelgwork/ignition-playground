@@ -12,6 +12,7 @@ from typing import Any, Dict, Optional, Callable
 import logging
 
 from ignition_toolkit.gateway import GatewayClient
+from ignition_toolkit.browser import BrowserManager
 from ignition_toolkit.credentials import CredentialVault
 from ignition_toolkit.storage import Database, ExecutionModel, StepResultModel
 from ignition_toolkit.playbook.models import (
@@ -60,6 +61,7 @@ class PlaybookEngine:
         credential_vault: Optional[CredentialVault] = None,
         database: Optional[Database] = None,
         state_manager: Optional[StateManager] = None,
+        screenshot_callback: Optional[Callable[[str, str], None]] = None,
     ):
         """
         Initialize playbook engine
@@ -69,11 +71,13 @@ class PlaybookEngine:
             credential_vault: Credential vault for loading credentials
             database: Database for execution tracking
             state_manager: State manager for pause/resume/skip
+            screenshot_callback: Async callback for screenshot frames (execution_id, screenshot_b64)
         """
         self.gateway_client = gateway_client
         self.credential_vault = credential_vault
         self.database = database
         self.state_manager = state_manager or StateManager()
+        self.screenshot_callback = screenshot_callback
         self._current_execution: Optional[ExecutionState] = None
         self._update_callback: Optional[Callable[[ExecutionState], None]] = None
 
@@ -137,9 +141,25 @@ class PlaybookEngine:
                 variables=execution_state.variables,
             )
 
+            # Create browser manager with screenshot streaming if callback provided
+            browser_manager = None
+            if self.screenshot_callback:
+                # Create screenshot callback that includes execution_id
+                async def screenshot_frame_callback(screenshot_b64: str):
+                    await self.screenshot_callback(execution_id, screenshot_b64)
+
+                browser_manager = BrowserManager(
+                    headless=False,  # Non-headless for visual feedback
+                    screenshot_callback=screenshot_frame_callback
+                )
+                await browser_manager.start()
+                await browser_manager.start_screenshot_streaming()
+                logger.info(f"Browser screenshot streaming started for execution {execution_id}")
+
             # Create step executor
             executor = StepExecutor(
                 gateway_client=self.gateway_client,
+                browser_manager=browser_manager,
                 parameter_resolver=resolver,
                 base_path=base_path,
             )
@@ -235,6 +255,15 @@ class PlaybookEngine:
             execution_state.completed_at = datetime.now()
 
         finally:
+            # Stop browser manager if created
+            if browser_manager:
+                try:
+                    await browser_manager.stop_screenshot_streaming()
+                    await browser_manager.stop()
+                    logger.info("Browser screenshot streaming stopped")
+                except Exception as e:
+                    logger.warning(f"Error stopping browser manager: {e}")
+
             # Notify final update
             await self._notify_update(execution_state)
 

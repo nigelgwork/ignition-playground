@@ -19,6 +19,9 @@ import {
   Tooltip,
   Switch,
   FormControlLabel,
+  IconButton,
+  Menu,
+  MenuItem,
 } from '@mui/material';
 import {
   Settings as ConfigureIcon,
@@ -26,6 +29,8 @@ import {
   ExpandMore as ExpandMoreIcon,
   CheckCircle as CheckIcon,
   Warning as WarningIcon,
+  Download as DownloadIcon,
+  MoreVert as MoreVertIcon,
 } from '@mui/icons-material';
 import type { PlaybookInfo } from '../types/api';
 
@@ -33,6 +38,7 @@ interface PlaybookCardProps {
   playbook: PlaybookInfo;
   onConfigure: (playbook: PlaybookInfo) => void;
   onExecute?: (playbook: PlaybookInfo) => void;
+  onExport?: (playbook: PlaybookInfo) => void;
 }
 
 // Get enabled playbooks from localStorage
@@ -66,10 +72,11 @@ function getTestStatus(path: string): 'tested' | 'untested' | 'example' {
   return 'untested'; // Default to untested for safety
 }
 
-export function PlaybookCard({ playbook, onConfigure, onExecute }: PlaybookCardProps) {
+export function PlaybookCard({ playbook, onConfigure, onExecute, onExport }: PlaybookCardProps) {
   const [expanded, setExpanded] = useState(false);
   const [enabledPlaybooks, setEnabledPlaybooks] = useState<Set<string>>(getEnabledPlaybooks());
   const [savedConfig, setSavedConfig] = useState<SavedConfig | null>(getSavedConfigPreview(playbook.path));
+  const [menuAnchor, setMenuAnchor] = useState<null | HTMLElement>(null);
 
   const testStatus = getTestStatus(playbook.path);
   const isManuallyEnabled = enabledPlaybooks.has(playbook.path);
@@ -119,6 +126,17 @@ export function PlaybookCard({ playbook, onConfigure, onExecute }: PlaybookCardP
           <Typography variant="h6" gutterBottom sx={{ flexGrow: 1 }}>
             {playbook.name}
           </Typography>
+
+          {/* Menu Button */}
+          {onExport && (
+            <IconButton
+              size="small"
+              onClick={(e) => setMenuAnchor(e.currentTarget)}
+              sx={{ ml: 1 }}
+            >
+              <MoreVertIcon fontSize="small" />
+            </IconButton>
+          )}
 
           {/* Test Status Icon */}
           {(testStatus === 'tested' || testStatus === 'untested') && (
@@ -337,6 +355,23 @@ export function PlaybookCard({ playbook, onConfigure, onExecute }: PlaybookCardP
           </Tooltip>
         </Box>
       </CardActions>
+
+      {/* Menu for Export and other options */}
+      <Menu
+        anchorEl={menuAnchor}
+        open={Boolean(menuAnchor)}
+        onClose={() => setMenuAnchor(null)}
+      >
+        <MenuItem
+          onClick={() => {
+            setMenuAnchor(null);
+            onExport?.(playbook);
+          }}
+        >
+          <DownloadIcon fontSize="small" sx={{ mr: 1 }} />
+          Export Playbook
+        </MenuItem>
+      </Menu>
     </Card>
   );
 }

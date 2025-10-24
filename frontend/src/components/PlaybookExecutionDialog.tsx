@@ -232,7 +232,7 @@ export function PlaybookExecutionDialog({
         <Button
           onClick={handleSaveConfig}
           variant="outlined"
-          disabled={!isValid || configSaved}
+          disabled={configSaved}
           startIcon={<SaveIcon />}
         >
           Save Config

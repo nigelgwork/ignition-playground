@@ -12,8 +12,15 @@ import {
   Accordion,
   AccordionSummary,
   AccordionDetails,
+  Button,
+  IconButton,
+  Tooltip,
 } from '@mui/material';
-import { ExpandMore as ExpandMoreIcon } from '@mui/icons-material';
+import {
+  ExpandMore as ExpandMoreIcon,
+  Upload as UploadIcon,
+  Refresh as RefreshIcon,
+} from '@mui/icons-material';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../api/client';
 import { PlaybookCard } from '../components/PlaybookCard';
@@ -72,15 +79,84 @@ export function Playbooks() {
   // Categorize playbooks
   const categories = categorizePlaybooks(playbooks);
 
+  const handleExport = (playbook: PlaybookInfo) => {
+    // Create download link for playbook export
+    const exportData = {
+      name: playbook.name,
+      path: playbook.path,
+      version: playbook.version,
+      description: playbook.description,
+      message: 'To import this playbook, use the Import button and select this JSON file.',
+    };
+
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${playbook.name.replace(/\s+/g, '_')}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleImport = () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json';
+    input.onchange = (e: Event) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          try {
+            const data = JSON.parse(event.target?.result as string);
+            alert(`Import playbook: ${data.name}\n\nNote: This is a reference. The actual playbook YAML file must be copied to:\n${data.path}\n\nSee documentation for import instructions.`);
+          } catch (error) {
+            alert('Invalid JSON file');
+          }
+        };
+        reader.readAsText(file);
+      }
+    };
+    input.click();
+  };
+
   return (
     <Box>
-      <Typography variant="h4" gutterBottom>
-        Playbooks
-      </Typography>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 3 }}>
+        <Box>
+          <Typography variant="h4" gutterBottom>
+            Playbooks
+          </Typography>
+          <Typography variant="body1" color="text.secondary">
+            Select a playbook to configure and execute
+          </Typography>
+        </Box>
 
-      <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
-        Select a playbook to configure and execute
-      </Typography>
+        <Box sx={{ display: 'flex', gap: 1 }}>
+          <Tooltip title="Import playbook reference">
+            <Button
+              variant="outlined"
+              startIcon={<UploadIcon />}
+              onClick={handleImport}
+              size="small"
+            >
+              Import
+            </Button>
+          </Tooltip>
+
+          <Tooltip title="Refresh playbook list">
+            <IconButton
+              onClick={() => window.location.reload()}
+              size="small"
+              color="primary"
+            >
+              <RefreshIcon />
+            </IconButton>
+          </Tooltip>
+        </Box>
+      </Box>
 
       {/* Loading state */}
       {isLoading && (
@@ -130,6 +206,7 @@ export function Playbooks() {
                       playbook={playbook}
                       onConfigure={handleConfigure}
                       onExecute={handleExecute}
+                      onExport={handleExport}
                     />
                   ))}
                 </Box>
@@ -165,6 +242,7 @@ export function Playbooks() {
                       playbook={playbook}
                       onConfigure={handleConfigure}
                       onExecute={handleExecute}
+                      onExport={handleExport}
                     />
                   ))}
                 </Box>
@@ -200,6 +278,7 @@ export function Playbooks() {
                       playbook={playbook}
                       onConfigure={handleConfigure}
                       onExecute={handleExecute}
+                      onExport={handleExport}
                     />
                   ))}
                 </Box>

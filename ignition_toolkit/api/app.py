@@ -315,11 +315,16 @@ async def start_execution(request: ExecutionRequest, background_tasks: Backgroun
         if request.gateway_url:
             gateway_client = GatewayClient(request.gateway_url)
 
+        # Create screenshot callback for browser streaming
+        async def screenshot_callback(execution_id: str, screenshot_b64: str):
+            await broadcast_screenshot_frame(execution_id, screenshot_b64)
+
         # Create engine
         engine = PlaybookEngine(
             gateway_client=gateway_client,
             credential_vault=vault,
             database=database,
+            screenshot_callback=screenshot_callback,
         )
 
         # Set up WebSocket broadcast callback
@@ -668,6 +673,41 @@ async def broadcast_execution_state(state: ExecutionState):
             await websocket.send_json(message)
         except Exception as e:
             logger.warning(f"Failed to send to WebSocket client: {e}")
+            disconnected.append(websocket)
+
+    # Remove disconnected clients
+    for ws in disconnected:
+        if ws in websocket_connections:
+            websocket_connections.remove(ws)
+
+
+async def broadcast_screenshot_frame(execution_id: str, screenshot_b64: str):
+    """
+    Broadcast screenshot frame to all connected WebSocket clients
+
+    Args:
+        execution_id: Execution ID this screenshot belongs to
+        screenshot_b64: Base64-encoded JPEG screenshot data
+    """
+    if not websocket_connections:
+        return
+
+    message = {
+        "type": "screenshot_frame",
+        "data": {
+            "execution_id": execution_id,
+            "screenshot": screenshot_b64,
+            "timestamp": datetime.now().isoformat()
+        }
+    }
+
+    # Send to all connected clients
+    disconnected = []
+    for websocket in websocket_connections:
+        try:
+            await websocket.send_json(message)
+        except Exception as e:
+            logger.warning(f"Failed to send screenshot to WebSocket client: {e}")
             disconnected.append(websocket)
 
     # Remove disconnected clients
