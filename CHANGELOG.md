@@ -5,6 +5,22 @@ All notable changes to the Ignition Automation Toolkit will be documented in thi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.5] - 2025-10-24
+
+### Fixed
+- **Execute Button UX**: Major improvement to playbook execution workflow
+  - Execute button now disabled when no saved configuration exists (tooltip: "Configure this playbook first")
+  - Execute button now directly executes with saved config instead of opening dialog
+  - No need to fill form again for repeat executions
+  - Automatically navigates to execution detail page with live browser streaming
+  - Configure button opens dialog to edit/save configuration
+  - Clear separation: Configure to setup, Execute to run
+
+### Technical Details
+- Playbooks.tsx: handleExecute() reads localStorage, calls API directly, navigates to /executions/{id}
+- PlaybookCard.tsx: Execute button disabled when !savedConfig
+- Defensive fallback: Opens config dialog if somehow no saved config exists
+
 ## [1.0.4] - 2025-10-24
 
 ### Added
