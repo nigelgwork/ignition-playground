@@ -58,16 +58,30 @@
 
 ---
 
-## 📋 REMAINING TASKS
+## ✅ COMPLETED
 
-### Phase 1.4: Execution State Controls (2-3 hours)
-**Files to modify:**
-- `ignition_toolkit/playbook/engine.py` - Add pause/resume/skip state
-- `ignition_toolkit/api/app.py` - Add control endpoints:
-  - `POST /api/executions/{id}/pause`
-  - `POST /api/executions/{id}/resume`
-  - `POST /api/executions/{id}/skip`
-  - `POST /api/executions/{id}/stop`
+### Phase 1.4: Execution State Controls (DONE)
+**Files Modified:**
+1. `ignition_toolkit/playbook/engine.py`:
+   - Added `_browser_manager` instance variable
+   - Enhanced `pause()` to also pause screenshot streaming
+   - Enhanced `resume()` to also resume screenshot streaming
+   - Cleanup browser reference in finally block
+
+**How It Works:**
+- Pause freezes both execution AND browser screenshots
+- Resume continues both execution AND screenshot streaming
+- Existing API endpoints now control browser streaming too:
+  - `POST /api/executions/{id}/pause` (line 475)
+  - `POST /api/executions/{id}/resume` (line 487)
+  - `POST /api/executions/{id}/skip` (line 499)
+  - `POST /api/executions/{id}/cancel` (line 511)
+
+**Committed:** Yes (git hash: 8d77f51)
+
+---
+
+## 📋 REMAINING TASKS
 
 ### Phase 2: Frontend React Components (4-5 hours)
 **Files to create:**

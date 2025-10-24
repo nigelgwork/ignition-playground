@@ -8,8 +8,15 @@ import type { WebSocketMessage, ExecutionUpdate } from '../types/api';
 const WS_URL = import.meta.env.VITE_WS_URL || 'ws://localhost:5000/ws/executions';
 const WS_API_KEY = import.meta.env.VITE_WS_API_KEY || 'dev-key-change-in-production';
 
+interface ScreenshotFrame {
+  executionId: string;
+  screenshot: string;
+  timestamp: string;
+}
+
 interface UseWebSocketOptions {
   onExecutionUpdate?: (update: ExecutionUpdate) => void;
+  onScreenshotFrame?: (frame: ScreenshotFrame) => void;
   onError?: (error: Event) => void;
   onOpen?: () => void;
   onClose?: () => void;
@@ -18,7 +25,7 @@ interface UseWebSocketOptions {
 export function useWebSocket(options: UseWebSocketOptions = {}) {
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<number | undefined>(undefined);
-  const { onExecutionUpdate, onError, onOpen, onClose } = options;
+  const { onExecutionUpdate, onScreenshotFrame, onError, onOpen, onClose } = options;
 
   const connect = useCallback(() => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
@@ -39,6 +46,8 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
 
           if (message.type === 'execution_update' && message.data) {
             onExecutionUpdate?.(message.data);
+          } else if (message.type === 'screenshot_frame' && message.data) {
+            onScreenshotFrame?.(message.data as ScreenshotFrame);
           } else if (message.type === 'error') {
             console.error('[WebSocket] Error:', message.error);
           }
@@ -67,7 +76,7 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
     } catch (error) {
       console.error('[WebSocket] Connection failed:', error);
     }
-  }, [onExecutionUpdate, onError, onOpen, onClose]);
+  }, [onExecutionUpdate, onScreenshotFrame, onError, onOpen, onClose]);
 
   const disconnect = useCallback(() => {
     if (reconnectTimeoutRef.current) {

@@ -10,6 +10,7 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import { Layout } from './components/Layout';
 import { Playbooks } from './pages/Playbooks';
 import { Executions } from './pages/Executions';
+import { ExecutionDetail } from './pages/ExecutionDetail';
 import { Credentials } from './pages/Credentials';
 import { useWebSocket } from './hooks/useWebSocket';
 import { useStore } from './store';
@@ -57,6 +58,7 @@ const warpColors = {
 function AppContent() {
   const setWSConnected = useStore((state) => state.setWSConnected);
   const setExecutionUpdate = useStore((state) => state.setExecutionUpdate);
+  const setScreenshotFrame = useStore((state) => state.setScreenshotFrame);
   const themeMode = useStore((state) => state.theme);
 
   // Create theme based on current mode from store
@@ -127,6 +129,7 @@ function AppContent() {
     onOpen: () => setWSConnected(true),
     onClose: () => setWSConnected(false),
     onExecutionUpdate: (update) => setExecutionUpdate(update.execution_id, update),
+    onScreenshotFrame: (frame) => setScreenshotFrame(frame.executionId, frame),
   });
 
   return (
@@ -136,6 +139,7 @@ function AppContent() {
         <Route path="/" element={<Layout />}>
           <Route index element={<Playbooks />} />
           <Route path="executions" element={<Executions />} />
+          <Route path="executions/:executionId" element={<ExecutionDetail />} />
           <Route path="credentials" element={<Credentials />} />
         </Route>
       </Routes>

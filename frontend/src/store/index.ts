@@ -11,10 +11,20 @@ const getInitialTheme = (): 'dark' | 'light' => {
   return (stored === 'light' || stored === 'dark') ? stored : 'dark';
 };
 
+interface ScreenshotFrame {
+  executionId: string;
+  screenshot: string; // base64 encoded JPEG
+  timestamp: string;
+}
+
 interface AppState {
   // Execution updates from WebSocket
   executionUpdates: Map<string, ExecutionUpdate>;
   setExecutionUpdate: (executionId: string, update: ExecutionUpdate) => void;
+
+  // Screenshot frames from WebSocket
+  currentScreenshots: Map<string, ScreenshotFrame>;
+  setScreenshotFrame: (executionId: string, frame: ScreenshotFrame) => void;
 
   // WebSocket connection status
   isWSConnected: boolean;
@@ -32,6 +42,14 @@ export const useStore = create<AppState>((set) => ({
       const newUpdates = new Map(state.executionUpdates);
       newUpdates.set(executionId, update);
       return { executionUpdates: newUpdates };
+    }),
+
+  currentScreenshots: new Map(),
+  setScreenshotFrame: (executionId, frame) =>
+    set((state) => {
+      const newScreenshots = new Map(state.currentScreenshots);
+      newScreenshots.set(executionId, frame);
+      return { currentScreenshots: newScreenshots };
     }),
 
   isWSConnected: false,
