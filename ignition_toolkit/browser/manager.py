@@ -1,16 +1,23 @@
 """
 Browser manager - Playwright browser automation
 
-Handles browser lifecycle and basic operations.
+Handles browser lifecycle and basic operations with screenshot streaming.
 """
 
 import asyncio
+import base64
 import logging
+import os
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Callable, Awaitable
 from playwright.async_api import async_playwright, Browser, BrowserContext, Page
 
 logger = logging.getLogger(__name__)
+
+# Screenshot streaming configuration
+SCREENSHOT_FPS = int(os.getenv("SCREENSHOT_FPS", "2"))  # 2 frames per second
+SCREENSHOT_QUALITY = int(os.getenv("SCREENSHOT_QUALITY", "80"))  # JPEG quality 0-100
+SCREENSHOT_ENABLED = os.getenv("SCREENSHOT_STREAMING", "true").lower() == "true"
 
 
 class BrowserManager:
@@ -29,6 +36,7 @@ class BrowserManager:
         headless: bool = False,
         slow_mo: int = 0,
         screenshots_dir: Optional[Path] = None,
+        screenshot_callback: Optional[Callable[[str], Awaitable[None]]] = None,
     ):
         """
         Initialize browser manager
@@ -37,16 +45,23 @@ class BrowserManager:
             headless: Run browser in headless mode
             slow_mo: Slow down operations by milliseconds
             screenshots_dir: Directory for saving screenshots
+            screenshot_callback: Async function to call with base64 screenshot data
         """
         self.headless = headless
         self.slow_mo = slow_mo
         self.screenshots_dir = screenshots_dir or Path("./data/screenshots")
         self.screenshots_dir.mkdir(parents=True, exist_ok=True)
+        self.screenshot_callback = screenshot_callback
 
         self._playwright = None
         self._browser: Optional[Browser] = None
         self._context: Optional[BrowserContext] = None
         self._page: Optional[Page] = None
+
+        # Screenshot streaming state
+        self._streaming_task: Optional[asyncio.Task] = None
+        self._streaming_active = False
+        self._streaming_paused = False
 
     async def __aenter__(self):
         """Async context manager entry"""
@@ -212,3 +227,98 @@ class BrowserManager:
         """
         page = await self.get_page()
         return await page.evaluate(script)
+
+    async def start_screenshot_streaming(self) -> None:
+        """
+        Start streaming screenshots to callback function
+
+        Captures screenshots at configured FPS and sends base64-encoded
+        JPEG data to the callback function.
+        """
+        if not SCREENSHOT_ENABLED:
+            logger.info("Screenshot streaming disabled by configuration")
+            return
+
+        if not self.screenshot_callback:
+            logger.warning("No screenshot callback configured, streaming disabled")
+            return
+
+        if self._streaming_task is not None:
+            logger.warning("Screenshot streaming already active")
+            return
+
+        self._streaming_active = True
+        self._streaming_paused = False
+        self._streaming_task = asyncio.create_task(self._screenshot_streaming_loop())
+        logger.info(f"Screenshot streaming started at {SCREENSHOT_FPS} FPS")
+
+    async def stop_screenshot_streaming(self) -> None:
+        """Stop screenshot streaming"""
+        if self._streaming_task is None:
+            return
+
+        self._streaming_active = False
+        self._streaming_task.cancel()
+
+        try:
+            await self._streaming_task
+        except asyncio.CancelledError:
+            pass
+
+        self._streaming_task = None
+        logger.info("Screenshot streaming stopped")
+
+    def pause_screenshot_streaming(self) -> None:
+        """Pause screenshot streaming (freeze current frame)"""
+        self._streaming_paused = True
+        logger.info("Screenshot streaming paused")
+
+    def resume_screenshot_streaming(self) -> None:
+        """Resume screenshot streaming"""
+        self._streaming_paused = False
+        logger.info("Screenshot streaming resumed")
+
+    async def _screenshot_streaming_loop(self) -> None:
+        """
+        Internal loop for capturing and streaming screenshots
+
+        Runs continuously at configured FPS until stopped.
+        """
+        page = await self.get_page()
+        frame_interval = 1.0 / SCREENSHOT_FPS
+
+        logger.info(f"Screenshot streaming loop started (interval: {frame_interval:.3f}s)")
+
+        while self._streaming_active:
+            try:
+                frame_start = asyncio.get_event_loop().time()
+
+                # Only capture if not paused
+                if not self._streaming_paused:
+                    # Capture screenshot
+                    screenshot_bytes = await page.screenshot(
+                        type='jpeg',
+                        quality=SCREENSHOT_QUALITY,
+                        full_page=False  # Viewport only for performance
+                    )
+
+                    # Encode to base64
+                    screenshot_b64 = base64.b64encode(screenshot_bytes).decode()
+
+                    # Send to callback
+                    if self.screenshot_callback:
+                        await self.screenshot_callback(screenshot_b64)
+
+                # Calculate sleep time to maintain FPS
+                frame_elapsed = asyncio.get_event_loop().time() - frame_start
+                sleep_time = max(0, frame_interval - frame_elapsed)
+
+                await asyncio.sleep(sleep_time)
+
+            except asyncio.CancelledError:
+                logger.info("Screenshot streaming loop cancelled")
+                break
+            except Exception as e:
+                logger.error(f"Error in screenshot streaming: {e}")
+                # Continue streaming despite errors
+                await asyncio.sleep(frame_interval)
