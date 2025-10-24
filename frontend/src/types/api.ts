@@ -29,6 +29,12 @@ export interface PlaybookInfo {
   step_count: number;
   parameters: ParameterInfo[];
   steps: StepInfo[];
+  // Metadata fields
+  revision: number;
+  verified: boolean;
+  enabled: boolean;
+  last_modified: string | null;
+  verified_at: string | null;
 }
 
 export interface ExecutionRequest {

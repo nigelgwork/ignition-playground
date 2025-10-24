@@ -11,30 +11,37 @@ import {
   Button,
   Chip,
   Box,
-  Collapse,
   Divider,
   List,
   ListItem,
   ListItemText,
   Tooltip,
-  Switch,
-  FormControlLabel,
   IconButton,
   Menu,
   MenuItem,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Snackbar,
 } from '@mui/material';
 import {
   Settings as ConfigureIcon,
   PlayArrow as PlayIcon,
-  ExpandMore as ExpandMoreIcon,
   CheckCircle as CheckIcon,
   Warning as WarningIcon,
   Download as DownloadIcon,
   MoreVert as MoreVertIcon,
   List as ViewStepsIcon,
+  Verified as VerifiedIcon,
+  ToggleOn as EnableIcon,
+  ToggleOff as DisableIcon,
+  Info as InfoIcon,
 } from '@mui/icons-material';
 import type { PlaybookInfo } from '../types/api';
 import { useStore } from '../store';
+import { api } from '../api/client';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 
 interface PlaybookCardProps {
   playbook: PlaybookInfo;
@@ -42,17 +49,6 @@ interface PlaybookCardProps {
   onExecute?: (playbook: PlaybookInfo) => void;
   onExport?: (playbook: PlaybookInfo) => void;
   onViewSteps?: (playbook: PlaybookInfo) => void;
-}
-
-// Get enabled playbooks from localStorage
-function getEnabledPlaybooks(): Set<string> {
-  const stored = localStorage.getItem('enabledPlaybooks');
-  return stored ? new Set(JSON.parse(stored)) : new Set();
-}
-
-// Save enabled playbooks to localStorage
-function saveEnabledPlaybooks(enabled: Set<string>) {
-  localStorage.setItem('enabledPlaybooks', JSON.stringify(Array.from(enabled)));
 }
 
 // Get saved config for preview
@@ -76,15 +72,16 @@ function getTestStatus(path: string): 'tested' | 'untested' | 'example' {
 }
 
 export function PlaybookCard({ playbook, onConfigure, onExecute, onExport, onViewSteps }: PlaybookCardProps) {
-  const [expanded, setExpanded] = useState(false);
-  const [enabledPlaybooks, setEnabledPlaybooks] = useState<Set<string>>(getEnabledPlaybooks());
+  const queryClient = useQueryClient();
   const [savedConfig, setSavedConfig] = useState<SavedConfig | null>(getSavedConfigPreview(playbook.path));
   const [menuAnchor, setMenuAnchor] = useState<null | HTMLElement>(null);
+  const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
+  const [snackbarMessage, setSnackbarMessage] = useState('');
+  const [snackbarOpen, setSnackbarOpen] = useState(false);
   const selectedCredential = useStore((state) => state.selectedCredential);
 
   const testStatus = getTestStatus(playbook.path);
-  const isManuallyEnabled = enabledPlaybooks.has(playbook.path);
-  const isDisabled = testStatus === 'untested' && !isManuallyEnabled;
+  const isDisabled = !playbook.enabled;
 
   // Check for saved config updates periodically
   useEffect(() => {
@@ -94,16 +91,65 @@ export function PlaybookCard({ playbook, onConfigure, onExecute, onExport, onVie
     return () => clearInterval(interval);
   }, [playbook.path]);
 
-  const handleToggleEnabled = () => {
-    const newEnabled = new Set(enabledPlaybooks);
-    if (isManuallyEnabled) {
-      newEnabled.delete(playbook.path);
-    } else {
-      newEnabled.add(playbook.path);
-    }
-    setEnabledPlaybooks(newEnabled);
-    saveEnabledPlaybooks(newEnabled);
-  };
+  // Mutation for verifying playbook
+  const verifyMutation = useMutation({
+    mutationFn: () => api.playbooks.verify(playbook.path),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['playbooks'] });
+      setSnackbarMessage('Playbook marked as verified');
+      setSnackbarOpen(true);
+      setMenuAnchor(null);
+    },
+    onError: (error) => {
+      setSnackbarMessage(`Failed to verify: ${(error as Error).message}`);
+      setSnackbarOpen(true);
+    },
+  });
+
+  // Mutation for unverifying playbook
+  const unverifyMutation = useMutation({
+    mutationFn: () => api.playbooks.unverify(playbook.path),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['playbooks'] });
+      setSnackbarMessage('Playbook verification removed');
+      setSnackbarOpen(true);
+      setMenuAnchor(null);
+    },
+    onError: (error) => {
+      setSnackbarMessage(`Failed to unverify: ${(error as Error).message}`);
+      setSnackbarOpen(true);
+    },
+  });
+
+  // Mutation for enabling playbook
+  const enableMutation = useMutation({
+    mutationFn: () => api.playbooks.enable(playbook.path),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['playbooks'] });
+      setSnackbarMessage('Playbook enabled');
+      setSnackbarOpen(true);
+      setMenuAnchor(null);
+    },
+    onError: (error) => {
+      setSnackbarMessage(`Failed to enable: ${(error as Error).message}`);
+      setSnackbarOpen(true);
+    },
+  });
+
+  // Mutation for disabling playbook
+  const disableMutation = useMutation({
+    mutationFn: () => api.playbooks.disable(playbook.path),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['playbooks'] });
+      setSnackbarMessage('Playbook disabled');
+      setSnackbarOpen(true);
+      setMenuAnchor(null);
+    },
+    onError: (error) => {
+      setSnackbarMessage(`Failed to disable: ${(error as Error).message}`);
+      setSnackbarOpen(true);
+    },
+  });
 
   const handleExecuteClick = () => {
     if (onExecute) {
@@ -178,7 +224,7 @@ export function PlaybookCard({ playbook, onConfigure, onExecute, onExport, onVie
 
         <Box sx={{ display: 'flex', gap: 1, mb: 1, flexWrap: 'wrap' }}>
           <Chip
-            label={`v${playbook.version}`}
+            label={`v${playbook.version}.r${playbook.revision}`}
             size="small"
             color="primary"
             variant="outlined"
@@ -195,11 +241,20 @@ export function PlaybookCard({ playbook, onConfigure, onExecute, onExport, onVie
               variant="outlined"
             />
           )}
-          {testStatus === 'untested' && (
+          {playbook.verified && (
             <Chip
-              label="Untested"
+              icon={<VerifiedIcon />}
+              label="Verified"
               size="small"
-              color="warning"
+              color="success"
+              variant="outlined"
+            />
+          )}
+          {!playbook.enabled && (
+            <Chip
+              label="Disabled"
+              size="small"
+              color="error"
               variant="outlined"
             />
           )}
@@ -226,41 +281,159 @@ export function PlaybookCard({ playbook, onConfigure, onExecute, onExport, onVie
           </Box>
         )}
 
-        {/* Expandable Details Section */}
-        <Box sx={{ mt: 1 }}>
-          <Button
-            size="small"
-            onClick={() => setExpanded(!expanded)}
-            endIcon={
-              <ExpandMoreIcon
-                sx={{
-                  transform: expanded ? 'rotate(180deg)' : 'rotate(0deg)',
-                  transition: 'transform 0.3s',
-                }}
-              />
-            }
-            sx={{ textTransform: 'none', p: 0, minWidth: 0 }}
-          >
-            <Typography variant="caption">
-              {expanded ? 'Hide' : 'Show'} Details
-            </Typography>
-          </Button>
-        </Box>
+      </CardContent>
 
-        <Collapse in={expanded} timeout="auto">
-          <Divider sx={{ my: 1 }} />
+      <CardActions sx={{ pt: 0, gap: 1 }}>
+        {/* Configure Button */}
+        <Tooltip title="Configure parameters for this playbook">
+          <span style={{ flex: 1 }}>
+            <Button
+              size="small"
+              variant="outlined"
+              startIcon={<ConfigureIcon />}
+              onClick={() => onConfigure(playbook)}
+              fullWidth
+              disabled={isDisabled}
+              aria-label={`Configure ${playbook.name} playbook`}
+            >
+              Configure
+            </Button>
+          </span>
+        </Tooltip>
+
+        {/* Execute Button */}
+        <Tooltip title={
+          isDisabled ? 'Enable this playbook first' :
+          selectedCredential ? `Execute with global credential: ${selectedCredential.name}` :
+          savedConfig ? 'Execute with saved configuration' :
+          'Select a global credential or configure this playbook first'
+        }>
+          <span style={{ flex: 1 }}>
+            <Button
+              size="small"
+              variant="contained"
+              startIcon={<PlayIcon />}
+              onClick={handleExecuteClick}
+              fullWidth
+              disabled={isDisabled || (!savedConfig && !selectedCredential)}
+              aria-label={`Execute ${playbook.name} playbook`}
+            >
+              Execute
+            </Button>
+          </span>
+        </Tooltip>
+      </CardActions>
+
+      {/* Menu for all options */}
+      <Menu
+        anchorEl={menuAnchor}
+        open={Boolean(menuAnchor)}
+        onClose={() => setMenuAnchor(null)}
+      >
+        {/* Show Details */}
+        <MenuItem
+          onClick={() => {
+            setMenuAnchor(null);
+            setDetailsDialogOpen(true);
+          }}
+        >
+          <InfoIcon fontSize="small" sx={{ mr: 1 }} />
+          Show Details
+        </MenuItem>
+
+        <Divider />
+
+        {/* Verify/Unverify */}
+        {playbook.verified ? (
+          <MenuItem
+            onClick={() => unverifyMutation.mutate()}
+            disabled={unverifyMutation.isPending}
+          >
+            <VerifiedIcon fontSize="small" sx={{ mr: 1 }} />
+            Remove Verification
+          </MenuItem>
+        ) : (
+          <MenuItem
+            onClick={() => verifyMutation.mutate()}
+            disabled={verifyMutation.isPending}
+          >
+            <VerifiedIcon fontSize="small" sx={{ mr: 1 }} />
+            Mark as Verified
+          </MenuItem>
+        )}
+
+        {/* Enable/Disable */}
+        {playbook.enabled ? (
+          <MenuItem
+            onClick={() => disableMutation.mutate()}
+            disabled={disableMutation.isPending}
+          >
+            <DisableIcon fontSize="small" sx={{ mr: 1 }} />
+            Disable Playbook
+          </MenuItem>
+        ) : (
+          <MenuItem
+            onClick={() => enableMutation.mutate()}
+            disabled={enableMutation.isPending}
+          >
+            <EnableIcon fontSize="small" sx={{ mr: 1 }} />
+            Enable Playbook
+          </MenuItem>
+        )}
+
+        <Divider />
+
+        {/* View All Steps */}
+        {onViewSteps && (
+          <MenuItem
+            onClick={() => {
+              setMenuAnchor(null);
+              onViewSteps(playbook);
+            }}
+          >
+            <ViewStepsIcon fontSize="small" sx={{ mr: 1 }} />
+            View All Steps
+          </MenuItem>
+        )}
+
+        {/* Export */}
+        <MenuItem
+          onClick={() => {
+            setMenuAnchor(null);
+            onExport?.(playbook);
+          }}
+        >
+          <DownloadIcon fontSize="small" sx={{ mr: 1 }} />
+          Export Playbook
+        </MenuItem>
+      </Menu>
+
+      {/* Details Dialog */}
+      <Dialog
+        open={detailsDialogOpen}
+        onClose={() => setDetailsDialogOpen(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>{playbook.name} - Details</DialogTitle>
+        <DialogContent>
           <Box sx={{ mt: 1 }}>
             <Typography variant="caption" color="text.secondary" fontWeight="bold">
               Steps ({playbook.step_count}):
             </Typography>
             <List dense sx={{ py: 0 }}>
               {playbook.steps && playbook.steps.length > 0 ? (
-                playbook.steps.slice(0, 5).map((step, index) => (
+                playbook.steps.map((step, index) => (
                   <ListItem key={step.id} sx={{ py: 0.5 }}>
                     <ListItemText
                       primary={
                         <Typography variant="caption" color="text.secondary">
                           {index + 1}. {step.name}
+                        </Typography>
+                      }
+                      secondary={
+                        <Typography variant="caption" color="text.secondary">
+                          Type: {step.type} | Timeout: {step.timeout}s
                         </Typography>
                       }
                     />
@@ -277,22 +450,11 @@ export function PlaybookCard({ playbook, onConfigure, onExecute, onExport, onVie
                   />
                 </ListItem>
               )}
-              {playbook.steps && playbook.steps.length > 5 && (
-                <ListItem sx={{ py: 0.5 }}>
-                  <ListItemText
-                    primary={
-                      <Typography variant="caption" color="primary" fontStyle="italic">
-                        + {playbook.steps.length - 5} more steps...
-                      </Typography>
-                    }
-                  />
-                </ListItem>
-              )}
             </List>
 
             {playbook.parameter_count > 0 && (
               <>
-                <Typography variant="caption" color="text.secondary" fontWeight="bold" sx={{ mt: 1 }}>
+                <Typography variant="caption" color="text.secondary" fontWeight="bold" sx={{ mt: 2 }}>
                   Required Parameters:
                 </Typography>
                 <List dense sx={{ py: 0 }}>
@@ -317,100 +479,32 @@ export function PlaybookCard({ playbook, onConfigure, onExecute, onExport, onVie
                 </List>
               </>
             )}
+
+            {playbook.verified && playbook.verified_at && (
+              <Box sx={{ mt: 2, p: 1, bgcolor: 'success.dark', borderRadius: 1 }}>
+                <Typography variant="caption" color="success.light" fontWeight="bold">
+                  Verified
+                </Typography>
+                <Typography variant="caption" color="success.light" sx={{ display: 'block' }}>
+                  At: {new Date(playbook.verified_at).toLocaleString()}
+                </Typography>
+              </Box>
+            )}
           </Box>
-        </Collapse>
-      </CardContent>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDetailsDialogOpen(false)}>Close</Button>
+        </DialogActions>
+      </Dialog>
 
-      <CardActions sx={{ pt: 0, gap: 1, flexDirection: 'column', alignItems: 'stretch' }}>
-        {/* Enable/Disable Switch - Always available at top */}
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', px: 1 }}>
-          <Typography variant="caption" color="text.secondary">
-            {testStatus === 'tested' ? 'Tested' : 'Enable for testing'}
-          </Typography>
-          <FormControlLabel
-            control={
-              <Switch
-                checked={isManuallyEnabled || testStatus === 'tested'}
-                onChange={handleToggleEnabled}
-                disabled={testStatus === 'tested'}
-                size="small"
-              />
-            }
-            label=""
-            sx={{ m: 0 }}
-          />
-        </Box>
-
-        {/* Button Row */}
-        <Box sx={{ display: 'flex', gap: 1 }}>
-          {/* Configure Button */}
-          <Tooltip title="Configure parameters for this playbook">
-            <span style={{ flex: 1 }}>
-              <Button
-                size="small"
-                variant="outlined"
-                startIcon={<ConfigureIcon />}
-                onClick={() => onConfigure(playbook)}
-                fullWidth
-                disabled={isDisabled}
-                aria-label={`Configure ${playbook.name} playbook`}
-              >
-                Configure
-              </Button>
-            </span>
-          </Tooltip>
-
-          {/* Execute Button */}
-          <Tooltip title={
-            isDisabled ? 'Enable this playbook first' :
-            selectedCredential ? `Execute with global credential: ${selectedCredential.name}` :
-            savedConfig ? 'Execute with saved configuration' :
-            'Select a global credential or configure this playbook first'
-          }>
-            <span style={{ flex: 1 }}>
-              <Button
-                size="small"
-                variant="contained"
-                startIcon={<PlayIcon />}
-                onClick={handleExecuteClick}
-                fullWidth
-                disabled={isDisabled || (!savedConfig && !selectedCredential)}
-                aria-label={`Execute ${playbook.name} playbook`}
-              >
-                Execute
-              </Button>
-            </span>
-          </Tooltip>
-        </Box>
-      </CardActions>
-
-      {/* Menu for Export and other options */}
-      <Menu
-        anchorEl={menuAnchor}
-        open={Boolean(menuAnchor)}
-        onClose={() => setMenuAnchor(null)}
-      >
-        {onViewSteps && (
-          <MenuItem
-            onClick={() => {
-              setMenuAnchor(null);
-              onViewSteps(playbook);
-            }}
-          >
-            <ViewStepsIcon fontSize="small" sx={{ mr: 1 }} />
-            View All Steps
-          </MenuItem>
-        )}
-        <MenuItem
-          onClick={() => {
-            setMenuAnchor(null);
-            onExport?.(playbook);
-          }}
-        >
-          <DownloadIcon fontSize="small" sx={{ mr: 1 }} />
-          Export Playbook
-        </MenuItem>
-      </Menu>
+      {/* Snackbar for notifications */}
+      <Snackbar
+        open={snackbarOpen}
+        autoHideDuration={4000}
+        onClose={() => setSnackbarOpen(false)}
+        message={snackbarMessage}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+      />
     </Card>
   );
 }

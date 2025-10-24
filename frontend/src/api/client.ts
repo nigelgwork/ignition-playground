@@ -73,6 +73,26 @@ export const api = {
           }),
         }
       ),
+    verify: (path: string) =>
+      fetchJSON<{ status: string; playbook_path: string; verified: boolean; verified_at: string; message: string }>(
+        `/api/playbooks/${encodeURIComponent(path)}/verify`,
+        { method: 'POST' }
+      ),
+    unverify: (path: string) =>
+      fetchJSON<{ status: string; playbook_path: string; verified: boolean; message: string }>(
+        `/api/playbooks/${encodeURIComponent(path)}/unverify`,
+        { method: 'POST' }
+      ),
+    enable: (path: string) =>
+      fetchJSON<{ status: string; playbook_path: string; enabled: boolean; message: string }>(
+        `/api/playbooks/${encodeURIComponent(path)}/enable`,
+        { method: 'POST' }
+      ),
+    disable: (path: string) =>
+      fetchJSON<{ status: string; playbook_path: string; enabled: boolean; message: string }>(
+        `/api/playbooks/${encodeURIComponent(path)}/disable`,
+        { method: 'POST' }
+      ),
   },
 
   /**
