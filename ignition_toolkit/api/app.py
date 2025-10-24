@@ -1114,7 +1114,7 @@ async def broadcast_screenshot_frame(execution_id: str, screenshot_b64: str):
     message = {
         "type": "screenshot_frame",
         "data": {
-            "execution_id": execution_id,
+            "executionId": execution_id,  # camelCase to match frontend
             "screenshot": screenshot_b64,
             "timestamp": datetime.now().isoformat()
         }

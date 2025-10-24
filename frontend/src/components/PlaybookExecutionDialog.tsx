@@ -278,7 +278,7 @@ export function PlaybookExecutionDialog({
 
       <DialogActions sx={{ gap: 1, flexWrap: 'wrap' }}>
         <Button onClick={onClose} disabled={executeMutation.isPending}>
-          Cancel
+          {configSaved ? 'Close' : 'Cancel'}
         </Button>
 
         <Box sx={{ flexGrow: 1 }} />

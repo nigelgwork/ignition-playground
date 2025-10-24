@@ -24,7 +24,7 @@ steps:
     name: "Step 1: Open Gateway Webpage"
     type: browser.navigate
     parameters:
-      url: "{{ gateway_url }}"
+      url: "{{ parameter.gateway_url }}"
     timeout: 30
 
   - id: step1b_screenshot_initial
@@ -46,7 +46,7 @@ steps:
     type: browser.fill
     parameters:
       selector: "input[type='text'], input[name='username'], input[placeholder*='username' i]"
-      value: "{{ username }}"
+      value: "{{ parameter.username }}"
     timeout: 10
 
   - id: step2b_password
@@ -54,7 +54,7 @@ steps:
     type: browser.fill
     parameters:
       selector: "input[type='password'], input[name='password']"
-      value: "{{ password }}"
+      value: "{{ parameter.password }}"
     timeout: 10
 
   - id: step2c_screenshot_before_submit

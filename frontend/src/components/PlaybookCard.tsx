@@ -37,6 +37,7 @@ import {
   ToggleOn as EnableIcon,
   ToggleOff as DisableIcon,
   Info as InfoIcon,
+  Close as ClearIcon,
 } from '@mui/icons-material';
 import type { PlaybookInfo } from '../types/api';
 import { useStore } from '../store';
@@ -267,17 +268,33 @@ export function PlaybookCard({ playbook, onConfigure, onExecute, onExport, onVie
         {/* Saved Configuration Preview */}
         {savedConfig && (
           <Box sx={{ mt: 1, mb: 2, p: 1, bgcolor: 'success.dark', borderRadius: 1, border: '1px solid', borderColor: 'success.main' }}>
-            <Typography variant="caption" color="success.light" fontWeight="bold">
-              ✓ Configured
-            </Typography>
-            <Typography variant="caption" color="success.light" sx={{ display: 'block' }}>
-              Gateway: {savedConfig.gatewayUrl}
-            </Typography>
-            {Object.keys(savedConfig.parameters).length > 0 && (
-              <Typography variant="caption" color="success.light" sx={{ display: 'block' }}>
-                {Object.keys(savedConfig.parameters).length} parameter(s) set
-              </Typography>
-            )}
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+              <Box sx={{ flexGrow: 1 }}>
+                <Typography variant="caption" color="success.light" fontWeight="bold">
+                  ✓ Configured
+                </Typography>
+                <Typography variant="caption" color="success.light" sx={{ display: 'block' }}>
+                  Gateway: {savedConfig.gatewayUrl}
+                </Typography>
+                {Object.keys(savedConfig.parameters).length > 0 && (
+                  <Typography variant="caption" color="success.light" sx={{ display: 'block' }}>
+                    {Object.keys(savedConfig.parameters).length} parameter(s) set
+                  </Typography>
+                )}
+              </Box>
+              <Tooltip title="Clear manual config (use global credential instead)">
+                <IconButton
+                  size="small"
+                  onClick={() => {
+                    localStorage.removeItem(`playbook_config_${playbook.path}`);
+                    setSavedConfig(null);
+                  }}
+                  sx={{ color: 'success.light', ml: 1, mt: -0.5 }}
+                >
+                  <ClearIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+            </Box>
           </Box>
         )}
 

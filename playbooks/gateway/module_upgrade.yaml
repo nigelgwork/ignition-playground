@@ -8,10 +8,15 @@ parameters:
     required: true
     description: "Gateway URL (e.g., http://localhost:8088)"
 
-  - name: gateway_credential
-    type: credential
+  - name: username
+    type: string
     required: true
-    description: "Credential name from vault"
+    description: "Gateway admin username"
+
+  - name: password
+    type: string
+    required: true
+    description: "Gateway admin password"
 
   - name: module_file
     type: file
@@ -28,8 +33,9 @@ steps:
     name: "Login to Gateway"
     type: gateway.login
     parameters:
-      username: "{{ credential.gateway_credential.username }}"
-      password: "{{ credential.gateway_credential.password }}"
+      url: "{{ parameter.gateway_url }}"
+      username: "{{ parameter.username }}"
+      password: "{{ parameter.password }}"
     timeout: 30
 
   - id: list_modules_before
