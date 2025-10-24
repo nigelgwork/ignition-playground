@@ -26,6 +26,7 @@ import {
   Snackbar,
   Checkbox,
   FormControlLabel,
+  TextField,
 } from '@mui/material';
 import {
   Settings as ConfigureIcon,
@@ -41,6 +42,9 @@ import {
   Info as InfoIcon,
   Close as ClearIcon,
   BugReport as DebugIcon,
+  Edit as EditIcon,
+  Check as SaveIcon,
+  Cancel as CancelIcon,
 } from '@mui/icons-material';
 import type { PlaybookInfo } from '../types/api';
 import { useStore } from '../store';
@@ -86,6 +90,9 @@ export function PlaybookCard({ playbook, onConfigure, onExecute, onExport, onVie
     const stored = localStorage.getItem(`playbook_debug_${playbook.path}`);
     return stored === 'true';
   });
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editedName, setEditedName] = useState(playbook.name);
+  const [editedDescription, setEditedDescription] = useState(playbook.description);
   const selectedCredential = useStore((state) => state.selectedCredential);
 
   const testStatus = getTestStatus(playbook.path);
@@ -159,6 +166,36 @@ export function PlaybookCard({ playbook, onConfigure, onExecute, onExport, onVie
     },
   });
 
+  // Mutation for updating playbook metadata
+  const updateMetadataMutation = useMutation({
+    mutationFn: ({ name, description }: { name?: string; description?: string }) =>
+      api.playbooks.updateMetadata(playbook.path, name, description),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['playbooks'] });
+      setSnackbarMessage('Playbook updated successfully');
+      setSnackbarOpen(true);
+      setEditDialogOpen(false);
+    },
+    onError: (error) => {
+      setSnackbarMessage(`Failed to update: ${(error as Error).message}`);
+      setSnackbarOpen(true);
+    },
+  });
+
+  const handleOpenEditDialog = () => {
+    setEditedName(playbook.name);
+    setEditedDescription(playbook.description);
+    setEditDialogOpen(true);
+    setMenuAnchor(null);
+  };
+
+  const handleSaveEdit = () => {
+    updateMetadataMutation.mutate({
+      name: editedName !== playbook.name ? editedName : undefined,
+      description: editedDescription !== playbook.description ? editedDescription : undefined,
+    });
+  };
+
   const handleDebugModeToggle = (event: React.ChangeEvent<HTMLInputElement>) => {
     const newDebugMode = event.target.checked;
     setDebugMode(newDebugMode);
@@ -181,22 +218,56 @@ export function PlaybookCard({ playbook, onConfigure, onExecute, onExport, onVie
         height: '100%',
         display: 'flex',
         flexDirection: 'column',
-        opacity: isDisabled ? 0.6 : 1,
+        position: 'relative',
+        opacity: isDisabled ? 0.4 : 1,
         border: '2px solid',
-        borderColor: isDisabled ? 'warning.main' : 'divider',
+        borderColor: isDisabled ? 'error.main' : 'divider',
         borderRadius: 2,
-        backgroundColor: 'background.paper',
+        backgroundColor: isDisabled ? 'grey.900' : 'background.paper',
         transition: 'all 0.3s ease-in-out',
-        '&:hover': {
+        '&:hover': isDisabled ? {} : {
           transform: 'translateY(-6px)',
           boxShadow: (theme) => theme.shadows[12],
           borderColor: 'primary.main',
           borderWidth: '3px',
           backgroundColor: 'action.hover',
         },
-        cursor: 'grab',
+        cursor: isDisabled ? 'not-allowed' : 'grab',
+        filter: isDisabled ? 'grayscale(1)' : 'none',
       }}
     >
+      {/* Disabled overlay */}
+      {isDisabled && (
+        <Box
+          sx={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.7)',
+            zIndex: 1,
+            borderRadius: 2,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            pointerEvents: 'none',
+          }}
+        >
+          <Chip
+            label="DISABLED"
+            color="error"
+            size="medium"
+            sx={{
+              fontSize: '1.5rem',
+              fontWeight: 'bold',
+              py: 2.5,
+              px: 4,
+              height: 'auto',
+            }}
+          />
+        </Box>
+      )}
       <CardContent sx={{ flexGrow: 1, pb: 0 }}>
         <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
           <Typography variant="h6" gutterBottom sx={{ flexGrow: 1 }}>
@@ -394,6 +465,14 @@ export function PlaybookCard({ playbook, onConfigure, onExecute, onExport, onVie
 
         <Divider />
 
+        {/* Edit Playbook */}
+        <MenuItem onClick={handleOpenEditDialog}>
+          <EditIcon fontSize="small" sx={{ mr: 1 }} />
+          Edit Playbook
+        </MenuItem>
+
+        <Divider />
+
         {/* Verify/Unverify */}
         {playbook.verified ? (
           <MenuItem
@@ -458,6 +537,51 @@ export function PlaybookCard({ playbook, onConfigure, onExecute, onExport, onVie
           Export Playbook
         </MenuItem>
       </Menu>
+
+      {/* Edit Dialog */}
+      <Dialog
+        open={editDialogOpen}
+        onClose={() => setEditDialogOpen(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>Edit Playbook</DialogTitle>
+        <DialogContent>
+          <Box sx={{ mt: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <TextField
+              label="Playbook Name"
+              value={editedName}
+              onChange={(e) => setEditedName(e.target.value)}
+              fullWidth
+              variant="outlined"
+              size="small"
+            />
+            <TextField
+              label="Description"
+              value={editedDescription}
+              onChange={(e) => setEditedDescription(e.target.value)}
+              fullWidth
+              multiline
+              rows={3}
+              variant="outlined"
+              size="small"
+            />
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setEditDialogOpen(false)} startIcon={<CancelIcon />}>
+            Cancel
+          </Button>
+          <Button
+            onClick={handleSaveEdit}
+            variant="contained"
+            startIcon={<SaveIcon />}
+            disabled={updateMetadataMutation.isPending || (editedName === playbook.name && editedDescription === playbook.description)}
+          >
+            {updateMetadataMutation.isPending ? 'Saving...' : 'Save'}
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {/* Details Dialog */}
       <Dialog

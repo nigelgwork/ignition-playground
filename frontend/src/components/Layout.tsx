@@ -64,7 +64,7 @@ export function Layout() {
   return (
     <Box sx={{ display: 'flex' }}>
       <AppBar position="fixed" sx={{ zIndex: (theme) => theme.zIndex.drawer + 1 }}>
-        <Toolbar>
+        <Toolbar sx={{ minHeight: '51px !important', height: '51px' }}>
           <Typography variant="h6" noWrap component="div">
             ⚡ Ignition Playground
           </Typography>

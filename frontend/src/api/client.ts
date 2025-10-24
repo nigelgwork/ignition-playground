@@ -93,6 +93,14 @@ export const api = {
         `/api/playbooks/${encodeURIComponent(path)}/disable`,
         { method: 'POST' }
       ),
+    updateMetadata: (path: string, name?: string, description?: string) =>
+      fetchJSON<{ status: string; playbook_path: string; name: string; description: string; revision: number; message: string }>(
+        '/api/playbooks/metadata',
+        {
+          method: 'PATCH',
+          body: JSON.stringify({ playbook_path: path, name, description }),
+        }
+      ),
   },
 
   /**

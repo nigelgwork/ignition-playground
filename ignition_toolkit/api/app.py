@@ -838,6 +838,67 @@ async def update_playbook(request: PlaybookUpdateRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+class PlaybookMetadataUpdateRequest(BaseModel):
+    """Request to update playbook name and description"""
+    playbook_path: str
+    name: Optional[str] = None
+    description: Optional[str] = None
+
+
+@app.patch("/api/playbooks/metadata")
+async def update_playbook_metadata(request: PlaybookMetadataUpdateRequest):
+    """
+    Update playbook name and/or description in YAML file
+    """
+    try:
+        # Validate and resolve playbook path
+        playbook_path = validate_playbook_path(request.playbook_path)
+
+        if not playbook_path.exists():
+            raise HTTPException(status_code=404, detail="Playbook not found")
+
+        # Read current YAML
+        import yaml
+        with open(playbook_path, 'r') as f:
+            playbook_data = yaml.safe_load(f)
+
+        # Update name and/or description
+        if request.name is not None:
+            playbook_data['name'] = request.name
+        if request.description is not None:
+            playbook_data['description'] = request.description
+
+        # Create backup
+        from datetime import datetime
+        backup_path = playbook_path.with_suffix(f".backup.{datetime.now().strftime('%Y%m%d_%H%M%S')}.yaml")
+        backup_path.write_text(playbook_path.read_text())
+
+        # Write updated YAML
+        with open(playbook_path, 'w') as f:
+            yaml.safe_dump(playbook_data, f, default_flow_style=False, sort_keys=False)
+
+        # Increment revision
+        metadata_store.increment_revision(request.playbook_path)
+        meta = metadata_store.get_metadata(request.playbook_path)
+
+        logger.info(f"Updated playbook metadata: {playbook_path}")
+
+        return {
+            "status": "success",
+            "playbook_path": str(request.playbook_path),
+            "name": playbook_data.get('name'),
+            "description": playbook_data.get('description'),
+            "revision": meta.revision,
+            "message": "Playbook metadata updated successfully"
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception(f"Error updating playbook metadata: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # Credential management endpoints
 class CredentialInfo(BaseModel):
     """Credential information (without password)"""

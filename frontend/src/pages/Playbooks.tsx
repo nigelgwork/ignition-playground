@@ -334,12 +334,12 @@ export function Playbooks() {
 
   return (
     <Box>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5, py: 0.5 }}>
         <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 2 }}>
-          <Typography variant="h5">
+          <Typography variant="h5" sx={{ fontSize: '1.3rem' }}>
             Playbooks
           </Typography>
-          <Typography variant="body2" color="text.secondary">
+          <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.8rem' }}>
             Select a playbook to configure and execute
           </Typography>
         </Box>
@@ -406,8 +406,8 @@ export function Playbooks() {
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
           {/* Gateway Section */}
           <Accordion defaultExpanded>
-            <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-              <Typography variant="h6">🔧 Gateway ({gatewayPlaybooks.length})</Typography>
+            <AccordionSummary expandIcon={<ExpandMoreIcon />} sx={{ minHeight: '32px !important', '& .MuiAccordionSummary-content': { my: '6px !important' } }}>
+              <Typography variant="h6" sx={{ fontSize: '1.1rem' }}>🔧 Gateway ({gatewayPlaybooks.length})</Typography>
             </AccordionSummary>
             <AccordionDetails>
               {gatewayPlaybooks.length > 0 ? (
@@ -448,8 +448,8 @@ export function Playbooks() {
 
           {/* Designer Section - Always shown */}
           <Accordion defaultExpanded>
-            <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-              <Typography variant="h6">🎨 Designer ({designerPlaybooks.length})</Typography>
+            <AccordionSummary expandIcon={<ExpandMoreIcon />} sx={{ minHeight: '32px !important', '& .MuiAccordionSummary-content': { my: '6px !important' } }}>
+              <Typography variant="h6" sx={{ fontSize: '1.1rem' }}>🎨 Designer ({designerPlaybooks.length})</Typography>
             </AccordionSummary>
             <AccordionDetails>
               {designerPlaybooks.length > 0 ? (
@@ -490,8 +490,8 @@ export function Playbooks() {
 
           {/* Perspective Section */}
           <Accordion defaultExpanded>
-            <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-              <Typography variant="h6">📱 Perspective ({perspectivePlaybooks.length})</Typography>
+            <AccordionSummary expandIcon={<ExpandMoreIcon />} sx={{ minHeight: '32px !important', '& .MuiAccordionSummary-content': { my: '6px !important' } }}>
+              <Typography variant="h6" sx={{ fontSize: '1.1rem' }}>📱 Perspective ({perspectivePlaybooks.length})</Typography>
             </AccordionSummary>
             <AccordionDetails>
               {perspectivePlaybooks.length > 0 ? (

@@ -6,7 +6,6 @@ import { useState, useEffect } from 'react';
 import {
   Box,
   FormControl,
-  InputLabel,
   Select,
   MenuItem,
   Chip,
@@ -109,14 +108,15 @@ export function GlobalCredentialSelector() {
   }, [selectedCredential]);
 
   return (
-    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, minWidth: 300 }}>
+    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, minWidth: 300 }}>
+      <Typography variant="caption" color="text.secondary" sx={{ whiteSpace: 'nowrap', fontSize: '0.75rem' }}>
+        Global Credentials:
+      </Typography>
       <FormControl size="small" sx={{ flex: 1, minWidth: 200 }}>
-        <InputLabel id="global-credential-label">Global Credentials</InputLabel>
         <Select
           labelId="global-credential-label"
           id="global-credential-select"
           value={selectedCredential?.name || ''}
-          label="Global Credentials"
           onChange={(e) => handleSelect(e.target.value)}
         >
           <MenuItem value="">
