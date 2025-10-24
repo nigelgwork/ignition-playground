@@ -196,6 +196,10 @@ export function Playbooks() {
     const savedConfigKey = `playbook_config_${playbook.path}`;
     const savedConfigStr = localStorage.getItem(savedConfigKey);
 
+    // Get debug mode preference
+    const debugModeStr = localStorage.getItem(`playbook_debug_${playbook.path}`);
+    const debug_mode = debugModeStr === 'true';
+
     // If global credential is selected, execute directly with it
     if (selectedCredential && !savedConfigStr) {
       try {
@@ -204,6 +208,7 @@ export function Playbooks() {
           parameters: {}, // Backend will auto-fill from credential
           gateway_url: selectedCredential.gateway_url,
           credential_name: selectedCredential.name,
+          debug_mode,
         });
 
         // Navigate to execution detail page
@@ -230,6 +235,7 @@ export function Playbooks() {
         playbook_path: playbook.path,
         parameters: savedConfig.parameters,
         gateway_url: savedConfig.gatewayUrl,
+        debug_mode,
       });
 
       // Navigate to execution detail page

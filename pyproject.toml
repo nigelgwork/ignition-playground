@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ignition-toolkit"
-version = "1.0.21"  # Updated: 2025-10-24 - Clear config button, parameter standardization, Close button UX
+version = "1.0.22"  # Updated: 2025-10-24 - Debug mode toggle on playbook cards
 description = "Lightweight automation toolkit for Ignition SCADA Gateway operations"
 readme = "README.md"
 requires-python = ">=3.10"

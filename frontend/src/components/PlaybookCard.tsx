@@ -24,6 +24,8 @@ import {
   DialogContent,
   DialogActions,
   Snackbar,
+  Checkbox,
+  FormControlLabel,
 } from '@mui/material';
 import {
   Settings as ConfigureIcon,
@@ -38,6 +40,7 @@ import {
   ToggleOff as DisableIcon,
   Info as InfoIcon,
   Close as ClearIcon,
+  BugReport as DebugIcon,
 } from '@mui/icons-material';
 import type { PlaybookInfo } from '../types/api';
 import { useStore } from '../store';
@@ -79,6 +82,10 @@ export function PlaybookCard({ playbook, onConfigure, onExecute, onExport, onVie
   const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
   const [snackbarOpen, setSnackbarOpen] = useState(false);
+  const [debugMode, setDebugMode] = useState(() => {
+    const stored = localStorage.getItem(`playbook_debug_${playbook.path}`);
+    return stored === 'true';
+  });
   const selectedCredential = useStore((state) => state.selectedCredential);
 
   const testStatus = getTestStatus(playbook.path);
@@ -151,6 +158,12 @@ export function PlaybookCard({ playbook, onConfigure, onExecute, onExport, onVie
       setSnackbarOpen(true);
     },
   });
+
+  const handleDebugModeToggle = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const newDebugMode = event.target.checked;
+    setDebugMode(newDebugMode);
+    localStorage.setItem(`playbook_debug_${playbook.path}`, newDebugMode.toString());
+  };
 
   const handleExecuteClick = () => {
     if (onExecute) {
@@ -297,6 +310,27 @@ export function PlaybookCard({ playbook, onConfigure, onExecute, onExport, onVie
             </Box>
           </Box>
         )}
+
+        {/* Debug Mode Toggle */}
+        <Box sx={{ mt: 1, display: 'flex', alignItems: 'center' }}>
+          <FormControlLabel
+            control={
+              <Checkbox
+                checked={debugMode}
+                onChange={handleDebugModeToggle}
+                size="small"
+                disabled={isDisabled}
+                icon={<DebugIcon />}
+                checkedIcon={<DebugIcon />}
+              />
+            }
+            label={
+              <Typography variant="caption" color={debugMode ? 'primary' : 'text.secondary'}>
+                Debug Mode {debugMode ? 'ON' : 'OFF'}
+              </Typography>
+            }
+          />
+        </Box>
 
       </CardContent>
 

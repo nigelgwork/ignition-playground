@@ -42,6 +42,7 @@ export interface ExecutionRequest {
   parameters: Record<string, string>;
   gateway_url?: string;
   credential_name?: string;
+  debug_mode?: boolean;
 }
 
 export interface ExecutionResponse {

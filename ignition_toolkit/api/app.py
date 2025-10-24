@@ -114,6 +114,7 @@ class ExecutionRequest(BaseModel):
     parameters: Dict[str, str]
     gateway_url: Optional[str] = None
     credential_name: Optional[str] = None  # Name of saved credential to use
+    debug_mode: Optional[bool] = False  # Enable debug mode for this execution
 
     @validator('parameters')
     def validate_parameters(cls, v):
@@ -444,6 +445,11 @@ async def start_execution(request: ExecutionRequest, background_tasks: Backgroun
 
         # Store engine with real execution ID immediately
         active_engines[execution_id] = engine
+
+        # Enable debug mode if requested
+        if request.debug_mode:
+            engine.enable_debug(execution_id)
+            logger.info(f"Debug mode enabled for execution {execution_id}")
 
         # Start execution in background
         async def run_execution():

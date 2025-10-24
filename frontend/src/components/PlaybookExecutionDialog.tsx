@@ -78,7 +78,7 @@ export function PlaybookExecutionDialog({
 
   // Execute playbook mutation
   const executeMutation = useMutation({
-    mutationFn: (params: { playbook_path: string; parameters: Record<string, string>; gateway_url?: string }) =>
+    mutationFn: (params: { playbook_path: string; parameters: Record<string, string>; gateway_url?: string; debug_mode?: boolean }) =>
       api.executions.start(params),
     onSuccess: (data) => {
       onExecutionStarted?.(data.execution_id);
@@ -165,10 +165,15 @@ export function PlaybookExecutionDialog({
   };
 
   const handleExecute = () => {
+    // Get debug mode preference from localStorage
+    const debugModeStr = localStorage.getItem(`playbook_debug_${playbook.path}`);
+    const debug_mode = debugModeStr === 'true';
+
     executeMutation.mutate({
       playbook_path: playbook.path,
       parameters,
       gateway_url: gatewayUrl,
+      debug_mode,
     });
   };
 
