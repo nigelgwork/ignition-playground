@@ -192,8 +192,8 @@ export function Layout() {
         </Box>
       </Drawer>
 
-      <Box component="main" sx={{ flexGrow: 1, p: 3, minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
-        <Toolbar />
+      <Box component="main" sx={{ flexGrow: 1, p: 3, pt: 1.5, minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+        <Toolbar sx={{ minHeight: '51px !important', height: '51px' }} />
         <Box sx={{ flexGrow: 1 }}>
           <Outlet />
         </Box>

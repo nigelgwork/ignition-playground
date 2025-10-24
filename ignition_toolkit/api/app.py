@@ -218,6 +218,9 @@ async def list_playbooks():
 
     playbooks = []
     for yaml_file in playbooks_dir.rglob("*.yaml"):
+        # Skip backup files
+        if '.backup.' in yaml_file.name:
+            continue
         try:
             loader = PlaybookLoader()
             playbook = loader.load_from_file(yaml_file)

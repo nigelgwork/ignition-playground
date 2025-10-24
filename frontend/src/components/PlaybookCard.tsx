@@ -24,7 +24,7 @@ import {
   DialogContent,
   DialogActions,
   Snackbar,
-  Checkbox,
+  Switch,
   FormControlLabel,
   TextField,
 } from '@mui/material';
@@ -219,11 +219,11 @@ export function PlaybookCard({ playbook, onConfigure, onExecute, onExport, onVie
         display: 'flex',
         flexDirection: 'column',
         position: 'relative',
-        opacity: isDisabled ? 0.4 : 1,
-        border: '2px solid',
+        opacity: isDisabled ? 0.3 : 1,
+        border: isDisabled ? '4px solid' : '2px solid',
         borderColor: isDisabled ? 'error.main' : 'divider',
         borderRadius: 2,
-        backgroundColor: isDisabled ? 'grey.900' : 'background.paper',
+        backgroundColor: isDisabled ? '#1a0000' : 'background.paper',
         transition: 'all 0.3s ease-in-out',
         '&:hover': isDisabled ? {} : {
           transform: 'translateY(-6px)',
@@ -233,7 +233,7 @@ export function PlaybookCard({ playbook, onConfigure, onExecute, onExport, onVie
           backgroundColor: 'action.hover',
         },
         cursor: isDisabled ? 'not-allowed' : 'grab',
-        filter: isDisabled ? 'grayscale(1)' : 'none',
+        filter: isDisabled ? 'grayscale(100%) brightness(0.4)' : 'none',
       }}
     >
       {/* Disabled overlay */}
@@ -245,27 +245,42 @@ export function PlaybookCard({ playbook, onConfigure, onExecute, onExport, onVie
             left: 0,
             right: 0,
             bottom: 0,
-            backgroundColor: 'rgba(0, 0, 0, 0.7)',
+            backgroundColor: 'rgba(0, 0, 0, 0.85)',
             zIndex: 1,
             borderRadius: 2,
             display: 'flex',
+            flexDirection: 'column',
             alignItems: 'center',
             justifyContent: 'center',
             pointerEvents: 'none',
+            gap: 2,
           }}
         >
+          <Box
+            sx={{
+              fontSize: '4rem',
+              filter: 'grayscale(100%)',
+            }}
+          >
+            🚫
+          </Box>
           <Chip
             label="DISABLED"
             color="error"
             size="medium"
             sx={{
-              fontSize: '1.5rem',
+              fontSize: '1.8rem',
               fontWeight: 'bold',
-              py: 2.5,
-              px: 4,
+              py: 3,
+              px: 5,
               height: 'auto',
+              border: '3px solid',
+              borderColor: 'error.main',
             }}
           />
+          <Typography variant="caption" color="error.light" sx={{ fontSize: '0.9rem', fontWeight: 'bold' }}>
+            Enable to use this playbook
+          </Typography>
         </Box>
       )}
       <CardContent sx={{ flexGrow: 1, pb: 0 }}>
@@ -383,21 +398,21 @@ export function PlaybookCard({ playbook, onConfigure, onExecute, onExport, onVie
         )}
 
         {/* Debug Mode Toggle */}
-        <Box sx={{ mt: 1, display: 'flex', alignItems: 'center' }}>
+        <Box sx={{ mt: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
+          <DebugIcon fontSize="small" color={debugMode ? 'primary' : 'disabled'} />
           <FormControlLabel
             control={
-              <Checkbox
+              <Switch
                 checked={debugMode}
                 onChange={handleDebugModeToggle}
                 size="small"
                 disabled={isDisabled}
-                icon={<DebugIcon />}
-                checkedIcon={<DebugIcon />}
+                color="primary"
               />
             }
             label={
-              <Typography variant="caption" color={debugMode ? 'primary' : 'text.secondary'}>
-                Debug Mode {debugMode ? 'ON' : 'OFF'}
+              <Typography variant="caption" color={debugMode ? 'primary' : 'text.secondary'} fontWeight={debugMode ? 'bold' : 'normal'}>
+                Debug Mode
               </Typography>
             }
           />
