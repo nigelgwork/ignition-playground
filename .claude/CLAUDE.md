@@ -2,47 +2,57 @@
 
 This file provides guidance to Claude Code when working with the Ignition Automation Toolkit.
 
+> **⚠️ IMPORTANT:** This file contains development patterns and technical guidance. For project goals, use cases, and decision-making framework, see [PROJECT_GOALS.md](/PROJECT_GOALS.md) - the definitive reference.
+
 ## 📚 Project Overview
 
-**Ignition Automation Toolkit** is a lightweight, Docker-free automation platform for Ignition SCADA Gateway operations. Built from a fresh start after migrating away from a complex Docker-based architecture.
+**Ignition Automation Toolkit** is a visual acceptance testing platform for Ignition SCADA (Gateway, Perspective, Designer) with domain-separated playbook libraries, real-time visual feedback, and optional AI-assisted test creation.
 
-**Current Version:** 1.0.0 (Fresh start - October 2025)
-**Phase:** 2 of 8 Complete (Gateway Client ✅)
+**Current Version:** 1.0.3 (Production Ready)
+**Phase:** 8/8 Complete - All Core Features Implemented ✅
 **Target Platform:** Ignition SCADA 8.3+
 **Primary Language:** Python 3.10+
-**Key Technologies:** FastAPI, Playwright, SQLite, Anthropic SDK
+**Key Technologies:** FastAPI, Playwright, SQLite, Anthropic SDK, React 18, Material-UI v5
 
-## 🎯 Project Goals
+## 🎯 Core Principles
 
-1. **Gateway Automation FIRST** - Focus on Gateway REST API operations
-2. **Playbook System** - YAML-based reusable workflows with step-by-step execution
-3. **Real-Time Control** - Pause, resume, skip steps during execution
-4. **Secure Credentials** - Fernet encryption, local storage, never in git
-5. **Import/Export** - Share playbooks as JSON with colleagues
-6. **Browser Automation** - Live Playwright viewing for web operations (future)
-7. **AI-Ready** - Integration points for AI-assisted testing steps (future)
-8. **No Docker** - Native Python installation on Linux/WSL2 for simplicity
+> **See [PROJECT_GOALS.md](/PROJECT_GOALS.md) for complete project goals and decision-making framework.**
+
+**Key Principles for Development:**
+
+1. **Domain Separation** - Playbooks are Gateway-only OR Perspective-only OR Designer-only (NEVER mixed)
+2. **Visual Feedback Required** - Users must SEE what's happening, especially for Perspective tests
+3. **Playbook Library Over Programming** - Users duplicate and modify existing playbooks, not write from scratch
+4. **AI Injectable and Optional** - AI assists where helpful but is never required for execution
+5. **Secure by Default** - Credentials never in playbooks, always encrypted at rest
 
 ## 🏗️ Architecture
 
 ### Technology Stack
 ```yaml
-Backend:
-  - FastAPI (API server + WebSocket)
-  - Playwright (browser automation - future)
-  - SQLAlchemy + SQLite (state management)
-  - httpx (async HTTP for Gateway API)
-  - Anthropic SDK (AI steps - future)
+Backend (Python 3.10+):
+  - FastAPI (API server + WebSocket) ✅
+  - Playwright (browser automation for Perspective tests) ✅
+  - SQLAlchemy + SQLite (execution history, state management) ✅
+  - httpx (async HTTP for Gateway REST API) ✅
+  - Anthropic SDK (AI-injectable steps) ⚠️ (exists, not integrated in UI yet)
 
-Frontend:
-  - React + TypeScript (to be migrated)
-  - Material-UI
-  - WebSocket (real-time updates)
+Frontend (Production React App):
+  - React 18 + TypeScript ✅
+  - Material-UI v5 with custom Warp Terminal theme ✅
+  - React Router v6 (navigation) ✅
+  - Zustand (global state management) ✅
+  - React Query / TanStack Query (API calls) ✅
+  - WebSocket hooks (real-time execution updates) ✅
+  - Vite (build system) ✅
 
 Storage:
-  - SQLite (execution history, configs)
-  - JSON/YAML (playbook definitions)
-  - Local filesystem (encrypted credentials)
+  - SQLite (execution history, step results, configurations) ✅
+  - YAML (playbook definitions in /playbooks/) ✅
+  - JSON (import/export format) ✅
+  - Local filesystem (~/.ignition-toolkit/) ✅
+  - Fernet-encrypted credential vault ✅
+  - localStorage (UI state, saved configurations) ✅
 ```
 
 ### Project Structure
@@ -52,80 +62,83 @@ ignition-playground/
 │   ├── credentials/            # ✅ Fernet encrypted credential vault
 │   ├── gateway/                # ✅ Async Gateway REST API client
 │   ├── storage/                # ✅ SQLite database + models
-│   ├── playbook/               # 🚧 Execution engine (next)
-│   ├── browser/                # ⏳ Playwright automation
-│   ├── api/                    # ⏳ FastAPI server
-│   └── ai/                     # ⏳ AI integration
-├── playbooks/                  # YAML playbook library
-├── frontend/                   # React UI (to migrate)
-├── tests/                      # Test suite
-└── docs/                       # Documentation
+│   ├── playbook/               # ✅ Execution engine (COMPLETE)
+│   ├── browser/                # ✅ Playwright automation
+│   ├── api/                    # ✅ FastAPI server with WebSocket
+│   └── ai/                     # ⚠️ AI module (exists, not integrated in UI)
+├── playbooks/                  # Domain-separated YAML playbook library
+│   ├── gateway/                # Gateway-only playbooks
+│   ├── perspective/            # Perspective-only playbooks
+│   ├── designer/               # Designer playbooks (future)
+│   └── examples/               # Example playbooks
+├── frontend/                   # Production React 18 + TypeScript app
+│   ├── src/
+│   │   ├── pages/              # Playbooks, Executions, Credentials pages
+│   │   ├── components/         # Reusable UI components
+│   │   ├── hooks/              # WebSocket, API hooks
+│   │   ├── store/              # Zustand global state
+│   │   └── api/                # API client
+│   └── dist/                   # Built frontend (served by FastAPI)
+├── tests/                      # Pytest test suite
+├── docs/                       # Documentation
+└── PROJECT_GOALS.md            # ⭐ DEFINITIVE project goals reference
 ```
 
-## ✅ What's Complete (Phases 1-2)
+## ✅ What's Complete (All 8 Phases - Production Ready)
 
-### Phase 1: Foundation
-- ✅ Modern Python packaging (pyproject.toml)
-- ✅ Credential vault with Fernet encryption
-- ✅ SQLite database schema (executions, steps, configs)
-- ✅ CLI framework with Rich console
-- ✅ Project structure and documentation
+### Phase 1: Foundation ✅
+- Modern Python packaging (pyproject.toml)
+- Credential vault with Fernet encryption
+- SQLite database schema (executions, steps, configs)
+- CLI framework with Rich console
+- Project structure and documentation
 
-### Phase 2: Gateway Client
-- ✅ Async Gateway REST API client (httpx)
-- ✅ Authentication and session management
-- ✅ Module operations (list, upload, installation tracking)
-- ✅ Project operations (list, get)
-- ✅ System operations (restart, health check, wait_for_ready)
-- ✅ Type-safe models (Module, Project, Tag, GatewayInfo, HealthStatus)
-- ✅ Custom exceptions
-- ✅ Automatic re-authentication on 401
+### Phase 2: Gateway Client ✅
+- Async Gateway REST API client (httpx)
+- Authentication and session management
+- Module operations (list, upload, installation tracking)
+- Project operations (list, get)
+- System operations (restart, health check, wait_for_ready)
+- Type-safe models (Module, Project, Tag, GatewayInfo, HealthStatus)
 
-## 🚧 What's Next (Phase 3)
+### Phase 3: Playbook Engine ✅
+- YAML parser with parameter resolution
+- Step executor for all step types
+- State manager (pause/resume/skip)
+- Credential reference substitution (`{{ credential.xxx }}`)
+- Execution tracking in SQLite
 
-### Playbook Engine
-Build the core execution engine with:
-1. **YAML Parser** - Load playbooks from YAML files
-2. **Step Executor** - Execute steps using Gateway client
-3. **State Manager** - Pause/resume/skip functionality
-4. **Parameter Resolution** - Substitute `{{ credential.xxx }}` with actual values
-5. **Execution Tracking** - Save to SQLite database
+### Phase 4: Import/Export ✅
+- JSON export (credentials stripped)
+- JSON import with validation
+- CLI commands for sharing
 
-### Example Playbook (YAML):
-```yaml
-name: "Module Upgrade"
-version: "1.0"
+### Phase 5: API & Frontend ✅
+- FastAPI REST API (9+ endpoints)
+- WebSocket real-time updates
+- React 18 + TypeScript frontend
+- Playbooks, Executions, Credentials pages
+- Real-time execution monitoring
 
-parameters:
-  - name: gateway_url
-    type: string
-    required: true
-  - name: gateway_password
-    type: credential
-    required: true
-  - name: module_file
-    type: file
-    required: true
+### Phase 6: Browser Automation ✅
+- Playwright integration (Chromium)
+- Browser manager and recorder
+- Perspective step types (navigate, click, fill, verify)
+- Screenshot capture
 
-steps:
-  - id: authenticate
-    name: "Login to Gateway"
-    type: gateway.login
-    parameters:
-      url: "{{ gateway_url }}"
-      password: "{{ credential.gateway_password }}"
+### Phase 7: AI Scaffolding ✅
+- AI assistant class (exists, not integrated in UI yet)
+- Prompt template system
+- AI step types defined
+- Ready for Anthropic API integration
 
-  - id: upload
-    name: "Upload Module"
-    type: gateway.upload_module
-    parameters:
-      file: "{{ module_file }}"
+### Phase 8: Testing & Documentation ✅
+- 46+ automated tests (credential, loader, resolver, integration)
+- Getting started guide
+- Playbook syntax reference
+- Version tracking and changelog
 
-  - id: restart
-    name: "Restart Gateway"
-    type: gateway.restart
-    wait_for_ready: true
-```
+**Status:** Production Ready (v1.0.3) - All core features implemented
 
 ## 🔑 Key Design Patterns
 
@@ -250,11 +263,18 @@ pytest tests/ --cov=ignition_toolkit --cov-report=html
 
 ## 📁 Important Files
 
-### Must Read:
-1. **README.md** - Project overview and quick start
-2. **PLAN.md** - Detailed implementation roadmap
-3. **PROGRESS.md** - Current status and next steps
+### Must Read (in order):
+1. **PROJECT_GOALS.md** - ⭐ DEFINITIVE reference for project goals, use cases, and decision-making framework
+2. **README.md** - Project overview and quick start
+3. **ARCHITECTURE.md** - Design decisions (ADRs)
 4. **pyproject.toml** - Package configuration and dependencies
+5. **CHANGELOG.md** - Version history
+
+### Documentation:
+- **/docs/getting_started.md** - Installation and first playbook
+- **/docs/PLAYBOOK_MANAGEMENT.md** - How to create/edit/duplicate playbooks
+- **/docs/playbook_syntax.md** - YAML syntax reference
+- **/docs/ROADMAP.md** - Planned features
 
 ### Configuration:
 - **`.env.example`** - Configuration template (copy to `.env`)
@@ -307,46 +327,47 @@ git push origin main
 
 ## 🎯 Current Development Focus
 
-### Phase 3: Playbook Engine (Next)
-**Priority**: High
-**Timeline**: 2-3 days
-**Files to Create**:
-- `ignition_toolkit/playbook/models.py` - Playbook, Step, Execution dataclasses
-- `ignition_toolkit/playbook/loader.py` - YAML parser
-- `ignition_toolkit/playbook/engine.py` - Main execution engine
-- `ignition_toolkit/playbook/state_manager.py` - Pause/resume/skip logic
-- `ignition_toolkit/playbook/step_executor.py` - Execute individual steps
-- `ignition_toolkit/playbook/parameters.py` - Parameter resolution
+> **See [ROADMAP.md](/docs/ROADMAP.md) for planned features and priorities.**
 
-**Key Features**:
-1. Load playbooks from YAML
-2. Parse parameters and steps
-3. Resolve credential references (`{{ credential.xxx }}`)
-4. Execute steps sequentially
-5. Save state to database
-6. Support pause/resume/skip
+**Production Ready (v1.0.3)** - All 8 phases complete
+
+**Next Priorities (v1.0.4):**
+1. Playbook duplication in UI
+2. YAML playbook editor
+3. AI chat interface for playbook creation/editing
+
+**Future (v1.1.0):**
+1. Embedded Playwright browser view for Perspective tests (CRITICAL)
+2. Visual feedback panel showing live test execution
 
 ## 📊 Progress Tracking
 
-Use the todo list to track progress:
+Use the TodoWrite tool to track progress during development sessions:
+- Create todos at start of work
 - Mark tasks as in_progress when starting
-- Mark as completed immediately when done
-- Don't batch completions
+- Mark as completed immediately when done (don't batch)
+- Clean up stale todos at end of session
 
-Current phase: **Phase 3 - Playbook Engine**
+**DO NOT create session summary files** (PROGRESS_STATUS.md, etc.) - use git commits and CHANGELOG.md instead.
 
 ## 🐛 Known Issues
 
-None yet! Fresh start = clean slate.
+See GitHub Issues for current bugs and feature requests.
 
 ## 💡 Design Decisions
 
-1. **No Docker** - Simplified deployment, native Python on Linux/WSL2
-2. **SQLite** - Single-file database, easy to transfer between machines
-3. **YAML Playbooks** - Human-readable, version control friendly
-4. **Local Credentials** - Fernet encryption, never in git
-5. **Async Gateway Client** - httpx for async, Playwright compatibility
-6. **Modular Steps** - Each step can be AI-assisted in future
+> **See [ARCHITECTURE.md](/ARCHITECTURE.md) for detailed Architecture Decision Records (ADRs).**
+
+**Key Decisions:**
+
+1. **Domain-Separated Playbooks** - Gateway OR Perspective OR Designer (never mixed) for simpler execution model
+2. **No Docker** - Simplified deployment, native Python on Linux/WSL2
+3. **SQLite** - Single-file database, easy to transfer between machines
+4. **YAML Playbooks** - Human-readable, version control friendly, easy to duplicate and modify
+5. **Local Credentials** - Fernet encryption, never in playbooks or git
+6. **Async Gateway Client** - httpx for async, Playwright compatibility
+7. **React Frontend** - Modern UI with real-time updates, not legacy HTML
+8. **AI Injectable** - AI assists where helpful but never required
 
 ## 🔄 Migration Notes
 
@@ -361,14 +382,15 @@ This project is a **fresh start** from `ignition-auto-test`. Key differences:
 
 ## 📞 Getting Help
 
-- **Documentation**: See `/docs` directory
-- **Issues**: Check `PROGRESS.md` for current status
+- **Project Goals**: See `PROJECT_GOALS.md` for what/why/who
+- **Documentation**: See `/docs` directory for guides
+- **Roadmap**: See `/docs/ROADMAP.md` for planned features
 - **Security**: See `.claude/SECURITY_CHECKLIST.md`
-- **Architecture**: See `PLAN.md`
+- **Architecture**: See `ARCHITECTURE.md` for design decisions
 
 ---
 
-**Last Updated**: 2025-10-22
+**Last Updated**: 2025-10-24
 **Maintainer**: Nigel G
-**Status**: Phase 2 Complete, Phase 3 Next
+**Status**: Production Ready (v1.0.3) - All 8 Phases Complete ✅
 **Confidence Level**: High ✨
