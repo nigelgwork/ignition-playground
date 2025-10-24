@@ -34,6 +34,7 @@ import {
   List as ViewStepsIcon,
 } from '@mui/icons-material';
 import type { PlaybookInfo } from '../types/api';
+import { useStore } from '../store';
 
 interface PlaybookCardProps {
   playbook: PlaybookInfo;
@@ -79,6 +80,7 @@ export function PlaybookCard({ playbook, onConfigure, onExecute, onExport, onVie
   const [enabledPlaybooks, setEnabledPlaybooks] = useState<Set<string>>(getEnabledPlaybooks());
   const [savedConfig, setSavedConfig] = useState<SavedConfig | null>(getSavedConfigPreview(playbook.path));
   const [menuAnchor, setMenuAnchor] = useState<null | HTMLElement>(null);
+  const selectedCredential = useStore((state) => state.selectedCredential);
 
   const testStatus = getTestStatus(playbook.path);
   const isManuallyEnabled = enabledPlaybooks.has(playbook.path);
@@ -361,8 +363,9 @@ export function PlaybookCard({ playbook, onConfigure, onExecute, onExport, onVie
           {/* Execute Button */}
           <Tooltip title={
             isDisabled ? 'Enable this playbook first' :
-            !savedConfig ? 'Configure this playbook first' :
-            'Execute with saved configuration'
+            selectedCredential ? `Execute with global credential: ${selectedCredential.name}` :
+            savedConfig ? 'Execute with saved configuration' :
+            'Select a global credential or configure this playbook first'
           }>
             <span style={{ flex: 1 }}>
               <Button
@@ -371,7 +374,7 @@ export function PlaybookCard({ playbook, onConfigure, onExecute, onExport, onVie
                 startIcon={<PlayIcon />}
                 onClick={handleExecuteClick}
                 fullWidth
-                disabled={isDisabled || !savedConfig}
+                disabled={isDisabled || (!savedConfig && !selectedCredential)}
                 aria-label={`Execute ${playbook.name} playbook`}
               >
                 Execute

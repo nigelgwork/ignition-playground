@@ -36,6 +36,7 @@ class StepExecutor:
         ai_assistant: Optional[AIAssistant] = None,
         parameter_resolver: Optional[ParameterResolver] = None,
         base_path: Optional[Path] = None,
+        state_manager: Optional[Any] = None,  # StateManager type hint causes circular import
     ):
         """
         Initialize step executor
@@ -46,12 +47,14 @@ class StepExecutor:
             ai_assistant: AI assistant for AI operations
             parameter_resolver: Parameter resolver for resolving references
             base_path: Base path for resolving relative file paths
+            state_manager: State manager for pause/resume and debug mode
         """
         self.gateway_client = gateway_client
         self.browser_manager = browser_manager
         self.ai_assistant = ai_assistant
         self.parameter_resolver = parameter_resolver
         self.base_path = base_path or Path.cwd()
+        self.state_manager = state_manager
 
     async def execute_step(self, step: PlaybookStep) -> StepResult:
         """
@@ -95,6 +98,23 @@ class StepExecutor:
                 last_error = str(e)
                 logger.warning(f"Step {step.id} failed (attempt {retry_count + 1}): {e}")
 
+            # Check if debug mode is enabled - if so, pause on first failure
+            if (
+                self.state_manager
+                and self.state_manager.is_debug_mode_enabled()
+                and retry_count == 0  # Only on first failure
+            ):
+                logger.info("Debug mode enabled - capturing context and pausing")
+                debug_context = await self._capture_debug_context(step, last_error)
+                await self.state_manager.trigger_debug_pause(debug_context)
+
+                # Mark step as failed and return (no retries in debug mode)
+                result.status = StepStatus.FAILED
+                result.completed_at = datetime.now()
+                result.error = last_error
+                result.retry_count = 0
+                return result
+
             # Increment retry count
             retry_count += 1
 
@@ -109,6 +129,38 @@ class StepExecutor:
         result.error = last_error
         result.retry_count = retry_count - 1
         return result
+
+    async def _capture_debug_context(self, step: PlaybookStep, error: str) -> Dict[str, Any]:
+        """
+        Capture debug context on failure
+
+        Args:
+            step: Failed step
+            error: Error message
+
+        Returns:
+            Debug context dictionary
+        """
+        context = {
+            "step_id": step.id,
+            "step_name": step.name,
+            "step_type": step.type.value,
+            "step_parameters": step.parameters,
+            "error": error,
+            "timestamp": datetime.now().isoformat(),
+        }
+
+        # Capture screenshot and HTML if browser step
+        if self.browser_manager and step.type.value.startswith("browser."):
+            try:
+                context["screenshot_base64"] = await self.browser_manager.get_screenshot_base64()
+                context["page_html"] = await self.browser_manager.get_page_html()
+                logger.info("Captured screenshot and HTML for debug context")
+            except Exception as e:
+                logger.warning(f"Failed to capture screenshot/HTML: {e}")
+                context["capture_error"] = str(e)
+
+        return context
 
     async def _execute_step_impl(self, step: PlaybookStep) -> Dict[str, Any]:
         """

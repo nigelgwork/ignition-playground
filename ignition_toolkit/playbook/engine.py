@@ -152,7 +152,7 @@ class PlaybookEngine:
                     await self.screenshot_callback(execution_id, screenshot_b64)
 
                 browser_manager = BrowserManager(
-                    headless=False,  # Non-headless for visual feedback
+                    headless=True,  # Headless mode with screenshot streaming for embedded view
                     screenshot_callback=screenshot_frame_callback
                 )
                 await browser_manager.start()
@@ -166,6 +166,7 @@ class PlaybookEngine:
                 browser_manager=browser_manager,
                 parameter_resolver=resolver,
                 base_path=base_path,
+                state_manager=self.state_manager,
             )
 
             # Execute steps

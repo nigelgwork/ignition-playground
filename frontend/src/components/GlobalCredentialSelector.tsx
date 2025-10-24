@@ -47,19 +47,34 @@ export function GlobalCredentialSelector() {
   const handleSelect = (credentialName: string) => {
     if (credentialName === '') {
       setSelectedCredential(null);
+      localStorage.removeItem('selectedCredentialName');
       return;
     }
 
     const credential = allCredentials.find((c) => c.name === credentialName);
     if (credential) {
       setSelectedCredential(credential);
+      // Save to localStorage
+      localStorage.setItem('selectedCredentialName', credentialName);
     }
   };
 
   const handleClear = () => {
     setSelectedCredential(null);
     setConnectionStatus('unknown');
+    localStorage.removeItem('selectedCredentialName');
   };
+
+  // Restore selected credential from localStorage on mount
+  useEffect(() => {
+    const savedCredentialName = localStorage.getItem('selectedCredentialName');
+    if (savedCredentialName && allCredentials.length > 0) {
+      const credential = allCredentials.find((c) => c.name === savedCredentialName);
+      if (credential) {
+        setSelectedCredential(credential);
+      }
+    }
+  }, [savedCredentials, sessionCredentials]);
 
   const isSessionCredential = (cred: CredentialInfo | SessionCredential): cred is SessionCredential => {
     return 'isSessionOnly' in cred && cred.isSessionOnly === true;

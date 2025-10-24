@@ -20,6 +20,7 @@ class ControlSignal(str, Enum):
     RESUME = "resume"
     SKIP = "skip"
     CANCEL = "cancel"
+    DEBUG_PAUSE = "debug_pause"  # Auto-pause triggered by failure in debug mode
 
 
 class StateManager:
@@ -47,6 +48,8 @@ class StateManager:
         self._signal_event.set()  # Start in running state
         self._lock = asyncio.Lock()
         self._skip_requested = False
+        self._debug_mode_enabled = False
+        self._debug_context = {}  # Stores screenshot, HTML, step info on failure
 
     async def check_control_signal(self) -> ControlSignal:
         """
@@ -132,6 +135,7 @@ class StateManager:
         self._signal = ControlSignal.NONE
         self._signal_event.set()
         self._skip_requested = False
+        self._debug_context = {}
 
     def is_paused(self) -> bool:
         """
@@ -163,4 +167,47 @@ class StateManager:
             "paused": self.is_paused(),
             "cancelled": self.is_cancelled(),
             "skip_requested": self._skip_requested,
+            "debug_mode_enabled": self._debug_mode_enabled,
+            "has_debug_context": bool(self._debug_context),
         }
+
+    def enable_debug_mode(self) -> None:
+        """Enable debug mode - auto-pause on failures"""
+        self._debug_mode_enabled = True
+        logger.info("Debug mode enabled - will auto-pause on failures")
+
+    def disable_debug_mode(self) -> None:
+        """Disable debug mode"""
+        self._debug_mode_enabled = False
+        self._debug_context = {}
+        logger.info("Debug mode disabled")
+
+    def is_debug_mode_enabled(self) -> bool:
+        """Check if debug mode is enabled"""
+        return self._debug_mode_enabled
+
+    async def trigger_debug_pause(self, context: dict) -> None:
+        """
+        Trigger debug pause due to failure
+
+        Args:
+            context: Debug context (screenshot, HTML, step info, error)
+        """
+        async with self._lock:
+            self._debug_context = context
+            self._signal = ControlSignal.DEBUG_PAUSE
+            self._signal_event.clear()
+            logger.info(f"Debug pause triggered: {context.get('error', 'Unknown error')}")
+
+    def get_debug_context(self) -> dict:
+        """
+        Get debug context from last failure
+
+        Returns:
+            Debug context dictionary
+        """
+        return self._debug_context.copy()
+
+    def clear_debug_context(self) -> None:
+        """Clear debug context"""
+        self._debug_context = {}

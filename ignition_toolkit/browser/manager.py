@@ -215,6 +215,28 @@ class BrowserManager:
             raise ValueError(f"Element not found: {selector}")
         return await element.text_content() or ""
 
+    async def get_page_html(self) -> str:
+        """
+        Get full page HTML content
+
+        Returns:
+            HTML content as string
+        """
+        page = await self.get_page()
+        return await page.content()
+
+    async def get_screenshot_base64(self) -> str:
+        """
+        Get screenshot as base64-encoded string
+
+        Returns:
+            Base64-encoded PNG screenshot
+        """
+        import base64
+        page = await self.get_page()
+        screenshot_bytes = await page.screenshot(type="png")
+        return base64.b64encode(screenshot_bytes).decode('utf-8')
+
     async def evaluate(self, script: str) -> any:
         """
         Execute JavaScript

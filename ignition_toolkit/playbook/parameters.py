@@ -33,8 +33,8 @@ class ParameterResolver:
         resolved = resolver.resolve("{{ credential.gateway_admin }}")
     """
 
-    # Pattern to match {{ type.name }}
-    PATTERN = re.compile(r"\{\{\s*(\w+)\.(\w+)\s*\}\}")
+    # Pattern to match {{ type.name }} or {{ name }}
+    PATTERN = re.compile(r"\{\{\s*(\w+)(?:\.(\w+))?\s*\}\}")
 
     def __init__(
         self,
@@ -103,6 +103,12 @@ class ParameterResolver:
         if len(matches) == 1 and matches[0].group(0) == value:
             ref_type = matches[0].group(1)
             ref_name = matches[0].group(2)
+
+            # If ref_name is None, it means bare parameter name like {{ gateway_url }}
+            if ref_name is None:
+                ref_name = ref_type
+                ref_type = "parameter"
+
             resolved = self._resolve_reference(ref_type, ref_name)
 
             # For credentials, return as-is (may be Credential object)
@@ -117,6 +123,12 @@ class ParameterResolver:
         for match in reversed(matches):  # Reverse to preserve positions
             ref_type = match.group(1)
             ref_name = match.group(2)
+
+            # If ref_name is None, it means bare parameter name like {{ gateway_url }}
+            if ref_name is None:
+                ref_name = ref_type
+                ref_type = "parameter"
+
             replacement = str(self._resolve_reference(ref_type, ref_name))
             result = result[: match.start()] + replacement + result[match.end() :]
 

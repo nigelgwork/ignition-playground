@@ -361,10 +361,16 @@ async def start_execution(request: ExecutionRequest, background_tasks: Backgroun
         parameters = request.parameters.copy()
         gateway_url = request.gateway_url
 
+        print(f"DEBUG: Request credential_name: {request.credential_name}")
+        print(f"DEBUG: Request gateway_url: {request.gateway_url}")
+        print(f"DEBUG: Request parameters: {request.parameters}")
+
         if request.credential_name:
             credential = vault.get_credential(request.credential_name)
             if not credential:
                 raise HTTPException(status_code=404, detail=f"Credential '{request.credential_name}' not found")
+
+            print(f"DEBUG: Loaded credential: name={credential.name}, gateway_url={credential.gateway_url}, username={credential.username}")
 
             # Auto-fill gateway_url if not provided
             if not gateway_url and credential.gateway_url:
@@ -375,12 +381,20 @@ async def start_execution(request: ExecutionRequest, background_tasks: Backgroun
                 if param.type == "credential" and param.name not in parameters:
                     parameters[param.name] = request.credential_name
 
+            # Auto-fill gateway_url parameter if it exists in playbook
+            for param in playbook.parameters:
+                if param.name.lower() in ['gateway_url', 'url'] and param.name not in parameters:
+                    if credential.gateway_url:
+                        parameters[param.name] = credential.gateway_url
+
             # Auto-fill username/password parameters if they exist
             for param in playbook.parameters:
                 if param.name.lower() in ['username', 'user', 'gateway_username'] and param.name not in parameters:
                     parameters[param.name] = credential.username
                 elif param.name.lower() in ['password', 'pass', 'gateway_password'] and param.name not in parameters:
                     parameters[param.name] = credential.password
+
+            print(f"DEBUG: Parameters after auto-fill: {parameters}")
 
         gateway_client = None
         if gateway_url:
@@ -667,6 +681,66 @@ async def cancel_execution(execution_id: str):
     await engine.cancel()
 
     return {"status": "cancelled", "execution_id": execution_id}
+
+
+# Debug Mode Endpoints
+
+@app.post("/api/executions/{execution_id}/debug/enable")
+async def enable_debug_mode(execution_id: str):
+    """Enable debug mode - auto-pause on failures"""
+    if execution_id not in active_engines:
+        raise HTTPException(status_code=404, detail="Execution not found")
+
+    engine = active_engines[execution_id]
+    engine.state_manager.enable_debug_mode()
+
+    return {"status": "enabled", "execution_id": execution_id}
+
+
+@app.post("/api/executions/{execution_id}/debug/disable")
+async def disable_debug_mode(execution_id: str):
+    """Disable debug mode"""
+    if execution_id not in active_engines:
+        raise HTTPException(status_code=404, detail="Execution not found")
+
+    engine = active_engines[execution_id]
+    engine.state_manager.disable_debug_mode()
+
+    return {"status": "disabled", "execution_id": execution_id}
+
+
+@app.get("/api/executions/{execution_id}/debug/context")
+async def get_debug_context(execution_id: str):
+    """Get debug context (screenshot, HTML, step info, error)"""
+    if execution_id not in active_engines:
+        raise HTTPException(status_code=404, detail="Execution not found")
+
+    engine = active_engines[execution_id]
+    context = engine.state_manager.get_debug_context()
+
+    if not context:
+        raise HTTPException(status_code=404, detail="No debug context available")
+
+    return context
+
+
+@app.get("/api/executions/{execution_id}/debug/dom")
+async def get_debug_dom(execution_id: str):
+    """Get current page DOM/HTML"""
+    if execution_id not in active_engines:
+        raise HTTPException(status_code=404, detail="Execution not found")
+
+    engine = active_engines[execution_id]
+
+    # Get HTML from browser if available
+    if engine._browser_manager:
+        try:
+            html = await engine._browser_manager.get_page_html()
+            return {"html": html}
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Failed to get DOM: {str(e)}")
+    else:
+        raise HTTPException(status_code=400, detail="No browser available for this execution")
 
 
 # Credential management endpoints

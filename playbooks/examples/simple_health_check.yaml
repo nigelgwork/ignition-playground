@@ -27,11 +27,26 @@ steps:
       url: "{{ gateway_url }}"
     timeout: 30
 
+  - id: step1b_click_login
+    name: "Step 1b: Click Login Button (top right)"
+    type: browser.click
+    parameters:
+      selector: "button:has-text('Login'), a:has-text('Login'), [class*='login']"
+    timeout: 10
+
+  - id: step1c_wait_for_form
+    name: "Step 1c: Wait for login form"
+    type: browser.verify
+    parameters:
+      selector: "input[type='text'], input[name='username'], input[placeholder*='username' i]"
+      text: ""
+    timeout: 10
+
   - id: step2_login
-    name: "Step 2: Login to Gateway"
+    name: "Step 2: Enter Username"
     type: browser.fill
     parameters:
-      selector: "input[name='username']"
+      selector: "input[type='text'], input[name='username'], input[placeholder*='username' i]"
       value: "{{ username }}"
     timeout: 10
 
@@ -39,7 +54,7 @@ steps:
     name: "Step 2b: Enter Password"
     type: browser.fill
     parameters:
-      selector: "input[name='password']"
+      selector: "input[type='password'], input[name='password']"
       value: "{{ password }}"
     timeout: 10
 
@@ -47,7 +62,7 @@ steps:
     name: "Step 2c: Submit Login"
     type: browser.click
     parameters:
-      selector: "button[type='submit']"
+      selector: "button[type='submit'], button:has-text('Sign In'), button:has-text('Login'), input[type='submit']"
     timeout: 10
 
   - id: step3_check_license
