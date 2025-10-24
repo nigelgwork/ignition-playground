@@ -2,7 +2,7 @@
  * PlaybookCard - Display playbook information with action button
  */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Card,
   CardContent,
@@ -46,6 +46,18 @@ function saveEnabledPlaybooks(enabled: Set<string>) {
   localStorage.setItem('enabledPlaybooks', JSON.stringify(Array.from(enabled)));
 }
 
+// Get saved config for preview
+interface SavedConfig {
+  gatewayUrl: string;
+  parameters: Record<string, string>;
+  savedAt: string;
+}
+
+function getSavedConfigPreview(playbookPath: string): SavedConfig | null {
+  const stored = localStorage.getItem(`playbook_config_${playbookPath}`);
+  return stored ? JSON.parse(stored) : null;
+}
+
 // Determine test status based on playbook path
 function getTestStatus(path: string): 'tested' | 'untested' | 'example' {
   if (path.includes('/examples/')) return 'example';
@@ -57,10 +69,19 @@ function getTestStatus(path: string): 'tested' | 'untested' | 'example' {
 export function PlaybookCard({ playbook, onConfigure, onExecute }: PlaybookCardProps) {
   const [expanded, setExpanded] = useState(false);
   const [enabledPlaybooks, setEnabledPlaybooks] = useState<Set<string>>(getEnabledPlaybooks());
+  const [savedConfig, setSavedConfig] = useState<SavedConfig | null>(getSavedConfigPreview(playbook.path));
 
   const testStatus = getTestStatus(playbook.path);
   const isManuallyEnabled = enabledPlaybooks.has(playbook.path);
   const isDisabled = testStatus === 'untested' && !isManuallyEnabled;
+
+  // Check for saved config updates periodically
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setSavedConfig(getSavedConfigPreview(playbook.path));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [playbook.path]);
 
   const handleToggleEnabled = () => {
     const newEnabled = new Set(enabledPlaybooks);
@@ -153,6 +174,23 @@ export function PlaybookCard({ playbook, onConfigure, onExecute }: PlaybookCardP
         <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
           {playbook.path.split('/').slice(-2).join('/')}
         </Typography>
+
+        {/* Saved Configuration Preview */}
+        {savedConfig && (
+          <Box sx={{ mt: 1, p: 1, bgcolor: 'success.dark', borderRadius: 1, border: '1px solid', borderColor: 'success.main' }}>
+            <Typography variant="caption" color="success.light" fontWeight="bold">
+              ✓ Configured
+            </Typography>
+            <Typography variant="caption" color="success.light" sx={{ display: 'block' }}>
+              Gateway: {savedConfig.gatewayUrl}
+            </Typography>
+            {Object.keys(savedConfig.parameters).length > 0 && (
+              <Typography variant="caption" color="success.light" sx={{ display: 'block' }}>
+                {Object.keys(savedConfig.parameters).length} parameter(s) set
+              </Typography>
+            )}
+          </Box>
+        )}
 
         {/* Expandable Details Section */}
         <Box sx={{ mt: 1 }}>

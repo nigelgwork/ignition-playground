@@ -14,7 +14,9 @@ import {
   Typography,
   Alert,
   CircularProgress,
+  Chip,
 } from '@mui/material';
+import { Save as SaveIcon, PlayArrow as PlayIcon } from '@mui/icons-material';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { api } from '../api/client';
 import { ParameterInput } from './ParameterInput';
@@ -27,6 +29,23 @@ interface PlaybookExecutionDialogProps {
   onExecutionStarted?: (executionId: string) => void;
 }
 
+interface SavedConfig {
+  gatewayUrl: string;
+  parameters: Record<string, string>;
+  savedAt: string;
+}
+
+// Get saved config for a playbook
+function getSavedConfig(playbookPath: string): SavedConfig | null {
+  const stored = localStorage.getItem(`playbook_config_${playbookPath}`);
+  return stored ? JSON.parse(stored) : null;
+}
+
+// Save config for a playbook
+function saveConfig(playbookPath: string, config: SavedConfig) {
+  localStorage.setItem(`playbook_config_${playbookPath}`, JSON.stringify(config));
+}
+
 export function PlaybookExecutionDialog({
   open,
   playbook,
@@ -35,6 +54,7 @@ export function PlaybookExecutionDialog({
 }: PlaybookExecutionDialogProps) {
   const [parameters, setParameters] = useState<Record<string, string>>({});
   const [gatewayUrl, setGatewayUrl] = useState('http://localhost:8088');
+  const [configSaved, setConfigSaved] = useState(false);
 
   // Fetch available credentials
   const { data: credentials = [] } = useQuery<CredentialInfo[]>({
@@ -55,16 +75,28 @@ export function PlaybookExecutionDialog({
     },
   });
 
-  // Reset form when playbook changes
+  // Load saved config or defaults when playbook changes
   useEffect(() => {
     if (playbook) {
-      const defaultParams: Record<string, string> = {};
-      playbook.parameters.forEach((param) => {
-        if (param.default) {
-          defaultParams[param.name] = param.default;
-        }
-      });
-      setParameters(defaultParams);
+      const savedConfig = getSavedConfig(playbook.path);
+
+      if (savedConfig) {
+        // Load saved configuration
+        setGatewayUrl(savedConfig.gatewayUrl);
+        setParameters(savedConfig.parameters);
+        setConfigSaved(true);
+      } else {
+        // Load defaults
+        const defaultParams: Record<string, string> = {};
+        playbook.parameters.forEach((param) => {
+          if (param.default) {
+            defaultParams[param.name] = param.default;
+          }
+        });
+        setParameters(defaultParams);
+        setGatewayUrl('http://localhost:8088');
+        setConfigSaved(false);
+      }
     }
   }, [playbook]);
 
@@ -72,6 +104,18 @@ export function PlaybookExecutionDialog({
 
   const handleParameterChange = (name: string, value: string) => {
     setParameters((prev) => ({ ...prev, [name]: value }));
+    setConfigSaved(false); // Mark as unsaved when changes are made
+  };
+
+  const handleSaveConfig = () => {
+    if (!playbook) return;
+
+    saveConfig(playbook.path, {
+      gatewayUrl,
+      parameters,
+      savedAt: new Date().toISOString(),
+    });
+    setConfigSaved(true);
   };
 
   const handleExecute = () => {
@@ -82,14 +126,43 @@ export function PlaybookExecutionDialog({
     });
   };
 
+  const handleSaveAndExecute = () => {
+    if (!playbook) return;
+
+    // Save config first
+    saveConfig(playbook.path, {
+      gatewayUrl,
+      parameters,
+      savedAt: new Date().toISOString(),
+    });
+    setConfigSaved(true);
+
+    // Then execute
+    handleExecute();
+  };
+
   const isValid = playbook.parameters.every((param) => {
     if (!param.required) return true;
     return parameters[param.name] && parameters[param.name].trim() !== '';
   });
 
+  const savedConfig = playbook ? getSavedConfig(playbook.path) : null;
+
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
-      <DialogTitle>Execute Playbook: {playbook.name}</DialogTitle>
+      <DialogTitle>
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <span>Configure Playbook: {playbook.name}</span>
+          {savedConfig && (
+            <Chip
+              label={configSaved ? 'Configuration Saved' : 'Unsaved Changes'}
+              size="small"
+              color={configSaved ? 'success' : 'warning'}
+              variant="outlined"
+            />
+          )}
+        </Box>
+      </DialogTitle>
 
       <DialogContent>
         <Box sx={{ mb: 2 }}>
@@ -99,6 +172,11 @@ export function PlaybookExecutionDialog({
           <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
             Version {playbook.version} • {playbook.step_count} steps
           </Typography>
+          {savedConfig && (
+            <Typography variant="caption" color="success.main" sx={{ display: 'block', mt: 0.5 }}>
+              Last saved: {new Date(savedConfig.savedAt).toLocaleString()}
+            </Typography>
+          )}
         </Box>
 
         {/* Gateway URL */}
@@ -106,7 +184,10 @@ export function PlaybookExecutionDialog({
           label="Gateway URL"
           fullWidth
           value={gatewayUrl}
-          onChange={(e) => setGatewayUrl(e.target.value)}
+          onChange={(e) => {
+            setGatewayUrl(e.target.value);
+            setConfigSaved(false);
+          }}
           placeholder="http://localhost:8088"
           sx={{ mb: 2 }}
           helperText="Ignition Gateway base URL"
@@ -141,17 +222,38 @@ export function PlaybookExecutionDialog({
         )}
       </DialogContent>
 
-      <DialogActions>
+      <DialogActions sx={{ gap: 1, flexWrap: 'wrap' }}>
         <Button onClick={onClose} disabled={executeMutation.isPending}>
           Cancel
         </Button>
+
+        <Box sx={{ flexGrow: 1 }} />
+
+        <Button
+          onClick={handleSaveConfig}
+          variant="outlined"
+          disabled={!isValid || configSaved}
+          startIcon={<SaveIcon />}
+        >
+          Save Config
+        </Button>
+
         <Button
           onClick={handleExecute}
-          variant="contained"
+          variant="outlined"
           disabled={!isValid || executeMutation.isPending}
-          startIcon={executeMutation.isPending ? <CircularProgress size={16} /> : undefined}
+          startIcon={executeMutation.isPending ? <CircularProgress size={16} /> : <PlayIcon />}
         >
           {executeMutation.isPending ? 'Starting...' : 'Execute'}
+        </Button>
+
+        <Button
+          onClick={handleSaveAndExecute}
+          variant="contained"
+          disabled={!isValid || executeMutation.isPending}
+          startIcon={executeMutation.isPending ? <CircularProgress size={16} /> : <PlayIcon />}
+        >
+          {executeMutation.isPending ? 'Starting...' : 'Save & Execute'}
         </Button>
       </DialogActions>
     </Dialog>
