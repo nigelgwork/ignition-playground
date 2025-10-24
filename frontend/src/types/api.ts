@@ -99,6 +99,7 @@ export interface ExecutionUpdate {
   playbook_name: string;
   status: string;
   current_step_index: number;
+  total_steps: number;
   error: string | null;
   started_at: string | null;
   completed_at: string | null;

@@ -606,7 +606,7 @@ async def get_execution_status(execution_id: str):
                 started_at=state.started_at,
                 completed_at=state.completed_at,
                 current_step_index=state.current_step_index,
-                total_steps=len(state.step_results) + 1,  # Approximate
+                total_steps=len(state.step_results),  # Now accurate with pre-population
                 error=state.error,
                 step_results=step_results,
             )

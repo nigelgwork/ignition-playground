@@ -7,7 +7,7 @@
  * - Real-time updates via WebSocket
  */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   Box,
@@ -49,6 +49,7 @@ export function ExecutionDetail() {
   const executionUpdates = useStore((state) => state.executionUpdates);
   const [debugMode, setDebugMode] = useState(false);
   const [showDebugPanel, setShowDebugPanel] = useState(false);
+  const [runtime, setRuntime] = useState<string>('0s');
 
   // Fetch execution from API
   const { data: executionFromAPI, isLoading, error } = useQuery<ExecutionStatusResponse>({
@@ -69,6 +70,45 @@ export function ExecutionDetail() {
   // Use WebSocket update if available, otherwise use API data
   const wsUpdate = executionUpdates.get(executionId);
   const execution = wsUpdate || executionFromAPI;
+
+  // Calculate and update runtime every second
+  useEffect(() => {
+    if (!execution?.started_at) {
+      setRuntime('0s');
+      return;
+    }
+
+    const calculateRuntime = () => {
+      if (!execution.started_at) return '0s';
+      const startTime = new Date(execution.started_at).getTime();
+      const endTime = execution.completed_at
+        ? new Date(execution.completed_at).getTime()
+        : Date.now();
+      const diffMs = endTime - startTime;
+
+      const seconds = Math.floor(diffMs / 1000);
+      const minutes = Math.floor(seconds / 60);
+      const hours = Math.floor(minutes / 60);
+
+      if (hours > 0) {
+        return `${hours}h ${minutes % 60}m ${seconds % 60}s`;
+      } else if (minutes > 0) {
+        return `${minutes}m ${seconds % 60}s`;
+      } else {
+        return `${seconds}s`;
+      }
+    };
+
+    setRuntime(calculateRuntime());
+
+    // Only update if still running
+    if (execution.status === 'running') {
+      const interval = setInterval(() => {
+        setRuntime(calculateRuntime());
+      }, 1000);
+      return () => clearInterval(interval);
+    }
+  }, [execution?.started_at, execution?.completed_at, execution?.status]);
 
   // Auto-show debug panel when execution is paused and debug mode is on
   // Look for a failed step in the results
@@ -268,10 +308,18 @@ export function ExecutionDetail() {
               zIndex: 1,
             }}
           >
-            <Typography variant="h6">Step Progress</Typography>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Typography variant="h6">Step Progress</Typography>
+              <Chip
+                label={`Runtime: ${runtime}`}
+                size="small"
+                color={execution.status === 'running' ? 'primary' : 'default'}
+                sx={{ fontWeight: 'bold', fontFamily: 'monospace' }}
+              />
+            </Box>
             <Typography variant="caption" color="text.secondary">
               {execution.current_step_index !== undefined
-                ? `Current step: ${execution.current_step_index + 1}`
+                ? `Current step: ${execution.current_step_index + 1} of ${execution.total_steps}`
                 : 'Initializing...'}
             </Typography>
           </Box>

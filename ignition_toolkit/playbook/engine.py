@@ -117,11 +117,26 @@ class PlaybookEngine:
         # This ensures ALL executions are tracked, even validation failures
         if execution_id is None:
             execution_id = str(uuid.uuid4())
+
+        # Pre-populate all steps with pending status so UI can show them upfront
+        initial_step_results = [
+            StepResult(
+                step_id=step.id,
+                step_name=step.name,
+                status=StepStatus.PENDING,
+                error=None,
+                started_at=None,
+                completed_at=None,
+            )
+            for step in playbook.steps
+        ]
+
         execution_state = ExecutionState(
             execution_id=execution_id,
             playbook_name=playbook.name,
             status=ExecutionStatus.RUNNING,
             started_at=datetime.now(),
+            step_results=initial_step_results,
         )
         self._current_execution = execution_state
 

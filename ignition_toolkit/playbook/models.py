@@ -295,9 +295,16 @@ class ExecutionState:
 
     def add_step_result(self, result: StepResult) -> None:
         """
-        Add step result to execution state
+        Add or update step result in execution state
 
         Args:
-            result: Step result to add
+            result: Step result to add or update
         """
+        # Check if step already exists (from pre-population)
+        for i, existing_result in enumerate(self.step_results):
+            if existing_result.step_id == result.step_id:
+                # Update in place
+                self.step_results[i] = result
+                return
+        # If not found, append (fallback for backward compatibility)
         self.step_results.append(result)
