@@ -52,6 +52,13 @@ export interface CredentialInfo {
   description?: string;
 }
 
+export interface CredentialCreate {
+  name: string;
+  username: string;
+  password: string;
+  description?: string;
+}
+
 export interface HealthResponse {
   status: string;
   version: string;

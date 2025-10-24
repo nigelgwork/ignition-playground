@@ -10,6 +10,7 @@ import type {
   ExecutionResponse,
   ExecutionStatusResponse,
   CredentialInfo,
+  CredentialCreate,
   HealthResponse,
 } from '../types/api';
 
@@ -118,6 +119,18 @@ export const api = {
    */
   credentials: {
     list: () => fetchJSON<CredentialInfo[]>('/api/credentials'),
+
+    create: (credential: CredentialCreate) =>
+      fetchJSON<{ message: string; name: string }>('/api/credentials', {
+        method: 'POST',
+        body: JSON.stringify(credential),
+      }),
+
+    delete: (name: string) =>
+      fetchJSON<{ message: string; name: string }>(
+        `/api/credentials/${encodeURIComponent(name)}`,
+        { method: 'DELETE' }
+      ),
   },
 };
 
