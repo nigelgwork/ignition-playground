@@ -140,27 +140,8 @@ class ExecutionStatusResponse(BaseModel):
     error: Optional[str]
 
 
-# Serve frontend (React build)
+# Frontend static files will be mounted AFTER all API routes to avoid conflicts
 frontend_dist = Path(__file__).parent.parent.parent / "frontend" / "dist"
-if frontend_dist.exists() and (frontend_dist / "index.html").exists():
-    # Mount static assets directory
-    assets_dir = frontend_dist / "assets"
-    if assets_dir.exists():
-        app.mount("/assets", StaticFiles(directory=str(assets_dir)), name="assets")
-
-    # Serve index.html for all routes (SPA routing)
-    @app.get("/{full_path:path}")
-    async def serve_frontend(full_path: str):
-        """Serve React SPA - returns index.html for all non-API routes"""
-        # Skip API routes
-        if full_path.startswith("api/") or full_path.startswith("ws/") or full_path == "health":
-            return {"error": "Not found"}
-
-        # Serve index.html for all other routes (React Router handles routing)
-        index_path = frontend_dist / "index.html"
-        return FileResponse(str(index_path))
-else:
-    logger.warning("Frontend build not found at frontend/dist - run 'npm run build' in frontend/ directory")
 
 
 # TTL-based execution cleanup
@@ -720,6 +701,24 @@ async def startup_event():
                 logger.exception(f"Error in periodic cleanup: {e}")
 
     asyncio.create_task(periodic_cleanup())
+
+
+# Serve frontend (React build) - MUST be at the END to avoid catching API routes
+if frontend_dist.exists() and (frontend_dist / "index.html").exists():
+    # Mount static assets directory
+    assets_dir = frontend_dist / "assets"
+    if assets_dir.exists():
+        app.mount("/assets", StaticFiles(directory=str(assets_dir)), name="assets")
+
+    # Serve index.html for all routes (SPA routing)
+    @app.get("/{full_path:path}")
+    async def serve_frontend(full_path: str):
+        """Serve React SPA - returns index.html for all non-API routes"""
+        # Serve index.html for all other routes (React Router handles routing)
+        index_path = frontend_dist / "index.html"
+        return FileResponse(str(index_path))
+else:
+    logger.warning("Frontend build not found at frontend/dist - run 'npm run build' in frontend/ directory")
 
 
 @app.on_event("shutdown")
