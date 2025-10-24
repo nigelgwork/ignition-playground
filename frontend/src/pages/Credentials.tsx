@@ -87,8 +87,11 @@ export function Credentials() {
 
       {/* Loading state */}
       {isLoading && (
-        <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
-          <CircularProgress aria-label="Loading credentials" />
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+          <CircularProgress size={20} aria-label="Loading credentials" />
+          <Typography variant="body2" color="text.secondary">
+            Loading credentials...
+          </Typography>
         </Box>
       )}
 

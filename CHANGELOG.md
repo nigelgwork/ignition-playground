@@ -5,6 +5,26 @@ All notable changes to the Ignition Automation Toolkit will be documented in thi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.6] - 2025-10-24
+
+### Fixed
+- **Page Spacing**: Credentials and Executions pages no longer center content vertically
+  - Loading states now appear at top of page with inline spinner and text
+  - Removed `py: 8` padding and `justifyContent: 'center'` from loading boxes
+  - Better UX with smaller spinner (size 20) and descriptive text
+
+- **ExecutionDetail Loading**: Fixed "Loading execution details..." infinite loop
+  - Now fetches execution from API using useQuery
+  - Falls back to WebSocket updates when available
+  - Shows proper loading state, error state, and not found state
+  - Refetches every 2 seconds as fallback to WebSocket
+  - ExecutionDetail.tsx: Added API fetch with React Query
+
+### Technical Details
+- Credentials.tsx: Changed loading box from centered to inline with text
+- Executions.tsx: Changed loading box from centered to inline with text
+- ExecutionDetail.tsx: Added useQuery to fetch execution, merged with WebSocket updates
+
 ## [1.0.5] - 2025-10-24
 
 ### Fixed

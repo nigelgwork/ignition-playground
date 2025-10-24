@@ -19,6 +19,8 @@ import {
   LinearProgress,
   Button,
   Divider,
+  CircularProgress,
+  Alert,
 } from '@mui/material';
 import {
   CheckCircle as CompletedIcon,
@@ -28,14 +30,25 @@ import {
   Pending as PendingIcon,
   Cancel as SkippedIcon,
 } from '@mui/icons-material';
+import { useQuery } from '@tanstack/react-query';
+import { api } from '../api/client';
 import { LiveBrowserView } from '../components/LiveBrowserView';
 import { ExecutionControls } from '../components/ExecutionControls';
 import { useStore } from '../store';
+import type { ExecutionStatusResponse } from '../types/api';
 
 export function ExecutionDetail() {
   const { executionId } = useParams<{ executionId: string }>();
   const navigate = useNavigate();
   const executionUpdates = useStore((state) => state.executionUpdates);
+
+  // Fetch execution from API
+  const { data: executionFromAPI, isLoading, error } = useQuery<ExecutionStatusResponse>({
+    queryKey: ['execution', executionId],
+    queryFn: () => api.executions.get(executionId!),
+    enabled: !!executionId,
+    refetchInterval: 2000, // Refetch every 2 seconds as fallback
+  });
 
   if (!executionId) {
     return (
@@ -45,12 +58,35 @@ export function ExecutionDetail() {
     );
   }
 
-  const execution = executionUpdates.get(executionId);
+  // Use WebSocket update if available, otherwise use API data
+  const wsUpdate = executionUpdates.get(executionId);
+  const execution = wsUpdate || executionFromAPI;
+
+  if (isLoading) {
+    return (
+      <Box sx={{ p: 3, display: 'flex', alignItems: 'center', gap: 2 }}>
+        <CircularProgress size={20} />
+        <Typography>Loading execution details...</Typography>
+      </Box>
+    );
+  }
+
+  if (error) {
+    return (
+      <Box sx={{ p: 3 }}>
+        <Alert severity="error">
+          Failed to load execution: {(error as Error).message}
+        </Alert>
+      </Box>
+    );
+  }
 
   if (!execution) {
     return (
       <Box sx={{ p: 3 }}>
-        <Typography>Loading execution details...</Typography>
+        <Alert severity="warning">
+          Execution not found
+        </Alert>
       </Box>
     );
   }

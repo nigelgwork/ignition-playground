@@ -153,8 +153,11 @@ export function Executions() {
 
       {/* Loading state */}
       {isLoading && (
-        <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
-          <CircularProgress aria-label="Loading executions" />
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+          <CircularProgress size={20} aria-label="Loading executions" />
+          <Typography variant="body2" color="text.secondary">
+            Loading executions...
+          </Typography>
         </Box>
       )}
 
