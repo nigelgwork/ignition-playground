@@ -743,6 +743,71 @@ async def get_debug_dom(execution_id: str):
         raise HTTPException(status_code=400, detail="No browser available for this execution")
 
 
+# Playbook Update Endpoint
+
+class PlaybookUpdateRequest(BaseModel):
+    """Request to update a playbook YAML file"""
+    playbook_path: str  # Relative path from playbooks directory
+    yaml_content: str  # New YAML content
+
+
+@app.put("/api/playbooks/update")
+async def update_playbook(request: PlaybookUpdateRequest):
+    """
+    Update a playbook YAML file with new content
+
+    This is used when applying fixes from debug mode.
+    Creates a backup before updating.
+    """
+    try:
+        # Resolve playbook path
+        playbooks_dir = Path("playbooks")
+        playbook_path = playbooks_dir / request.playbook_path
+
+        # Security check: ensure path is within playbooks directory
+        try:
+            playbook_path = playbook_path.resolve()
+            playbooks_dir = playbooks_dir.resolve()
+            if not str(playbook_path).startswith(str(playbooks_dir)):
+                raise HTTPException(status_code=400, detail="Invalid playbook path")
+        except Exception:
+            raise HTTPException(status_code=400, detail="Invalid playbook path")
+
+        # Check if file exists
+        if not playbook_path.exists():
+            raise HTTPException(status_code=404, detail="Playbook not found")
+
+        # Create backup with timestamp
+        from datetime import datetime
+        backup_path = playbook_path.with_suffix(f".backup.{datetime.now().strftime('%Y%m%d_%H%M%S')}.yaml")
+        backup_path.write_text(playbook_path.read_text())
+        logger.info(f"Created backup: {backup_path}")
+
+        # Validate YAML syntax before writing
+        import yaml
+        try:
+            yaml.safe_load(request.yaml_content)
+        except yaml.YAMLError as e:
+            raise HTTPException(status_code=400, detail=f"Invalid YAML: {str(e)}")
+
+        # Write new content
+        playbook_path.write_text(request.yaml_content)
+        logger.info(f"Updated playbook: {playbook_path}")
+
+        return {
+            "status": "success",
+            "playbook_path": str(request.playbook_path),
+            "backup_path": str(backup_path.name),
+            "message": "Playbook updated successfully"
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception(f"Error updating playbook: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # Credential management endpoints
 class CredentialInfo(BaseModel):
     """Credential information (without password)"""

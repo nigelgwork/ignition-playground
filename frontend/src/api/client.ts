@@ -62,6 +62,17 @@ export const api = {
     list: () => fetchJSON<PlaybookInfo[]>('/api/playbooks'),
     get: (path: string) =>
       fetchJSON<PlaybookInfo>(`/api/playbooks/${encodeURIComponent(path)}`),
+    update: (playbookPath: string, yamlContent: string) =>
+      fetchJSON<{ status: string; playbook_path: string; backup_path: string; message: string }>(
+        '/api/playbooks/update',
+        {
+          method: 'PUT',
+          body: JSON.stringify({
+            playbook_path: playbookPath,
+            yaml_content: yamlContent,
+          }),
+        }
+      ),
   },
 
   /**
@@ -112,6 +123,25 @@ export const api = {
         `/api/executions/${executionId}/cancel`,
         { method: 'POST' }
       ),
+
+    // Debug mode
+    enableDebug: (executionId: string) =>
+      fetchJSON<{ status: string; execution_id: string }>(
+        `/api/executions/${executionId}/debug/enable`,
+        { method: 'POST' }
+      ),
+
+    disableDebug: (executionId: string) =>
+      fetchJSON<{ status: string; execution_id: string }>(
+        `/api/executions/${executionId}/debug/disable`,
+        { method: 'POST' }
+      ),
+
+    getDebugContext: (executionId: string) =>
+      fetchJSON<any>(`/api/executions/${executionId}/debug/context`),
+
+    getDebugDOM: (executionId: string) =>
+      fetchJSON<{ html: string }>(`/api/executions/${executionId}/debug/dom`),
   },
 
   /**

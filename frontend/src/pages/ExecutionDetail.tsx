@@ -7,6 +7,7 @@
  * - Real-time updates via WebSocket
  */
 
+import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   Box,
@@ -21,6 +22,9 @@ import {
   Divider,
   CircularProgress,
   Alert,
+  Switch,
+  FormControlLabel,
+  Tooltip,
 } from '@mui/material';
 import {
   CheckCircle as CompletedIcon,
@@ -29,11 +33,13 @@ import {
   ArrowBack as BackIcon,
   Pending as PendingIcon,
   Cancel as SkippedIcon,
+  BugReport as DebugIcon,
 } from '@mui/icons-material';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../api/client';
 import { LiveBrowserView } from '../components/LiveBrowserView';
 import { ExecutionControls } from '../components/ExecutionControls';
+import { DebugPanel } from '../components/DebugPanel';
 import { useStore } from '../store';
 import type { ExecutionStatusResponse } from '../types/api';
 
@@ -41,6 +47,8 @@ export function ExecutionDetail() {
   const { executionId } = useParams<{ executionId: string }>();
   const navigate = useNavigate();
   const executionUpdates = useStore((state) => state.executionUpdates);
+  const [debugMode, setDebugMode] = useState(false);
+  const [showDebugPanel, setShowDebugPanel] = useState(false);
 
   // Fetch execution from API
   const { data: executionFromAPI, isLoading, error } = useQuery<ExecutionStatusResponse>({
@@ -61,6 +69,20 @@ export function ExecutionDetail() {
   // Use WebSocket update if available, otherwise use API data
   const wsUpdate = executionUpdates.get(executionId);
   const execution = wsUpdate || executionFromAPI;
+
+  // Auto-show debug panel when execution is paused and debug mode is on
+  // Look for a failed step in the results
+  if (
+    execution &&
+    debugMode &&
+    execution.status === 'running' &&
+    execution.step_results &&
+    execution.step_results.some((s) => s.status === 'failed')
+  ) {
+    if (!showDebugPanel) {
+      setShowDebugPanel(true);
+    }
+  }
 
   if (isLoading) {
     return (
@@ -173,6 +195,38 @@ export function ExecutionDetail() {
           size="small"
         />
 
+        <Tooltip title="Auto-pause on failures for debugging">
+          <FormControlLabel
+            control={
+              <Switch
+                checked={debugMode}
+                onChange={async (e) => {
+                  const enabled = e.target.checked;
+                  setDebugMode(enabled);
+                  try {
+                    if (enabled) {
+                      await api.executions.enableDebug(executionId);
+                    } else {
+                      await api.executions.disableDebug(executionId);
+                    }
+                  } catch (error) {
+                    console.error('Failed to toggle debug mode:', error);
+                    // Revert on error
+                    setDebugMode(!enabled);
+                  }
+                }}
+                size="small"
+              />
+            }
+            label={
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                <DebugIcon fontSize="small" />
+                <Typography variant="body2">Debug</Typography>
+              </Box>
+            }
+          />
+        </Tooltip>
+
         <ExecutionControls
           executionId={executionId}
           status={execution.status}
@@ -268,8 +322,12 @@ export function ExecutionDetail() {
           </List>
         </Paper>
 
-        {/* Right: Live Browser View */}
-        <LiveBrowserView executionId={executionId} />
+        {/* Right: Live Browser View OR Debug Panel */}
+        {showDebugPanel ? (
+          <DebugPanel executionId={executionId} />
+        ) : (
+          <LiveBrowserView executionId={executionId} />
+        )}
       </Box>
     </Box>
   );
