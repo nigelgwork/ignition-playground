@@ -19,6 +19,7 @@ from pydantic import BaseModel, validator
 from ignition_toolkit.playbook.loader import PlaybookLoader
 from ignition_toolkit.playbook.engine import PlaybookEngine
 from ignition_toolkit.playbook.models import ExecutionState, ExecutionStatus
+from ignition_toolkit.playbook.metadata import PlaybookMetadataStore
 from ignition_toolkit.gateway import GatewayClient
 from ignition_toolkit.credentials import CredentialVault
 from ignition_toolkit.storage import get_database
@@ -62,6 +63,9 @@ websocket_connections: List[WebSocket] = []
 # Configuration
 EXECUTION_TTL_MINUTES = 30  # Keep completed executions for 30 minutes
 
+# Initialize playbook metadata store
+metadata_store = PlaybookMetadataStore()
+
 
 # Pydantic models for API
 class ParameterInfo(BaseModel):
@@ -95,6 +99,12 @@ class PlaybookInfo(BaseModel):
     step_count: int
     parameters: List[ParameterInfo] = []
     steps: List[StepInfo] = []
+    # Metadata fields
+    revision: int = 0
+    verified: bool = False
+    enabled: bool = True
+    last_modified: Optional[str] = None
+    verified_at: Optional[str] = None
 
 
 class ExecutionRequest(BaseModel):
@@ -235,6 +245,10 @@ async def list_playbooks():
                 for s in playbook.steps
             ]
 
+            # Get metadata for this playbook
+            relative_path = str(yaml_file.relative_to(playbooks_dir))
+            meta = metadata_store.get_metadata(relative_path)
+
             playbooks.append(
                 PlaybookInfo(
                     name=playbook.name,
@@ -245,6 +259,11 @@ async def list_playbooks():
                     step_count=len(playbook.steps),
                     parameters=parameters,
                     steps=steps,
+                    revision=meta.revision,
+                    verified=meta.verified,
+                    enabled=meta.enabled,
+                    last_modified=meta.last_modified,
+                    verified_at=meta.verified_at,
                 )
             )
         except Exception as e:
@@ -794,11 +813,16 @@ async def update_playbook(request: PlaybookUpdateRequest):
         playbook_path.write_text(request.yaml_content)
         logger.info(f"Updated playbook: {playbook_path}")
 
+        # Increment revision in metadata
+        metadata_store.increment_revision(request.playbook_path)
+        meta = metadata_store.get_metadata(request.playbook_path)
+
         return {
             "status": "success",
             "playbook_path": str(request.playbook_path),
             "backup_path": str(backup_path.name),
-            "message": "Playbook updated successfully"
+            "revision": meta.revision,
+            "message": f"Playbook updated successfully (revision {meta.revision})"
         }
 
     except HTTPException:
@@ -931,6 +955,74 @@ async def delete_credential(name: str):
         raise
     except Exception as e:
         logger.error(f"Error deleting credential: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# Playbook Metadata Endpoints
+
+@app.post("/api/playbooks/{playbook_path:path}/verify")
+async def mark_playbook_verified(playbook_path: str):
+    """Mark a playbook as verified"""
+    try:
+        metadata_store.mark_verified(playbook_path, verified_by="user")
+        meta = metadata_store.get_metadata(playbook_path)
+        return {
+            "status": "success",
+            "playbook_path": playbook_path,
+            "verified": meta.verified,
+            "verified_at": meta.verified_at,
+            "message": "Playbook marked as verified"
+        }
+    except Exception as e:
+        logger.error(f"Error marking playbook as verified: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/playbooks/{playbook_path:path}/unverify")
+async def unmark_playbook_verified(playbook_path: str):
+    """Unmark a playbook as verified"""
+    try:
+        metadata_store.unmark_verified(playbook_path)
+        return {
+            "status": "success",
+            "playbook_path": playbook_path,
+            "verified": False,
+            "message": "Playbook verification removed"
+        }
+    except Exception as e:
+        logger.error(f"Error unmarking playbook as verified: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/playbooks/{playbook_path:path}/enable")
+async def enable_playbook(playbook_path: str):
+    """Enable a playbook"""
+    try:
+        metadata_store.set_enabled(playbook_path, True)
+        return {
+            "status": "success",
+            "playbook_path": playbook_path,
+            "enabled": True,
+            "message": "Playbook enabled"
+        }
+    except Exception as e:
+        logger.error(f"Error enabling playbook: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/playbooks/{playbook_path:path}/disable")
+async def disable_playbook(playbook_path: str):
+    """Disable a playbook"""
+    try:
+        metadata_store.set_enabled(playbook_path, False)
+        return {
+            "status": "success",
+            "playbook_path": playbook_path,
+            "enabled": False,
+            "message": "Playbook disabled"
+        }
+    except Exception as e:
+        logger.error(f"Error disabling playbook: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
