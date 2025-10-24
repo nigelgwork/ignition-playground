@@ -80,6 +80,7 @@ class PlaybookEngine:
         self.screenshot_callback = screenshot_callback
         self._current_execution: Optional[ExecutionState] = None
         self._update_callback: Optional[Callable[[ExecutionState], None]] = None
+        self._browser_manager: Optional[BrowserManager] = None
 
     def set_update_callback(self, callback: Callable[[ExecutionState], None]) -> None:
         """
@@ -154,6 +155,7 @@ class PlaybookEngine:
                 )
                 await browser_manager.start()
                 await browser_manager.start_screenshot_streaming()
+                self._browser_manager = browser_manager  # Store reference for pause/resume
                 logger.info(f"Browser screenshot streaming started for execution {execution_id}")
 
             # Create step executor
@@ -263,6 +265,8 @@ class PlaybookEngine:
                     logger.info("Browser screenshot streaming stopped")
                 except Exception as e:
                     logger.warning(f"Error stopping browser manager: {e}")
+                finally:
+                    self._browser_manager = None  # Clear reference
 
             # Notify final update
             await self._notify_update(execution_state)
@@ -374,10 +378,18 @@ class PlaybookEngine:
     async def pause(self) -> None:
         """Pause execution after current step"""
         await self.state_manager.pause()
+        # Also pause browser screenshot streaming (freezes current frame)
+        if self._browser_manager:
+            self._browser_manager.pause_screenshot_streaming()
+            logger.info("Browser screenshot streaming paused")
 
     async def resume(self) -> None:
         """Resume paused execution"""
         await self.state_manager.resume()
+        # Also resume browser screenshot streaming
+        if self._browser_manager:
+            self._browser_manager.resume_screenshot_streaming()
+            logger.info("Browser screenshot streaming resumed")
 
     async def skip_current_step(self) -> None:
         """Skip current step"""

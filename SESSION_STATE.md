@@ -54,7 +54,7 @@
 4. WebSocket broadcasts to all connected frontend clients
 5. Message format: `{"type": "screenshot_frame", "data": {...}}`
 
-**Committed:** Pending
+**Committed:** Yes (git hash: 657b5d8)
 
 ---
 
@@ -87,12 +87,22 @@
 
 ## 🎯 NEXT IMMEDIATE STEPS
 
-1. **Add `broadcast_screenshot_frame()` to app.py** (~15 min)
-2. **Connect BrowserManager callback to WebSocket** (~30 min)
-3. **Test backend screenshot streaming** (~15 min)
-4. **Commit progress** (~5 min)
+**Current Status:** Backend screenshot streaming complete ✅
 
-Then move to Phase 1.4 (execution controls)
+**Next Phase Options:**
+
+**Option A: Phase 1.4 - Execution Controls** (~30-45 min)
+- Note: Pause/resume/skip endpoints already exist in app.py (lines 470-515)
+- Just need to wire them up to BrowserManager pause/resume methods
+- This is quick and makes sense to complete backend work first
+
+**Option B: Phase 2 - Frontend Components** (~3-4 hours)
+- Create LiveBrowserView component
+- Wire up WebSocket screenshot reception
+- Create split-pane execution detail page
+- Add execution control buttons
+
+**Recommendation:** Complete Option A (Phase 1.4) first since execution controls are simple and complete the backend work, then move to frontend.
 
 ---
 
