@@ -1,0 +1,143 @@
+# Live Browser Streaming - Current Session State
+
+**Date:** 2025-10-24
+**Goal:** Implement live browser streaming for visual feedback during playbook execution
+**Test Case:** Gateway Reset Trial playbook with visual monitoring
+
+---
+
+## ✅ COMPLETED
+
+### Phase 1.1: Research & Benchmark (DONE)
+- Created `test_screenshot_streaming.py` benchmark script
+- Results:
+  - JPEG 80% quality: 38 KB/frame
+  - 2 FPS streaming: 102 KB/s bandwidth (feasible!)
+  - Playwright can handle 13+ FPS
+
+### Phase 1.2: BrowserManager Screenshot Streaming (DONE)
+- Modified `ignition_toolkit/browser/manager.py`
+- Added screenshot streaming methods:
+  - `start_screenshot_streaming()`
+  - `stop_screenshot_streaming()`
+  - `pause_screenshot_streaming()`
+  - `resume_screenshot_streaming()`
+  - `_screenshot_streaming_loop()` - internal async loop at 2 FPS
+- Configuration via environment variables:
+  - `SCREENSHOT_FPS=2` (default)
+  - `SCREENSHOT_QUALITY=80` (default)
+  - `SCREENSHOT_STREAMING=true` (default)
+- Callback-based: passes base64 JPEG to async callback function
+
+**Committed:** Yes (git hash: 8aec30e)
+
+---
+
+## 🚧 IN PROGRESS
+
+### Phase 1.3: Enhance WebSocket Protocol
+
+**Current WebSocket Implementation** (in `ignition_toolkit/api/app.py`):
+- Endpoint: `/ws/executions`
+- Authentication: API key in query params
+- Message types: `execution_update`, `pong`
+- Function: `broadcast_execution_state(state: ExecutionState)`
+
+**What Needs to Be Added:**
+
+1. **New broadcast function for screenshots:**
+```python
+async def broadcast_screenshot_frame(execution_id: str, screenshot_b64: str):
+    """Broadcast screenshot frame to WebSocket clients"""
+    message = {
+        "type": "screenshot_frame",
+        "data": {
+            "execution_id": execution_id,
+            "screenshot": screenshot_b64,
+            "timestamp": datetime.now().isoformat()
+        }
+    }
+    # Send to all connected clients
+```
+
+2. **Connect BrowserManager to WebSocket:**
+   - When playbook engine creates BrowserManager, pass screenshot callback
+   - Callback calls `broadcast_screenshot_frame()`
+
+3. **File to modify:** `ignition_toolkit/api/app.py`
+   - Add `broadcast_screenshot_frame()` function
+   - Export it so playbook engine can use it
+
+---
+
+## 📋 REMAINING TASKS
+
+### Phase 1.4: Execution State Controls (2-3 hours)
+**Files to modify:**
+- `ignition_toolkit/playbook/engine.py` - Add pause/resume/skip state
+- `ignition_toolkit/api/app.py` - Add control endpoints:
+  - `POST /api/executions/{id}/pause`
+  - `POST /api/executions/{id}/resume`
+  - `POST /api/executions/{id}/skip`
+  - `POST /api/executions/{id}/stop`
+
+### Phase 2: Frontend React Components (4-5 hours)
+**Files to create:**
+- `frontend/src/components/LiveBrowserView.tsx`
+- `frontend/src/components/ExecutionControls.tsx`
+- `frontend/src/pages/ExecutionDetail.tsx` (or modify existing)
+
+**Files to modify:**
+- `frontend/src/api/client.ts` - Add control methods
+
+### Phase 3: Testing (2 hours)
+- Test with Gateway Reset Trial playbook
+- Test with Perspective playbook (browser streaming)
+- Performance optimization
+
+---
+
+## 🎯 NEXT IMMEDIATE STEPS
+
+1. **Add `broadcast_screenshot_frame()` to app.py** (~15 min)
+2. **Connect BrowserManager callback to WebSocket** (~30 min)
+3. **Test backend screenshot streaming** (~15 min)
+4. **Commit progress** (~5 min)
+
+Then move to Phase 1.4 (execution controls)
+
+---
+
+## 📁 FILES MODIFIED SO FAR
+
+1. `test_screenshot_streaming.py` (NEW) - Benchmark
+2. `VISUAL_FEEDBACK_IMPLEMENTATION.md` (NEW) - Implementation plan
+3. `ignition_toolkit/browser/manager.py` (MODIFIED) - Screenshot streaming
+4. `SESSION_STATE.md` (NEW) - This file
+
+---
+
+## 🔗 KEY DECISIONS
+
+1. **2 FPS is optimal** - Good balance of smoothness vs bandwidth
+2. **JPEG 80% quality** - Good image quality, 3x smaller than PNG
+3. **Callback pattern** - BrowserManager doesn't know about WebSocket directly
+4. **Pause freezes frame** - Doesn't stop streaming, just skips capture
+5. **Domain separation** - Gateway playbooks won't use browser streaming (just Gateway op indicators)
+
+---
+
+## 💾 GIT STATUS
+
+**Branch:** master
+**Last commit:** 8aec30e - Phase 1.2 COMPLETE
+**Uncommitted changes:** None (all saved)
+**Next commit:** Phase 1.3 (WebSocket enhancement)
+
+---
+
+**To resume work:**
+1. Read this file
+2. Continue with Phase 1.3 - add `broadcast_screenshot_frame()` to app.py
+3. Connect to playbook engine
+4. Test and commit
