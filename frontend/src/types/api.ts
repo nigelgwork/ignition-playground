@@ -86,9 +86,15 @@ export interface ExecutionUpdate {
   step_results: StepResult[];
 }
 
+export interface ScreenshotFrame {
+  executionId: string;
+  screenshot: string; // base64 encoded JPEG
+  timestamp: string;
+}
+
 export interface WebSocketMessage {
-  type: 'execution_update' | 'pong' | 'error';
-  data?: ExecutionUpdate;
+  type: 'execution_update' | 'screenshot_frame' | 'pong' | 'error';
+  data?: ExecutionUpdate | ScreenshotFrame;
   error?: string;
 }
 

@@ -36,7 +36,7 @@ export function ExecutionControls({
   const handlePause = async () => {
     try {
       setLoading('pause');
-      await api.post(`/api/executions/${executionId}/pause`);
+      await api.executions.pause(executionId);
     } catch (error) {
       console.error('Failed to pause execution:', error);
     } finally {
@@ -47,7 +47,7 @@ export function ExecutionControls({
   const handleResume = async () => {
     try {
       setLoading('resume');
-      await api.post(`/api/executions/${executionId}/resume`);
+      await api.executions.resume(executionId);
     } catch (error) {
       console.error('Failed to resume execution:', error);
     } finally {
@@ -58,7 +58,7 @@ export function ExecutionControls({
   const handleSkip = async () => {
     try {
       setLoading('skip');
-      await api.post(`/api/executions/${executionId}/skip`);
+      await api.executions.skip(executionId);
     } catch (error) {
       console.error('Failed to skip step:', error);
     } finally {
@@ -69,7 +69,7 @@ export function ExecutionControls({
   const handleStop = async () => {
     try {
       setLoading('stop');
-      await api.post(`/api/executions/${executionId}/cancel`);
+      await api.executions.cancel(executionId);
     } catch (error) {
       console.error('Failed to stop execution:', error);
     } finally {

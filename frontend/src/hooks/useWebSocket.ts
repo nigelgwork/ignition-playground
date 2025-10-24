@@ -3,16 +3,10 @@
  */
 
 import { useEffect, useRef, useCallback } from 'react';
-import type { WebSocketMessage, ExecutionUpdate } from '../types/api';
+import type { WebSocketMessage, ExecutionUpdate, ScreenshotFrame } from '../types/api';
 
 const WS_URL = import.meta.env.VITE_WS_URL || 'ws://localhost:5000/ws/executions';
 const WS_API_KEY = import.meta.env.VITE_WS_API_KEY || 'dev-key-change-in-production';
-
-interface ScreenshotFrame {
-  executionId: string;
-  screenshot: string;
-  timestamp: string;
-}
 
 interface UseWebSocketOptions {
   onExecutionUpdate?: (update: ExecutionUpdate) => void;
@@ -45,7 +39,7 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
           const message: WebSocketMessage = JSON.parse(event.data);
 
           if (message.type === 'execution_update' && message.data) {
-            onExecutionUpdate?.(message.data);
+            onExecutionUpdate?.(message.data as ExecutionUpdate);
           } else if (message.type === 'screenshot_frame' && message.data) {
             onScreenshotFrame?.(message.data as ScreenshotFrame);
           } else if (message.type === 'error') {
