@@ -34,7 +34,10 @@ app = FastAPI(
 
 # CORS middleware - Restrict to localhost only (secure default)
 import os
-ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "http://localhost:5000,http://127.0.0.1:5000").split(",")
+ALLOWED_ORIGINS = os.getenv(
+    "ALLOWED_ORIGINS",
+    "http://localhost:5000,http://127.0.0.1:5000,http://localhost:3000,http://127.0.0.1:3000"
+).split(",")
 
 app.add_middleware(
     CORSMiddleware,
@@ -105,18 +108,27 @@ class ExecutionStatusResponse(BaseModel):
     error: Optional[str]
 
 
-# Serve frontend
-frontend_path = Path(__file__).parent.parent.parent / "frontend"
-if frontend_path.exists():
-    app.mount("/static", StaticFiles(directory=str(frontend_path)), name="static")
+# Serve frontend (React build)
+frontend_dist = Path(__file__).parent.parent.parent / "frontend" / "dist"
+if frontend_dist.exists() and (frontend_dist / "index.html").exists():
+    # Mount static assets directory
+    assets_dir = frontend_dist / "assets"
+    if assets_dir.exists():
+        app.mount("/assets", StaticFiles(directory=str(assets_dir)), name="assets")
 
-    @app.get("/")
-    async def serve_frontend():
-        """Serve frontend index.html"""
-        index_path = frontend_path / "index.html"
-        if index_path.exists():
-            return FileResponse(str(index_path))
-        return {"message": "Frontend not available"}
+    # Serve index.html for all routes (SPA routing)
+    @app.get("/{full_path:path}")
+    async def serve_frontend(full_path: str):
+        """Serve React SPA - returns index.html for all non-API routes"""
+        # Skip API routes
+        if full_path.startswith("api/") or full_path.startswith("ws/") or full_path == "health":
+            return {"error": "Not found"}
+
+        # Serve index.html for all other routes (React Router handles routing)
+        index_path = frontend_dist / "index.html"
+        return FileResponse(str(index_path))
+else:
+    logger.warning("Frontend build not found at frontend/dist - run 'npm run build' in frontend/ directory")
 
 
 # TTL-based execution cleanup
