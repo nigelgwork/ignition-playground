@@ -173,7 +173,7 @@ async def health_check():
     """Health check endpoint"""
     return {
         "status": "healthy",
-        "version": "1.0.1",
+        "version": "1.0.3",
         "timestamp": datetime.now().isoformat(),
     }
 
