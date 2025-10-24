@@ -126,6 +126,15 @@ export const api = {
         body: JSON.stringify(credential),
       }),
 
+    update: (name: string, credential: CredentialCreate) =>
+      fetchJSON<{ message: string; name: string }>(
+        `/api/credentials/${encodeURIComponent(name)}`,
+        {
+          method: 'PUT',
+          body: JSON.stringify(credential),
+        }
+      ),
+
     delete: (name: string) =>
       fetchJSON<{ message: string; name: string }>(
         `/api/credentials/${encodeURIComponent(name)}`,

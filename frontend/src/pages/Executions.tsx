@@ -8,26 +8,65 @@ import {
   Typography,
   Alert,
   CircularProgress,
-  Stack,
   ToggleButtonGroup,
   ToggleButton,
   Snackbar,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Paper,
+  Chip,
+  IconButton,
+  Tooltip,
 } from '@mui/material';
+import {
+  PlayArrow as PlayIcon,
+  Pause as PauseIcon,
+  SkipNext as SkipIcon,
+  Cancel as CancelIcon,
+  Visibility as ViewIcon,
+} from '@mui/icons-material';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import { api } from '../api/client';
-import { ExecutionCard } from '../components/ExecutionCard';
 import { useStore } from '../store';
 import type { ExecutionStatusResponse } from '../types/api';
 
 type StatusFilter = 'all' | 'running' | 'paused' | 'completed' | 'failed';
 
 export function Executions() {
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [snackbarMessage, setSnackbarMessage] = useState('');
   const [snackbarOpen, setSnackbarOpen] = useState(false);
 
   const executionUpdates = useStore((state) => state.executionUpdates);
+
+  // Helper function to get status color
+  const getStatusColor = (status: string): 'default' | 'primary' | 'warning' | 'success' | 'error' => {
+    switch (status) {
+      case 'running':
+        return 'primary';
+      case 'paused':
+        return 'warning';
+      case 'completed':
+        return 'success';
+      case 'failed':
+        return 'error';
+      default:
+        return 'default';
+    }
+  };
+
+  // Helper function to format timestamp
+  const formatTimestamp = (timestamp?: string | null): string => {
+    if (!timestamp) return '-';
+    return new Date(timestamp).toLocaleString();
+  };
 
   // Fetch executions from API
   const { data: executions = [], isLoading, error } = useQuery<ExecutionStatusResponse[]>({
@@ -115,7 +154,7 @@ export function Executions() {
   });
 
   return (
-    <Box>
+    <Box sx={{ width: '100%', maxWidth: '100%' }}>
       <Typography variant="h4" gutterBottom>
         Executions
       </Typography>
@@ -177,20 +216,120 @@ export function Executions() {
         </Alert>
       )}
 
-      {/* Execution List */}
+      {/* Execution Table */}
       {!isLoading && !error && filteredExecutions.length > 0 && (
-        <Stack spacing={2}>
-          {filteredExecutions.map((execution) => (
-            <ExecutionCard
-              key={execution.execution_id}
-              execution={execution}
-              onPause={(id) => pauseMutation.mutate(id)}
-              onResume={(id) => resumeMutation.mutate(id)}
-              onSkip={(id) => skipMutation.mutate(id)}
-              onCancel={(id) => cancelMutation.mutate(id)}
-            />
-          ))}
-        </Stack>
+        <TableContainer component={Paper} sx={{ width: '100%', maxWidth: '100%' }}>
+          <Table size="medium" sx={{ tableLayout: 'fixed', width: '100%' }}>
+            <TableHead>
+              <TableRow>
+                <TableCell width="20%">Playbook</TableCell>
+                <TableCell width="12%">Status</TableCell>
+                <TableCell width="15%">Progress</TableCell>
+                <TableCell width="18%">Started</TableCell>
+                <TableCell width="18%">Completed</TableCell>
+                <TableCell width="17%" align="right">Actions</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {filteredExecutions.map((execution) => (
+                <TableRow
+                  key={execution.execution_id}
+                  sx={{ '&:hover': { backgroundColor: 'action.hover' } }}
+                >
+                  <TableCell>
+                    <Typography variant="body2" fontWeight="medium">
+                      {execution.playbook_name}
+                    </Typography>
+                  </TableCell>
+                  <TableCell>
+                    <Chip
+                      label={execution.status.toUpperCase()}
+                      size="small"
+                      color={getStatusColor(execution.status)}
+                    />
+                  </TableCell>
+                  <TableCell>
+                    <Typography variant="body2" color="text.secondary">
+                      {execution.current_step_index !== undefined
+                        ? `${execution.current_step_index + 1} / ${execution.step_results?.length || 0}`
+                        : '-'}
+                    </Typography>
+                  </TableCell>
+                  <TableCell>
+                    <Typography variant="body2" color="text.secondary">
+                      {formatTimestamp(execution.started_at)}
+                    </Typography>
+                  </TableCell>
+                  <TableCell>
+                    <Typography variant="body2" color="text.secondary">
+                      {formatTimestamp(execution.completed_at)}
+                    </Typography>
+                  </TableCell>
+                  <TableCell align="right">
+                    <Tooltip title="View details">
+                      <IconButton
+                        size="small"
+                        color="primary"
+                        onClick={() => navigate(`/executions/${execution.execution_id}`)}
+                        aria-label={`View ${execution.playbook_name} details`}
+                      >
+                        <ViewIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                    {execution.status === 'running' && (
+                      <Tooltip title="Pause">
+                        <IconButton
+                          size="small"
+                          color="warning"
+                          onClick={() => pauseMutation.mutate(execution.execution_id)}
+                          aria-label={`Pause ${execution.playbook_name}`}
+                        >
+                          <PauseIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                    )}
+                    {execution.status === 'paused' && (
+                      <>
+                        <Tooltip title="Resume">
+                          <IconButton
+                            size="small"
+                            color="success"
+                            onClick={() => resumeMutation.mutate(execution.execution_id)}
+                            aria-label={`Resume ${execution.playbook_name}`}
+                          >
+                            <PlayIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                        <Tooltip title="Skip">
+                          <IconButton
+                            size="small"
+                            color="info"
+                            onClick={() => skipMutation.mutate(execution.execution_id)}
+                            aria-label={`Skip step in ${execution.playbook_name}`}
+                          >
+                            <SkipIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      </>
+                    )}
+                    {(execution.status === 'running' || execution.status === 'paused') && (
+                      <Tooltip title="Cancel">
+                        <IconButton
+                          size="small"
+                          color="error"
+                          onClick={() => cancelMutation.mutate(execution.execution_id)}
+                          aria-label={`Cancel ${execution.playbook_name}`}
+                        >
+                          <CancelIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                    )}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </TableContainer>
       )}
 
       {/* Snackbar for notifications */}

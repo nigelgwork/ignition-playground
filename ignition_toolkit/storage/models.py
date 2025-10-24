@@ -23,6 +23,7 @@ class ExecutionModel(Base):
     __tablename__ = "executions"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
+    execution_id = Column(String(255), unique=True, nullable=False, index=True)  # UUID from frontend
     playbook_name = Column(String(255), nullable=False)
     playbook_version = Column(String(50), nullable=True)
     status = Column(String(50), nullable=False)  # pending, running, completed, failed, paused
@@ -47,6 +48,7 @@ class ExecutionModel(Base):
         """Convert to dictionary"""
         return {
             "id": self.id,
+            "execution_id": self.execution_id,
             "playbook_name": self.playbook_name,
             "playbook_version": self.playbook_version,
             "status": self.status,

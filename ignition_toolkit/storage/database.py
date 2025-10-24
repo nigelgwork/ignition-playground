@@ -6,7 +6,7 @@ import logging
 from pathlib import Path
 from typing import Generator, Optional
 from contextlib import contextmanager
-from sqlalchemy import create_engine, event
+from sqlalchemy import create_engine, event, text
 from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy.engine import Engine
 
@@ -69,6 +69,38 @@ class Database:
         """Create all database tables"""
         Base.metadata.create_all(bind=self.engine)
         logger.info("Database tables created/verified")
+
+    def verify_schema(self) -> bool:
+        """
+        Verify database schema is valid
+
+        Returns:
+            True if schema is valid, False otherwise
+
+        Raises:
+            Exception: If database query fails
+        """
+        try:
+            with self.session_scope() as session:
+                # Test basic query
+                result = session.execute(text("SELECT 1")).fetchone()
+                if result[0] != 1:
+                    return False
+
+                # Verify key tables exist
+                tables_query = text(
+                    "SELECT name FROM sqlite_master WHERE type='table' "
+                    "AND name IN ('executions', 'step_results')"
+                )
+                tables = session.execute(tables_query).fetchall()
+                expected_tables = {"executions", "step_results"}
+                found_tables = {row[0] for row in tables}
+
+                return expected_tables.issubset(found_tables)
+
+        except Exception as e:
+            logger.error(f"Schema verification failed: {e}")
+            return False
 
     def get_session(self) -> Session:
         """

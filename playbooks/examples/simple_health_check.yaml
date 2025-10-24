@@ -1,53 +1,58 @@
 name: "Simple Health Check"
 version: "1.0"
-description: "Basic health check for Ignition Gateway"
+description: "3-step visual health check: Open gateway, login, check license status"
 
 parameters:
   - name: gateway_url
     type: string
     required: true
+    default: "http://localhost:8088"
     description: "Gateway URL (e.g., http://localhost:8088)"
 
-  - name: gateway_credential
-    type: credential
+  - name: username
+    type: string
     required: true
-    description: "Credential name from vault"
+    description: "Gateway username"
+
+  - name: password
+    type: string
+    required: true
+    description: "Gateway password"
 
 steps:
-  - id: login
-    name: "Login to Gateway"
-    type: gateway.login
+  - id: step1_open_gateway
+    name: "Step 1: Open Gateway Webpage"
+    type: browser.navigate
     parameters:
-      username: "{{ credential.gateway_credential.username }}"
-      password: "{{ credential.gateway_credential.password }}"
+      url: "{{ gateway_url }}"
     timeout: 30
 
-  - id: ping
-    name: "Ping Gateway"
-    type: gateway.ping
+  - id: step2_login
+    name: "Step 2: Login to Gateway"
+    type: browser.fill
+    parameters:
+      selector: "input[name='username']"
+      value: "{{ username }}"
     timeout: 10
 
-  - id: get_info
-    name: "Get Gateway Info"
-    type: gateway.get_info
-    timeout: 30
-
-  - id: get_health
-    name: "Check Gateway Health"
-    type: gateway.get_health
-    timeout: 30
-
-  - id: list_modules
-    name: "List Installed Modules"
-    type: gateway.list_modules
-    timeout: 30
-
-  - id: list_projects
-    name: "List Projects"
-    type: gateway.list_projects
-    timeout: 30
-
-  - id: logout
-    name: "Logout"
-    type: gateway.logout
+  - id: step2b_password
+    name: "Step 2b: Enter Password"
+    type: browser.fill
+    parameters:
+      selector: "input[name='password']"
+      value: "{{ password }}"
     timeout: 10
+
+  - id: step2c_submit
+    name: "Step 2c: Submit Login"
+    type: browser.click
+    parameters:
+      selector: "button[type='submit']"
+    timeout: 10
+
+  - id: step3_check_license
+    name: "Step 3: Check License Status"
+    type: browser.screenshot
+    parameters:
+      path: "license_status.png"
+    timeout: 15

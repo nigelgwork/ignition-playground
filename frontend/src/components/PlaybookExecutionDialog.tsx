@@ -22,6 +22,7 @@ import { useQuery, useMutation } from '@tanstack/react-query';
 import { api } from '../api/client';
 import { ParameterInput } from './ParameterInput';
 import type { PlaybookInfo, CredentialInfo } from '../types/api';
+import { useStore, type SessionCredential } from '../store';
 
 interface PlaybookExecutionDialogProps {
   open: boolean;
@@ -58,12 +59,22 @@ export function PlaybookExecutionDialog({
   const [gatewayUrl, setGatewayUrl] = useState('http://localhost:8088');
   const [configSaved, setConfigSaved] = useState(false);
 
+  // Get global selected credential
+  const selectedCredential = useStore((state) => state.selectedCredential);
+  const sessionCredentials = useStore((state) => state.sessionCredentials);
+
   // Fetch available credentials
   const { data: credentials = [] } = useQuery<CredentialInfo[]>({
     queryKey: ['credentials'],
     queryFn: api.credentials.list,
     enabled: open,
   });
+
+  // Combine saved and session credentials for display
+  const allCredentials = [
+    ...credentials,
+    ...sessionCredentials,
+  ];
 
   // Execute playbook mutation
   const executeMutation = useMutation({
@@ -97,12 +108,43 @@ export function PlaybookExecutionDialog({
             defaultParams[param.name] = param.default;
           }
         });
+
+        // Auto-fill from global credential if available
+        if (selectedCredential) {
+          // Auto-fill credential parameter if playbook has one
+          const credentialParam = playbook.parameters.find(p => p.type === 'credential');
+          if (credentialParam) {
+            defaultParams[credentialParam.name] = selectedCredential.name;
+          }
+
+          // Auto-fill any username/password parameters if they exist
+          const usernameParam = playbook.parameters.find(p => p.name.toLowerCase().includes('username') || p.name.toLowerCase().includes('user'));
+          const passwordParam = playbook.parameters.find(p => p.name.toLowerCase().includes('password') || p.name.toLowerCase().includes('pass'));
+
+          if (usernameParam) {
+            defaultParams[usernameParam.name] = selectedCredential.username;
+          }
+
+          // For session credentials, we have the password available
+          const isSessionCredential = 'isSessionOnly' in selectedCredential && selectedCredential.isSessionOnly;
+          if (passwordParam && isSessionCredential) {
+            defaultParams[passwordParam.name] = (selectedCredential as SessionCredential).password;
+          }
+        }
+
         setParameters(defaultParams);
-        setGatewayUrl('http://localhost:8088');
+
+        // Auto-fill gateway URL from selected credential
+        if (selectedCredential?.gateway_url) {
+          setGatewayUrl(selectedCredential.gateway_url);
+        } else {
+          setGatewayUrl('http://localhost:8088');
+        }
+
         setConfigSaved(false);
       }
     }
-  }, [playbook]);
+  }, [playbook, selectedCredential]);
 
   if (!playbook) return null;
 
@@ -183,6 +225,14 @@ export function PlaybookExecutionDialog({
           )}
         </Box>
 
+        {/* Show selected credential info if available */}
+        {selectedCredential && !savedConfig && (
+          <Alert severity="info" sx={{ mb: 2 }}>
+            Auto-filled from global credential: <strong>{selectedCredential.name}</strong>
+            {selectedCredential.gateway_url && ` (${selectedCredential.gateway_url})`}
+          </Alert>
+        )}
+
         {/* Gateway URL */}
         <TextField
           label="Gateway URL"
@@ -194,7 +244,7 @@ export function PlaybookExecutionDialog({
           }}
           placeholder="http://localhost:8088"
           sx={{ mb: 2 }}
-          helperText="Ignition Gateway base URL"
+          helperText={selectedCredential?.gateway_url ? "Auto-filled from global credential" : "Ignition Gateway base URL"}
         />
 
         {/* Parameter inputs - filter out gateway_url since it's shown above */}
@@ -211,7 +261,7 @@ export function PlaybookExecutionDialog({
                   key={param.name}
                   parameter={param}
                   value={parameters[param.name] || ''}
-                  credentials={credentials}
+                  credentials={allCredentials}
                   onChange={handleParameterChange}
                 />
               ))}

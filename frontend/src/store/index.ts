@@ -3,7 +3,7 @@
  */
 
 import { create } from 'zustand';
-import type { ExecutionUpdate } from '../types/api';
+import type { ExecutionUpdate, CredentialInfo } from '../types/api';
 
 // Initialize theme from localStorage or default to 'dark'
 const getInitialTheme = (): 'dark' | 'light' => {
@@ -15,6 +15,16 @@ interface ScreenshotFrame {
   executionId: string;
   screenshot: string; // base64 encoded JPEG
   timestamp: string;
+}
+
+// Session-only credential (not saved to vault)
+interface SessionCredential {
+  name: string;
+  username: string;
+  password: string;
+  gateway_url?: string;
+  description?: string;
+  isSessionOnly: true;
 }
 
 interface AppState {
@@ -33,6 +43,15 @@ interface AppState {
   // Theme mode
   theme: 'dark' | 'light';
   setTheme: (theme: 'dark' | 'light') => void;
+
+  // Global credential selection
+  selectedCredential: CredentialInfo | SessionCredential | null;
+  setSelectedCredential: (credential: CredentialInfo | SessionCredential | null) => void;
+
+  // Session-only credentials (stored in memory only)
+  sessionCredentials: SessionCredential[];
+  addSessionCredential: (credential: SessionCredential) => void;
+  removeSessionCredential: (name: string) => void;
 }
 
 export const useStore = create<AppState>((set) => ({
@@ -60,4 +79,20 @@ export const useStore = create<AppState>((set) => ({
     localStorage.setItem('theme', theme);
     set({ theme });
   },
+
+  selectedCredential: null,
+  setSelectedCredential: (credential) => set({ selectedCredential: credential }),
+
+  sessionCredentials: [],
+  addSessionCredential: (credential) =>
+    set((state) => ({
+      sessionCredentials: [...state.sessionCredentials, credential],
+    })),
+  removeSessionCredential: (name) =>
+    set((state) => ({
+      sessionCredentials: state.sessionCredentials.filter((c) => c.name !== name),
+    })),
 }));
+
+// Export SessionCredential type for use in other components
+export type { SessionCredential };

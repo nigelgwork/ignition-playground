@@ -23,15 +23,21 @@ from ignition_toolkit.gateway import GatewayClient
 from ignition_toolkit.credentials import CredentialVault
 from ignition_toolkit.storage import get_database
 from ignition_toolkit import __version__
+from ignition_toolkit.startup.lifecycle import lifespan
+from ignition_toolkit.api.routers import health_router
 
 logger = logging.getLogger(__name__)
 
-# Create FastAPI app
+# Create FastAPI app with lifespan manager
 app = FastAPI(
     title="Ignition Automation Toolkit API",
     description="REST API for Ignition Gateway automation",
     version=__version__,
+    lifespan=lifespan,
 )
+
+# Register health check router FIRST (before other routes)
+app.include_router(health_router)
 
 # CORS middleware - Restrict to localhost only (secure default)
 import os
@@ -68,6 +74,16 @@ class ParameterInfo(BaseModel):
     description: str = ""
 
 
+class StepInfo(BaseModel):
+    """Step definition for frontend"""
+
+    id: str
+    name: str
+    type: str
+    timeout: int
+    retry_count: int
+
+
 class PlaybookInfo(BaseModel):
     """Playbook metadata"""
 
@@ -78,6 +94,7 @@ class PlaybookInfo(BaseModel):
     parameter_count: int
     step_count: int
     parameters: List[ParameterInfo] = []
+    steps: List[StepInfo] = []
 
 
 class ExecutionRequest(BaseModel):
@@ -86,6 +103,7 @@ class ExecutionRequest(BaseModel):
     playbook_path: str
     parameters: Dict[str, str]
     gateway_url: Optional[str] = None
+    credential_name: Optional[str] = None  # Name of saved credential to use
 
     @validator('parameters')
     def validate_parameters(cls, v):
@@ -128,6 +146,16 @@ class ExecutionResponse(BaseModel):
     message: str
 
 
+class StepResultResponse(BaseModel):
+    """Step execution result"""
+    step_id: str
+    step_name: str
+    status: str
+    error: Optional[str] = None
+    started_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
+
+
 class ExecutionStatusResponse(BaseModel):
     """Current execution status"""
 
@@ -139,6 +167,7 @@ class ExecutionStatusResponse(BaseModel):
     current_step_index: int
     total_steps: int
     error: Optional[str]
+    step_results: Optional[List[StepResultResponse]] = None
 
 
 # Frontend static files will be mounted AFTER all API routes to avoid conflicts
@@ -168,17 +197,6 @@ async def cleanup_old_executions():
         logger.info(f"Cleaned up {len(to_remove)} old execution(s)")
 
 
-# Health check
-@app.get("/health")
-async def health_check():
-    """Health check endpoint"""
-    return {
-        "status": "healthy",
-        "version": __version__,
-        "timestamp": datetime.now().isoformat(),
-    }
-
-
 # Playbook endpoints
 @app.get("/api/playbooks", response_model=List[PlaybookInfo])
 async def list_playbooks():
@@ -205,6 +223,18 @@ async def list_playbooks():
                 for p in playbook.parameters
             ]
 
+            # Convert steps to StepInfo models
+            steps = [
+                StepInfo(
+                    id=s.id,
+                    name=s.name,
+                    type=s.type.value,
+                    timeout=s.timeout,
+                    retry_count=s.retry_count,
+                )
+                for s in playbook.steps
+            ]
+
             playbooks.append(
                 PlaybookInfo(
                     name=playbook.name,
@@ -214,6 +244,7 @@ async def list_playbooks():
                     parameter_count=len(playbook.parameters),
                     step_count=len(playbook.steps),
                     parameters=parameters,
+                    steps=steps,
                 )
             )
         except Exception as e:
@@ -245,6 +276,18 @@ async def get_playbook(playbook_path: str):
             for p in playbook.parameters
         ]
 
+        # Convert steps to StepInfo models
+        steps = [
+            StepInfo(
+                id=s.id,
+                name=s.name,
+                type=s.type.value,
+                timeout=s.timeout,
+                retry_count=s.retry_count,
+            )
+            for s in playbook.steps
+        ]
+
         return PlaybookInfo(
             name=playbook.name,
             path=str(validated_path),
@@ -253,6 +296,7 @@ async def get_playbook(playbook_path: str):
             parameter_count=len(playbook.parameters),
             step_count=len(playbook.steps),
             parameters=parameters,
+            steps=steps,
         )
     except HTTPException:
         raise
@@ -312,9 +356,35 @@ async def start_execution(request: ExecutionRequest, background_tasks: Backgroun
         # Create components
         vault = CredentialVault()
         database = get_database()
+
+        # If credential_name provided, load credential and auto-fill parameters
+        parameters = request.parameters.copy()
+        gateway_url = request.gateway_url
+
+        if request.credential_name:
+            credential = vault.get_credential(request.credential_name)
+            if not credential:
+                raise HTTPException(status_code=404, detail=f"Credential '{request.credential_name}' not found")
+
+            # Auto-fill gateway_url if not provided
+            if not gateway_url and credential.gateway_url:
+                gateway_url = credential.gateway_url
+
+            # Auto-fill credential-type parameters with credential name
+            for param in playbook.parameters:
+                if param.type == "credential" and param.name not in parameters:
+                    parameters[param.name] = request.credential_name
+
+            # Auto-fill username/password parameters if they exist
+            for param in playbook.parameters:
+                if param.name.lower() in ['username', 'user', 'gateway_username'] and param.name not in parameters:
+                    parameters[param.name] = credential.username
+                elif param.name.lower() in ['password', 'pass', 'gateway_password'] and param.name not in parameters:
+                    parameters[param.name] = credential.password
+
         gateway_client = None
-        if request.gateway_url:
-            gateway_client = GatewayClient(request.gateway_url)
+        if gateway_url:
+            gateway_client = GatewayClient(gateway_url)
 
         # Create screenshot callback for browser streaming
         async def screenshot_callback(execution_id: str, screenshot_b64: str):
@@ -350,7 +420,7 @@ async def start_execution(request: ExecutionRequest, background_tasks: Backgroun
 
                 execution_state = await engine.execute_playbook(
                     playbook,
-                    request.parameters,
+                    parameters,  # Use auto-filled parameters instead of request.parameters
                     base_path=Path(request.playbook_path).parent,
                     execution_id=execution_id,  # Pass the pre-generated ID
                 )
@@ -403,6 +473,19 @@ async def list_executions(limit: int = 50, status: Optional[str] = None):
             if status and state.status.value != status:
                 continue
 
+            # Convert step results to response format
+            step_results = [
+                StepResultResponse(
+                    step_id=step.step_id,
+                    step_name=step.step_name,
+                    status=step.status.value,
+                    error=step.error,
+                    started_at=step.started_at,
+                    completed_at=step.completed_at,
+                )
+                for step in state.step_results
+            ]
+
             executions.append(ExecutionStatusResponse(
                 execution_id=state.execution_id,
                 playbook_name=state.playbook_name,
@@ -412,6 +495,7 @@ async def list_executions(limit: int = 50, status: Optional[str] = None):
                 current_step_index=state.current_step_index,
                 total_steps=len(state.step_results) + 1,
                 error=state.error,
+                step_results=step_results,
             ))
 
     # Then, fetch recent executions from database
@@ -442,6 +526,7 @@ async def list_executions(limit: int = 50, status: Optional[str] = None):
                         current_step_index=0,  # Not tracked in DB model
                         total_steps=0,  # Not tracked in DB model
                         error=db_exec.error_message,
+                        step_results=[],  # Return empty array instead of null for consistency
                     ))
     except Exception as e:
         logger.warning(f"Failed to fetch executions from database: {e}")
@@ -454,11 +539,24 @@ async def list_executions(limit: int = 50, status: Optional[str] = None):
 @app.get("/api/executions/{execution_id}", response_model=ExecutionStatusResponse)
 async def get_execution_status(execution_id: str):
     """Get execution status"""
-    # Check active engines
+    # Check active engines first (for running executions)
     if execution_id in active_engines:
         engine = active_engines[execution_id]
         state = engine.get_current_execution()
         if state:
+            # Convert step results to response format
+            step_results = [
+                StepResultResponse(
+                    step_id=step.step_id,
+                    step_name=step.step_name,
+                    status=step.status.value,
+                    error=step.error,
+                    started_at=step.started_at,
+                    completed_at=step.completed_at,
+                )
+                for step in state.step_results
+            ]
+
             return ExecutionStatusResponse(
                 execution_id=state.execution_id,
                 playbook_name=state.playbook_name,
@@ -468,9 +566,59 @@ async def get_execution_status(execution_id: str):
                 current_step_index=state.current_step_index,
                 total_steps=len(state.step_results) + 1,  # Approximate
                 error=state.error,
+                step_results=step_results,
             )
 
+    # If not in active engines, check database (for completed executions)
+    try:
+        database = get_database()
+        with database.session_scope() as session:
+            from ignition_toolkit.storage.models import ExecutionModel, StepResultModel
+
+            db_exec = session.query(ExecutionModel).filter(
+                ExecutionModel.execution_id == execution_id
+            ).first()
+
+            if db_exec:
+                # Get step results from database
+                # NOTE: execution_id column is INTEGER FK to executions.id, not UUID
+                db_steps = session.query(StepResultModel).filter(
+                    StepResultModel.execution_id == db_exec.id
+                ).order_by(StepResultModel.id).all()
+
+                step_results = [
+                    StepResultResponse(
+                        step_id=step.step_id,
+                        step_name=step.step_name,
+                        status=step.status,
+                        error=step.error_message,
+                        started_at=step.started_at,
+                        completed_at=step.completed_at,
+                    )
+                    for step in db_steps
+                ]
+
+                return ExecutionStatusResponse(
+                    execution_id=db_exec.execution_id,
+                    playbook_name=db_exec.playbook_name,
+                    status=db_exec.status,
+                    started_at=db_exec.started_at,
+                    completed_at=db_exec.completed_at,
+                    current_step_index=len(db_steps) - 1 if db_steps else 0,
+                    total_steps=len(db_steps),
+                    error=db_exec.error_message,
+                    step_results=step_results,
+                )
+    except Exception as e:
+        logger.warning(f"Failed to fetch execution from database: {e}")
+
     raise HTTPException(status_code=404, detail="Execution not found")
+
+
+@app.get("/api/executions/{execution_id}/status", response_model=ExecutionStatusResponse)
+async def get_execution_status_with_path(execution_id: str):
+    """Get execution status (alternative route for frontend compatibility)"""
+    return await get_execution_status(execution_id)
 
 
 @app.post("/api/executions/{execution_id}/pause")
@@ -526,6 +674,7 @@ class CredentialInfo(BaseModel):
     """Credential information (without password)"""
     name: str
     username: str
+    gateway_url: Optional[str] = None
     description: Optional[str] = ""
 
 
@@ -534,6 +683,7 @@ class CredentialCreate(BaseModel):
     name: str
     username: str
     password: str
+    gateway_url: Optional[str] = None
     description: Optional[str] = ""
 
 
@@ -547,6 +697,7 @@ async def list_credentials():
             CredentialInfo(
                 name=cred.name,
                 username=cred.username,
+                gateway_url=cred.gateway_url,
                 description=cred.description or ""
             )
             for cred in credentials
@@ -578,6 +729,7 @@ async def add_credential(credential: CredentialCreate):
                 name=credential.name,
                 username=credential.username,
                 password=credential.password,
+                gateway_url=credential.gateway_url,
                 description=credential.description
             )
         )
@@ -587,6 +739,41 @@ async def add_credential(credential: CredentialCreate):
         raise
     except Exception as e:
         logger.error(f"Error adding credential: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.put("/api/credentials/{name}")
+async def update_credential(name: str, credential: CredentialCreate):
+    """Update existing credential"""
+    try:
+        vault = CredentialVault()
+        from ignition_toolkit.credentials.vault import Credential
+
+        # Check if credential exists
+        try:
+            existing = vault.get_credential(name)
+            if not existing:
+                raise HTTPException(status_code=404, detail=f"Credential '{name}' not found")
+        except ValueError:
+            raise HTTPException(status_code=404, detail=f"Credential '{name}' not found")
+
+        # Update credential (delete and re-add with same name)
+        vault.delete_credential(name)
+        vault.save_credential(
+            Credential(
+                name=name,  # Use name from URL path, not from body
+                username=credential.username,
+                password=credential.password,
+                gateway_url=credential.gateway_url,
+                description=credential.description
+            )
+        )
+
+        return {"message": "Credential updated successfully", "name": name}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating credential: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -717,31 +904,8 @@ async def broadcast_screenshot_frame(execution_id: str, screenshot_b64: str):
             websocket_connections.remove(ws)
 
 
-# Startup/shutdown events
-@app.on_event("startup")
-async def startup_event():
-    """Initialize on startup"""
-    logger.info("Ignition Automation Toolkit API started")
-
-    # Security warning for default WebSocket API key
-    ws_api_key = os.getenv("WEBSOCKET_API_KEY", "dev-key-change-in-production")
-    if ws_api_key == "dev-key-change-in-production":
-        logger.warning("=" * 80)
-        logger.warning("SECURITY WARNING: Using default WebSocket API key!")
-        logger.warning("Set WEBSOCKET_API_KEY environment variable for production")
-        logger.warning("See SECURITY.md for production deployment guidelines")
-        logger.warning("=" * 80)
-
-    # Start periodic cleanup task
-    async def periodic_cleanup():
-        while True:
-            await asyncio.sleep(300)  # Run every 5 minutes
-            try:
-                await cleanup_old_executions()
-            except Exception as e:
-                logger.exception(f"Error in periodic cleanup: {e}")
-
-    asyncio.create_task(periodic_cleanup())
+# Note: Startup logic moved to startup/lifecycle.py lifespan manager
+# Security warning for WebSocket API key is now in environment validation
 
 
 # Serve frontend (React build) - MUST be at the END to avoid catching API routes
@@ -762,21 +926,4 @@ else:
     logger.warning("Frontend build not found at frontend/dist - run 'npm run build' in frontend/ directory")
 
 
-@app.on_event("shutdown")
-async def shutdown_event():
-    """Cleanup on shutdown"""
-    logger.info("Ignition Automation Toolkit API shutting down")
-
-    # Cancel all active executions
-    for engine in active_engines.values():
-        try:
-            await engine.cancel()
-        except Exception as e:
-            logger.exception(f"Error cancelling execution: {e}")
-
-    # Close WebSocket connections
-    for ws in websocket_connections:
-        try:
-            await ws.close()
-        except Exception:
-            pass
+# Note: Shutdown logic moved to startup/lifecycle.py lifespan manager

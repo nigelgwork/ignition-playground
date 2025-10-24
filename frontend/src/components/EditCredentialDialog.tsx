@@ -1,8 +1,8 @@
 /**
- * AddCredentialDialog - Dialog for adding new credentials
+ * EditCredentialDialog - Dialog for editing existing credentials
  */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Dialog,
   DialogTitle,
@@ -14,102 +14,83 @@ import {
   Alert,
   IconButton,
   InputAdornment,
-  FormControlLabel,
-  Switch,
-  Typography,
 } from '@mui/material';
 import { Visibility, VisibilityOff } from '@mui/icons-material';
-import type { CredentialCreate } from '../types/api';
-import { useStore, type SessionCredential } from '../store';
+import type { CredentialInfo, CredentialCreate } from '../types/api';
 
-interface AddCredentialDialogProps {
+interface EditCredentialDialogProps {
   open: boolean;
+  credential: CredentialInfo | null;
   onClose: () => void;
-  onSubmit: (credential: CredentialCreate) => void;
+  onSubmit: (name: string, credential: CredentialCreate) => void;
   isLoading?: boolean;
   error?: string | null;
 }
 
-export function AddCredentialDialog({
+export function EditCredentialDialog({
   open,
+  credential,
   onClose,
   onSubmit,
   isLoading = false,
   error = null,
-}: AddCredentialDialogProps) {
-  const [name, setName] = useState('');
+}: EditCredentialDialogProps) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [gatewayUrl, setGatewayUrl] = useState('');
   const [description, setDescription] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [sessionOnly, setSessionOnly] = useState(false);
 
-  const addSessionCredential = useStore((state) => state.addSessionCredential);
+  // Populate form when credential prop changes
+  useEffect(() => {
+    if (credential) {
+      setUsername(credential.username);
+      setPassword(''); // Don't populate password for security
+      setGatewayUrl(credential.gateway_url || '');
+      setDescription(credential.description || '');
+    }
+  }, [credential]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!name.trim() || !username.trim() || !password.trim()) {
+    if (!username.trim() || !password.trim() || !credential) {
       return;
     }
 
-    if (sessionOnly) {
-      // Add to session-only credentials (not saved to vault)
-      const sessionCred: SessionCredential = {
-        name: name.trim(),
-        username: username.trim(),
-        password: password.trim(),
-        gateway_url: gatewayUrl.trim() || undefined,
-        description: description.trim() || undefined,
-        isSessionOnly: true,
-      };
-      addSessionCredential(sessionCred);
-      handleClose(); // Close dialog
-    } else {
-      // Save to vault via API
-      onSubmit({
-        name: name.trim(),
-        username: username.trim(),
-        password: password.trim(),
-        gateway_url: gatewayUrl.trim() || undefined,
-        description: description.trim() || undefined,
-      });
-    }
+    onSubmit(credential.name, {
+      name: credential.name, // Name cannot be changed
+      username: username.trim(),
+      password: password.trim(),
+      gateway_url: gatewayUrl.trim() || undefined,
+      description: description.trim() || undefined,
+    });
   };
 
   const handleClose = () => {
     // Reset form
-    setName('');
     setUsername('');
     setPassword('');
     setGatewayUrl('');
     setDescription('');
     setShowPassword(false);
-    setSessionOnly(false);
     onClose();
   };
 
-  const isValid = name.trim() && username.trim() && password.trim();
+  const isValid = username.trim() && password.trim();
+
+  if (!credential) return null;
 
   return (
     <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
-      <DialogTitle>Add New Credential</DialogTitle>
+      <DialogTitle>Edit Credential: {credential.name}</DialogTitle>
 
       <form onSubmit={handleSubmit}>
         <DialogContent>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            <TextField
-              label="Name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="gateway_admin"
-              required
-              fullWidth
-              autoFocus
-              helperText="Unique identifier for this credential"
-              disabled={isLoading}
-            />
+            <Alert severity="info" sx={{ mb: 1 }}>
+              Credential name cannot be changed. Delete and recreate if you need a different name.
+            </Alert>
 
             <TextField
               label="Username"
@@ -118,6 +99,7 @@ export function AddCredentialDialog({
               placeholder="admin"
               required
               fullWidth
+              autoFocus
               disabled={isLoading}
             />
 
@@ -129,6 +111,7 @@ export function AddCredentialDialog({
               required
               fullWidth
               disabled={isLoading}
+              helperText="Enter new password (required to update)"
               InputProps={{
                 endAdornment: (
                   <InputAdornment position="end">
@@ -165,27 +148,7 @@ export function AddCredentialDialog({
               disabled={isLoading}
             />
 
-            <Box sx={{ p: 2, bgcolor: 'background.default', borderRadius: 1 }}>
-              <FormControlLabel
-                control={
-                  <Switch
-                    checked={sessionOnly}
-                    onChange={(e) => setSessionOnly(e.target.checked)}
-                    disabled={isLoading}
-                  />
-                }
-                label={
-                  <Box>
-                    <Typography variant="body2">Session Only (Don't Save)</Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      Temporary credential - will be cleared when you close the browser
-                    </Typography>
-                  </Box>
-                }
-              />
-            </Box>
-
-            {error && !sessionOnly && (
+            {error && (
               <Alert severity="error" sx={{ mt: 1 }}>
                 {error}
               </Alert>
@@ -200,9 +163,9 @@ export function AddCredentialDialog({
           <Button
             type="submit"
             variant="contained"
-            disabled={!isValid || (isLoading && !sessionOnly)}
+            disabled={!isValid || isLoading}
           >
-            {sessionOnly ? 'Add (Session Only)' : isLoading ? 'Adding...' : 'Save Credential'}
+            {isLoading ? 'Updating...' : 'Update Credential'}
           </Button>
         </DialogActions>
       </form>

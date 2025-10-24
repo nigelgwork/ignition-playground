@@ -26,6 +26,7 @@ import { Link, Outlet, useLocation } from 'react-router-dom';
 import { useStore } from '../store';
 import { api } from '../api/client';
 import type { HealthResponse } from '../types/api';
+import { GlobalCredentialSelector } from './GlobalCredentialSelector';
 
 const DRAWER_WIDTH = 240;
 
@@ -40,17 +41,18 @@ export function Layout() {
   const isWSConnected = useStore((state) => state.isWSConnected);
   const theme = useStore((state) => state.theme);
   const setTheme = useStore((state) => state.setTheme);
-  const [version, setVersion] = useState<string>('...');
+  const [version, setVersion] = useState<string>('');
   const [health, setHealth] = useState<'healthy' | 'unhealthy'>('healthy');
 
   // Fetch version and health on mount
   useEffect(() => {
     api.health()
       .then((data: HealthResponse) => {
-        setVersion(data.version);
+        setVersion(data.version || '1.0.17');
         setHealth(data.status === 'healthy' ? 'healthy' : 'unhealthy');
       })
       .catch(() => {
+        setVersion('1.0.17'); // Fallback version
         setHealth('unhealthy');
       });
   }, []);
@@ -63,9 +65,14 @@ export function Layout() {
     <Box sx={{ display: 'flex' }}>
       <AppBar position="fixed" sx={{ zIndex: (theme) => theme.zIndex.drawer + 1 }}>
         <Toolbar>
-          <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1 }}>
+          <Typography variant="h6" noWrap component="div">
             ⚡ Ignition Playground
           </Typography>
+
+          {/* Global Credential Selector */}
+          <Box sx={{ flexGrow: 1, display: 'flex', justifyContent: 'center', px: 2 }}>
+            <GlobalCredentialSelector />
+          </Box>
 
           {/* Health Badge */}
           <Chip
@@ -185,9 +192,11 @@ export function Layout() {
         </Box>
       </Drawer>
 
-      <Box component="main" sx={{ flexGrow: 1, p: 3 }}>
+      <Box component="main" sx={{ flexGrow: 1, p: 3, minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
         <Toolbar />
-        <Outlet />
+        <Box sx={{ flexGrow: 1 }}>
+          <Outlet />
+        </Box>
       </Box>
     </Box>
   );

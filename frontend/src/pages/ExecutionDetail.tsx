@@ -128,7 +128,17 @@ export function ExecutionDetail() {
     : 0;
 
   return (
-    <Box sx={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
+    <Box sx={{
+      position: 'fixed',
+      left: 240, // Drawer width
+      right: 0,
+      top: 64, // AppBar height
+      bottom: 0,
+      display: 'flex',
+      flexDirection: 'column',
+      overflow: 'hidden',
+      bgcolor: 'background.default',
+    }}>
       {/* Header */}
       <Paper
         elevation={1}
@@ -138,6 +148,7 @@ export function ExecutionDetail() {
           display: 'flex',
           alignItems: 'center',
           gap: 2,
+          flexShrink: 0,
         }}
       >
         <Button
@@ -170,7 +181,7 @@ export function ExecutionDetail() {
 
       {/* Progress Bar */}
       {execution.status === 'running' && (
-        <Box sx={{ px: 2 }}>
+        <Box sx={{ px: 2, py: 1, flexShrink: 0 }}>
           <LinearProgress variant="determinate" value={progress} />
           <Typography variant="caption" color="text.secondary">
             Progress: {Math.round(progress)}%
@@ -183,10 +194,11 @@ export function ExecutionDetail() {
         sx={{
           flexGrow: 1,
           display: 'grid',
-          gridTemplateColumns: '1fr 1fr',
+          gridTemplateColumns: '1fr 2fr',
           gap: 2,
           p: 2,
           overflow: 'hidden',
+          minHeight: 0, // Important for proper flex sizing
         }}
       >
         {/* Left: Step Progress */}

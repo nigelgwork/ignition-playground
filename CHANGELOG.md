@@ -5,6 +5,246 @@ All notable changes to the Ignition Automation Toolkit will be documented in thi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.13] - 2025-10-24
+
+### Fixed
+- **Credential Gateway URL Not Saving**: Fixed critical bug where gateway_url wasn't persisted
+  - Root cause: `vault.py:91` was not including `gateway_url` in credentials_data dictionary
+  - Added `"gateway_url": credential.gateway_url` to stored credential data
+  - Credentials now properly save and display gateway URLs
+
+### Changed
+- **Executions Page Layout**: Converted from card-based to clean table layout
+  - Replaced ExecutionCard components with Material-UI Table
+  - Columns: Playbook, Status, Progress, Started, Completed, Actions
+  - Status displayed as color-coded chips (running=blue, paused=orange, completed=green, failed=red)
+  - Action buttons: View (eye icon), Pause/Resume, Skip, Cancel
+  - Consistent with Credentials page table styling
+  - Hover effects on table rows
+  - Fixed table layout with column width percentages
+
+### Technical Details
+- Backend: `vault.py` save_credential() now includes gateway_url field
+- Frontend: Executions.tsx converted to table with TableContainer, Table, TableHead, TableBody
+- Frontend: Added helper functions for status colors and timestamp formatting
+- Frontend: Uses useNavigate for navigation to execution details
+
+## [1.0.12] - 2025-10-24
+
+### Fixed
+- **Credential Edit Not Saving**: Fixed bug where credential edits weren't persisting
+  - Backend was using credential name from request body instead of URL path
+  - Changed `app.py:737` to use `name` parameter from URL path
+  - Credentials now properly update when edited
+
+- **Simple Health Check Playbook Not Visible**: Fixed playbook validation error
+  - Removed invalid step types: `browser.launch` and `browser.close`
+  - Browser is automatically managed by playbook engine
+  - Playbook now loads correctly with 7 valid steps
+  - Card now visible in Examples category
+
+### Technical Details
+- Backend: `/api/credentials/{name}` PUT endpoint now uses path parameter for credential name
+- Playbook: Removed non-existent step types from simple_health_check.yaml
+- Browser automation launches automatically on first browser step
+- Browser closes automatically when execution completes
+
+## [1.0.11] - 2025-10-24
+
+### Added
+- **Credential Edit Function**: Full edit capability for existing credentials
+  - New EditCredentialDialog component
+  - Edit icon button added to credentials table
+  - PUT endpoint `/api/credentials/{name}` for updating credentials
+  - Update mutation in frontend with React Query
+  - Password required when updating (security best practice)
+  - Credential name cannot be changed (delete and recreate if needed)
+
+### Fixed
+- **Credentials Table Layout**: Improved horizontal spacing and table width
+  - Added `width: '100%', maxWidth: '100%'` to parent Box
+  - Set table layout to 'fixed' for consistent column widths
+  - Proper column width percentages: 25%, 25%, 40%, 10%
+  - Table now properly spreads across available space
+
+### Changed
+- **Credentials Table Actions**: Now includes both Edit and Delete buttons
+  - Edit button (blue) appears first
+  - Delete button (red) appears second
+  - Both buttons have tooltips for better UX
+
+### Technical Details
+- Backend: Added `@app.put("/api/credentials/{name}")` endpoint
+- Frontend: Created `EditCredentialDialog.tsx` component
+- Frontend: Updated `Credentials.tsx` with edit state and mutation
+- Frontend: Updated `client.ts` API with update method
+
+## [1.0.10] - 2025-10-24
+
+### Added
+- **Playbook Step Inspection**: View all steps in a playbook before execution
+  - Backend: Added `StepInfo` model with id, name, type, timeout, retry_count
+  - Updated API endpoints to include step details in playbook responses
+  - Created `PlaybookStepsDialog` component with full step table
+  - Step type color-coded chips (gateway=primary, browser=secondary, ai=success)
+  - "View All Steps" menu option in playbook cards
+  - First 5 steps shown in expanded card details
+
+- **Visual Health Check Playbook**: Simple browser-based health check
+  - Opens Ignition Gateway in browser
+  - Logs in with credentials
+  - Takes screenshot for verification
+  - Perfect first test to visually verify connectivity
+
+### Changed
+- **Enhanced Card Styling**: Made playbook cards more visually distinct
+  - Increased border width from 1px to 2px (3px on hover)
+  - Added elevation={3} for depth
+  - Increased border radius for rounded corners
+  - Changed gap between cards from 3 to 4
+  - Stronger hover effects (translateY -6px, shadow 12)
+  - Background color change on hover
+
+- **Credentials Page**: Changed from card grid to clean table layout
+  - Table format with Name, Username, Gateway URL, Actions columns
+  - Hover effects on rows
+  - Gateway URL displayed as chips
+  - More compact and professional appearance
+
+- **Drag Mode Toggle**: Added button to enable/disable drag mode
+  - Button in Playbooks header changes to "Drag Mode ON" when enabled
+  - Cards only draggable when mode is enabled
+  - Fixes issue where buttons were unclickable during drag
+
+### Technical Details
+- Frontend: Added `StepInfo` interface to types
+- Frontend: Updated `PlaybookInfo` to include `steps` array
+- Frontend: Modified PlaybookCard to show real step data
+- Card styling: Added borderRadius, backgroundColor, stronger transitions
+
+## [1.0.9] - 2025-10-24
+
+### Added
+- **Drag-and-Drop Playbook Reordering**: Organize playbooks visually with persistent ordering
+  - Drag playbook cards to reorder within each category (Gateway, Designer, Perspective)
+  - Order persisted to localStorage per category
+  - Smooth animations during drag operations
+  - Visual feedback with opacity change while dragging
+  - Uses @dnd-kit library for accessible, modern drag-and-drop
+
+- **Auto-fill from Global Credentials**: Playbook execution dialog now auto-fills from selected credential
+  - Auto-fills gateway URL from global credential
+  - Auto-fills credential parameter if playbook has one
+  - Auto-fills username/password parameters by name matching
+  - Works with both saved credentials and session-only credentials
+  - Visual indicator (Alert) shows which credential was used for auto-fill
+  - No need to manually configure when using global credential
+
+### Technical Details
+- **Frontend**: Added @dnd-kit/core and @dnd-kit/sortable dependencies
+- **State Management**: Added per-category state for playbooks to enable re-rendering on drag
+- **Drag Sensors**: Configured pointer and keyboard sensors for accessibility
+- **Order Persistence**: Uses localStorage keys: `playbook_order_gateway`, `playbook_order_designer`, `playbook_order_perspective`
+- **Auto-fill Logic**: Reads from Zustand global state, auto-fills based on parameter name matching
+
+## [1.0.8] - 2025-10-24
+
+### Added
+- **Global Credential Selector**: Select credentials once, apply to all playbook executions
+  - Dropdown selector in main app bar
+  - Shows username@gateway_url for quick reference
+  - Applies globally across all playbook configurations
+
+- **Enhanced Credential Management**:
+  - Gateway URL field added to credentials (URL, username, password)
+  - Session-only credentials (temporary, not saved to vault)
+  - Credentials now support gateway URL for auto-configuration
+  - Visual distinction between saved and session credentials
+
+- **Improved Card UX**:
+  - Playbook cards now have hover effects (elevation, border highlight, lift animation)
+  - Smooth transitions on hover
+  - Visual cursor feedback (grab cursor)
+
+- **Playbook Organization**:
+  - Created `/playbooks/perspective/` directory with README placeholder
+  - Created `/playbooks/designer/` directory with README placeholder
+  - Focus on Gateway automation first, Perspective/Designer coming later
+
+### Changed
+- **Version Display**: Fixed version showing as "v..." in UI - now displays correct version (1.0.8)
+- **Credential Dialog**: Enhanced with Gateway URL field and "Session Only" toggle
+- **Credential Cards**: Now display gateway URL when present
+
+### Removed
+- **Browser Playbooks**: Deleted `/playbooks/browser/` directory (incorrect Perspective implementations)
+  - Removed: `ignition_web_test.yaml`, `screenshot_audit.yaml`, `web_login_test.yaml`
+  - Will be replaced with proper Perspective playbooks in future release
+
+### Technical Details
+- **Backend**: Extended Credential model with `gateway_url` field (backward compatible)
+- **Frontend**: Added Zustand state for global credential selection and session credentials
+- **API**: Updated credential endpoints to handle gateway_url field
+- **Database**: Credential vault automatically handles new field (no migration needed)
+
+### Migration Notes
+- Existing credentials work without URL - URL field is optional
+- Session credentials are stored in browser memory only (cleared on refresh)
+- No breaking changes - fully backward compatible
+
+## [1.0.7] - 2025-10-24
+
+### Added
+- **Robust Startup System**: Comprehensive 5-phase startup validation system
+  - Phase 1: Environment validation (Python version, directories, permissions)
+  - Phase 2: Database initialization with schema verification
+  - Phase 3: Credential vault initialization with encryption testing
+  - Phase 4: Playbook library validation (non-fatal)
+  - Phase 5: Frontend build validation (non-fatal, production only)
+  - Fail-fast error handling with recovery hints
+  - Graceful degradation for non-critical components
+
+- **Health Check Endpoints**: Kubernetes-style health monitoring
+  - `GET /health` - Overall health check (200 if healthy/degraded, 503 if unhealthy)
+  - `GET /health/live` - Liveness probe (always 200 if running)
+  - `GET /health/ready` - Readiness probe (200 if ready, 503 if not)
+  - `GET /health/detailed` - Component-level health details with timestamps
+  - Real-time health state tracking for all system components
+
+- **Modular Startup Architecture**:
+  - `ignition_toolkit/startup/health.py` - Health state management
+  - `ignition_toolkit/startup/exceptions.py` - Startup-specific exceptions
+  - `ignition_toolkit/startup/validators.py` - Component validators
+  - `ignition_toolkit/startup/lifecycle.py` - FastAPI lifespan manager
+  - `ignition_toolkit/api/routers/health.py` - Health check endpoints
+
+### Enhanced
+- **Database Module**: Added `verify_schema()` method for validation
+- **Credential Vault**: Added `initialize()` and `test_encryption()` methods with singleton pattern
+- **Configuration**: Added Playwright settings (headless, browser type, timeout)
+- **FastAPI App**: Integrated lifespan context manager, replaced deprecated startup/shutdown events
+
+### Testing
+- **Comprehensive Test Coverage**: 44 automated tests for startup system
+  - Unit tests for health state management (13 tests)
+  - Unit tests for validators (13 tests)
+  - Unit tests for lifecycle manager (8 tests)
+  - Integration tests for health endpoints (11 tests)
+  - All tests passing with 100% coverage of new components
+
+### Technical Details
+- Replaced deprecated `@app.on_event("startup")` with modern lifespan context manager
+- Health router registered first to ensure availability during startup
+- Singleton patterns for settings, database, and vault instances
+- Clear separation between critical (database, vault) and non-critical (playbooks, frontend) validations
+- Startup time tracking and detailed error/warning collection
+
+### Migration Notes
+- No breaking changes - all existing functionality preserved
+- Health endpoints available immediately at startup
+- Development mode automatically detected (skips frontend validation)
+- Configuration errors now caught at startup instead of runtime
+
 ## [1.0.6] - 2025-10-24
 
 ### Fixed

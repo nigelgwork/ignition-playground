@@ -565,6 +565,85 @@ UI needed to persist user preferences (theme, saved playbook configurations, ena
 
 ---
 
+## ADR-011: FastAPI Lifespan for Robust Startup
+
+**Date:** 2025-10-24
+**Status:** Accepted ✅
+
+### Context
+
+The application needs a robust startup system that validates all components before accepting requests, with clear error messages when things go wrong.
+
+**Options:**
+1. **Deprecated @app.on_event**: Old pattern, works but deprecated
+2. **FastAPI lifespan context manager**: Modern pattern, recommended
+3. **Manual initialization in main()**: No framework integration
+4. **Lazy initialization**: Initialize on first request
+
+### Decision
+
+**We chose FastAPI lifespan context manager** with 5-phase validation.
+
+### Rationale
+
+1. **Modern FastAPI Pattern**: Recommended approach since FastAPI 0.93+
+   ```python
+   @asynccontextmanager
+   async def lifespan(app: FastAPI):
+       # Startup
+       await validate_environment()
+       await initialize_database()
+       yield
+       # Shutdown
+       cleanup()
+   ```
+
+2. **Fail-Fast Validation**: Application won't start if critical components fail
+   - Phase 1: Environment (Python version, directories, permissions)
+   - Phase 2: Database (schema verification)
+   - Phase 3: Credential vault (encryption test)
+   - Phase 4: Playbook library (non-fatal warning)
+   - Phase 5: Frontend build (non-fatal, production only)
+
+3. **Health State Tracking**: Global singleton tracks component health:
+   ```python
+   health = get_health_state()
+   # Overall: healthy/degraded/unhealthy
+   # Components: database, vault, playbooks, frontend
+   # Errors and warnings collected
+   ```
+
+4. **Kubernetes-Style Health Checks**:
+   - `/health` - Overall health (200/503)
+   - `/health/live` - Liveness probe (always 200)
+   - `/health/ready` - Readiness probe (200/503)
+   - `/health/detailed` - Component-level details
+
+5. **Recovery Hints**: Exceptions include actionable recovery instructions
+   ```python
+   raise DatabaseInitError(
+       "Database connection failed",
+       recovery_hint="Delete data/toolkit.db and restart"
+   )
+   ```
+
+### Consequences
+
+**Positive:**
+- Errors caught at startup, not runtime
+- Clear component health visibility
+- Standard health check endpoints for monitoring
+- Non-critical failures don't block startup (degraded mode)
+- Easy debugging with detailed error messages
+
+**Negative:**
+- Slightly slower startup (validates everything upfront)
+- More complex than lazy initialization
+
+**Accepted Trade-off:** Reliability over startup speed.
+
+---
+
 ## Summary of Key Decisions
 
 | ADR | Decision | Rationale |
@@ -579,6 +658,7 @@ UI needed to persist user preferences (theme, saved playbook configurations, ena
 | ADR-008 | Playwright automation | Modern API, fast, auto-wait, Python support |
 | ADR-009 | Domain-prefixed step types | Clear namespace, no conflicts, self-documenting |
 | ADR-010 | localStorage for UI config | Simple, fast, sufficient for single-user use |
+| ADR-011 | FastAPI lifespan startup | Fail-fast validation, health monitoring, modern pattern |
 
 ---
 

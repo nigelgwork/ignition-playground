@@ -4,7 +4,7 @@
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.0.1-blue.svg)](VERSION)
+[![Version](https://img.shields.io/badge/version-1.0.17-blue.svg)](VERSION)
 
 ## 🎯 Overview
 
@@ -60,6 +60,41 @@ ignition-toolkit credential add gateway_admin
 ignition-toolkit playbook run playbooks/examples/simple_health_check.yaml \
   --param gateway_url=http://localhost:8088 \
   --param gateway_credential=gateway_admin
+```
+
+### Health Monitoring
+
+The toolkit includes Kubernetes-style health check endpoints for monitoring:
+
+```bash
+# Overall health status
+curl http://localhost:5000/health
+
+# Liveness probe (always returns 200 if running)
+curl http://localhost:5000/health/live
+
+# Readiness probe (200 if ready, 503 if not)
+curl http://localhost:5000/health/ready
+
+# Detailed component-level health
+curl http://localhost:5000/health/detailed
+```
+
+**Example detailed health response:**
+```json
+{
+  "overall": "healthy",
+  "ready": true,
+  "startup_time": "2025-10-24T08:38:10.751958",
+  "components": {
+    "database": {"status": "healthy", "message": "Database operational"},
+    "vault": {"status": "healthy", "message": "Vault operational"},
+    "playbooks": {"status": "healthy", "message": "Found 4 playbooks"},
+    "frontend": {"status": "healthy", "message": "Dev mode - frontend served separately"}
+  },
+  "errors": [],
+  "warnings": []
+}
 ```
 
 ## 📚 Documentation

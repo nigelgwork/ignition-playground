@@ -12,6 +12,14 @@ export interface ParameterInfo {
   description: string;
 }
 
+export interface StepInfo {
+  id: string;
+  name: string;
+  type: string;
+  timeout: number;
+  retry_count: number;
+}
+
 export interface PlaybookInfo {
   name: string;
   path: string;
@@ -20,12 +28,14 @@ export interface PlaybookInfo {
   parameter_count: number;
   step_count: number;
   parameters: ParameterInfo[];
+  steps: StepInfo[];
 }
 
 export interface ExecutionRequest {
   playbook_path: string;
   parameters: Record<string, string>;
   gateway_url?: string;
+  credential_name?: string;
 }
 
 export interface ExecutionResponse {
@@ -49,6 +59,7 @@ export interface ExecutionStatusResponse {
 export interface CredentialInfo {
   name: string;
   username: string;
+  gateway_url?: string;
   description?: string;
 }
 
@@ -56,6 +67,7 @@ export interface CredentialCreate {
   name: string;
   username: string;
   password: string;
+  gateway_url?: string;
   description?: string;
 }
 

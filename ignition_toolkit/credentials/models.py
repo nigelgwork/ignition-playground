@@ -16,6 +16,7 @@ class Credential:
         name: Unique identifier for the credential
         username: Username or account name
         password: Password (encrypted at rest)
+        gateway_url: Optional Gateway URL for convenience
         description: Optional description
         created_at: Creation timestamp
         updated_at: Last update timestamp
@@ -23,6 +24,7 @@ class Credential:
     name: str
     username: str
     password: str
+    gateway_url: Optional[str] = None
     description: Optional[str] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
@@ -41,6 +43,7 @@ class Credential:
             "name": self.name,
             "username": self.username,
             "password": self.password,
+            "gateway_url": self.gateway_url,
             "description": self.description,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
@@ -61,6 +64,7 @@ class Credential:
             name=data["name"],
             username=data["username"],
             password=data["password"],
+            gateway_url=data.get("gateway_url"),
             description=data.get("description"),
             created_at=created_at,
             updated_at=updated_at,

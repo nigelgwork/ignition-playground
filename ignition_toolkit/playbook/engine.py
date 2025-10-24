@@ -113,10 +113,8 @@ class PlaybookEngine:
         Raises:
             PlaybookExecutionError: If execution fails
         """
-        # Validate parameters
-        self._validate_parameters(playbook, parameters)
-
-        # Create execution state
+        # Create execution state FIRST (before validation)
+        # This ensures ALL executions are tracked, even validation failures
         if execution_id is None:
             execution_id = str(uuid.uuid4())
         execution_state = ExecutionState(
@@ -130,11 +128,16 @@ class PlaybookEngine:
         # Reset state manager
         self.state_manager.reset()
 
-        # Save to database
+        # Save to database IMMEDIATELY (before validation)
         if self.database:
             await self._save_execution_start(execution_state, playbook, parameters)
 
+        # Initialize browser_manager to None BEFORE try block (scope issue)
+        browser_manager = None
+
         try:
+            # Validate parameters (can fail, but state already saved)
+            self._validate_parameters(playbook, parameters)
             # Create parameter resolver
             resolver = ParameterResolver(
                 credential_vault=self.credential_vault,
@@ -143,7 +146,6 @@ class PlaybookEngine:
             )
 
             # Create browser manager with screenshot streaming if callback provided
-            browser_manager = None
             if self.screenshot_callback:
                 # Create screenshot callback that includes execution_id
                 async def screenshot_frame_callback(screenshot_b64: str):
@@ -320,6 +322,7 @@ class PlaybookEngine:
         try:
             with self.database.session_scope() as session:
                 execution_model = ExecutionModel(
+                    execution_id=execution_state.execution_id,  # Save UUID
                     playbook_name=execution_state.playbook_name,
                     status=execution_state.status.value,
                     started_at=execution_state.started_at,

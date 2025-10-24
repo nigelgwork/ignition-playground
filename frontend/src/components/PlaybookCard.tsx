@@ -31,6 +31,7 @@ import {
   Warning as WarningIcon,
   Download as DownloadIcon,
   MoreVert as MoreVertIcon,
+  List as ViewStepsIcon,
 } from '@mui/icons-material';
 import type { PlaybookInfo } from '../types/api';
 
@@ -39,6 +40,7 @@ interface PlaybookCardProps {
   onConfigure: (playbook: PlaybookInfo) => void;
   onExecute?: (playbook: PlaybookInfo) => void;
   onExport?: (playbook: PlaybookInfo) => void;
+  onViewSteps?: (playbook: PlaybookInfo) => void;
 }
 
 // Get enabled playbooks from localStorage
@@ -72,7 +74,7 @@ function getTestStatus(path: string): 'tested' | 'untested' | 'example' {
   return 'untested'; // Default to untested for safety
 }
 
-export function PlaybookCard({ playbook, onConfigure, onExecute, onExport }: PlaybookCardProps) {
+export function PlaybookCard({ playbook, onConfigure, onExecute, onExport, onViewSteps }: PlaybookCardProps) {
   const [expanded, setExpanded] = useState(false);
   const [enabledPlaybooks, setEnabledPlaybooks] = useState<Set<string>>(getEnabledPlaybooks());
   const [savedConfig, setSavedConfig] = useState<SavedConfig | null>(getSavedConfigPreview(playbook.path));
@@ -112,13 +114,25 @@ export function PlaybookCard({ playbook, onConfigure, onExecute, onExport }: Pla
 
   return (
     <Card
+      elevation={3}
       sx={{
         height: '100%',
         display: 'flex',
         flexDirection: 'column',
         opacity: isDisabled ? 0.6 : 1,
-        border: isDisabled ? '1px solid' : 'none',
-        borderColor: 'warning.main',
+        border: '2px solid',
+        borderColor: isDisabled ? 'warning.main' : 'divider',
+        borderRadius: 2,
+        backgroundColor: 'background.paper',
+        transition: 'all 0.3s ease-in-out',
+        '&:hover': {
+          transform: 'translateY(-6px)',
+          boxShadow: (theme) => theme.shadows[12],
+          borderColor: 'primary.main',
+          borderWidth: '3px',
+          backgroundColor: 'action.hover',
+        },
+        cursor: 'grab',
       }}
     >
       <CardContent sx={{ flexGrow: 1, pb: 0 }}>
@@ -238,33 +252,40 @@ export function PlaybookCard({ playbook, onConfigure, onExecute, onExport }: Pla
               Steps ({playbook.step_count}):
             </Typography>
             <List dense sx={{ py: 0 }}>
-              <ListItem sx={{ py: 0.5 }}>
-                <ListItemText
-                  primary={
-                    <Typography variant="caption" color="text.secondary">
-                      • Authentication & validation
-                    </Typography>
-                  }
-                />
-              </ListItem>
-              <ListItem sx={{ py: 0.5 }}>
-                <ListItemText
-                  primary={
-                    <Typography variant="caption" color="text.secondary">
-                      • Main operations
-                    </Typography>
-                  }
-                />
-              </ListItem>
-              <ListItem sx={{ py: 0.5 }}>
-                <ListItemText
-                  primary={
-                    <Typography variant="caption" color="text.secondary">
-                      • Verification & cleanup
-                    </Typography>
-                  }
-                />
-              </ListItem>
+              {playbook.steps && playbook.steps.length > 0 ? (
+                playbook.steps.slice(0, 5).map((step, index) => (
+                  <ListItem key={step.id} sx={{ py: 0.5 }}>
+                    <ListItemText
+                      primary={
+                        <Typography variant="caption" color="text.secondary">
+                          {index + 1}. {step.name}
+                        </Typography>
+                      }
+                    />
+                  </ListItem>
+                ))
+              ) : (
+                <ListItem sx={{ py: 0.5 }}>
+                  <ListItemText
+                    primary={
+                      <Typography variant="caption" color="text.secondary">
+                        • {playbook.step_count} step(s)
+                      </Typography>
+                    }
+                  />
+                </ListItem>
+              )}
+              {playbook.steps && playbook.steps.length > 5 && (
+                <ListItem sx={{ py: 0.5 }}>
+                  <ListItemText
+                    primary={
+                      <Typography variant="caption" color="primary" fontStyle="italic">
+                        + {playbook.steps.length - 5} more steps...
+                      </Typography>
+                    }
+                  />
+                </ListItem>
+              )}
             </List>
 
             {playbook.parameter_count > 0 && (
@@ -366,6 +387,17 @@ export function PlaybookCard({ playbook, onConfigure, onExecute, onExport }: Pla
         open={Boolean(menuAnchor)}
         onClose={() => setMenuAnchor(null)}
       >
+        {onViewSteps && (
+          <MenuItem
+            onClick={() => {
+              setMenuAnchor(null);
+              onViewSteps(playbook);
+            }}
+          >
+            <ViewStepsIcon fontSize="small" sx={{ mr: 1 }} />
+            View All Steps
+          </MenuItem>
+        )}
         <MenuItem
           onClick={() => {
             setMenuAnchor(null);

@@ -88,6 +88,7 @@ class CredentialVault:
             "name": credential.name,
             "username": credential.username,
             "password": encrypted_password,  # Already encrypted
+            "gateway_url": credential.gateway_url,
             "description": credential.description,
             "created_at": credential.created_at.isoformat() if credential.created_at else datetime.now(UTC).isoformat(),
             "updated_at": datetime.now(UTC).isoformat(),
@@ -122,6 +123,7 @@ class CredentialVault:
             name=cred_data["name"],
             username=cred_data["username"],
             password=decrypted_password,
+            gateway_url=cred_data.get("gateway_url"),
             description=cred_data.get("description"),
             created_at=datetime.fromisoformat(cred_data["created_at"]) if cred_data.get("created_at") else None,
             updated_at=datetime.fromisoformat(cred_data["updated_at"]) if cred_data.get("updated_at") else None,
@@ -142,6 +144,7 @@ class CredentialVault:
                 name=cred_data["name"],
                 username=cred_data["username"],
                 password="<encrypted>",  # Don't return actual password
+                gateway_url=cred_data.get("gateway_url"),
                 description=cred_data.get("description"),
                 created_at=datetime.fromisoformat(cred_data["created_at"]) if cred_data.get("created_at") else None,
                 updated_at=datetime.fromisoformat(cred_data["updated_at"]) if cred_data.get("updated_at") else None,
@@ -183,3 +186,76 @@ class CredentialVault:
         """
         credentials_data = self._load_credentials_file()
         return name in credentials_data
+
+    def initialize(self) -> None:
+        """
+        Initialize credential vault
+
+        Creates vault directory and files if they don't exist.
+        Safe to call multiple times (idempotent).
+        """
+        # Ensure vault directory exists
+        self.vault_path.mkdir(parents=True, exist_ok=True)
+        logger.debug(f"Vault directory ready: {self.vault_path}")
+
+        # Ensure encryption key exists
+        if not self.encryption_key_path.exists():
+            # This will create a new key
+            _ = self.encryption.key
+            logger.info(f"Created new encryption key: {self.encryption_key_path}")
+        else:
+            logger.debug(f"Encryption key exists: {self.encryption_key_path}")
+
+        # Ensure credentials file exists
+        if not self.credentials_file.exists():
+            self._save_credentials_file({})
+            logger.info(f"Created new credentials file: {self.credentials_file}")
+        else:
+            logger.debug(f"Credentials file exists: {self.credentials_file}")
+
+        logger.info("Credential vault initialized")
+
+    def test_encryption(self) -> bool:
+        """
+        Test encryption/decryption functionality
+
+        Returns:
+            True if encryption works correctly, False otherwise
+        """
+        test_string = "test_encryption_12345"
+
+        try:
+            # Test encrypt/decrypt
+            encrypted = self.encryption.encrypt(test_string)
+            decrypted = self.encryption.decrypt(encrypted)
+
+            if decrypted != test_string:
+                logger.error("Encryption test failed: decrypted value doesn't match original")
+                return False
+
+            logger.debug("Encryption test passed")
+            return True
+
+        except Exception as e:
+            logger.error(f"Encryption test failed: {e}")
+            return False
+
+
+# Global vault instance (singleton)
+_credential_vault: Optional[CredentialVault] = None
+
+
+def get_credential_vault(vault_path: Optional[Path] = None) -> CredentialVault:
+    """
+    Get the global credential vault instance (singleton pattern)
+
+    Args:
+        vault_path: Path to vault directory (only used on first call)
+
+    Returns:
+        CredentialVault instance
+    """
+    global _credential_vault
+    if _credential_vault is None:
+        _credential_vault = CredentialVault(vault_path)
+    return _credential_vault
