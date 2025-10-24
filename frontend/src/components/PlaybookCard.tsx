@@ -17,20 +17,22 @@ import {
   ListItem,
   ListItemText,
   Tooltip,
+  Switch,
+  FormControlLabel,
 } from '@mui/material';
 import {
   Settings as ConfigureIcon,
+  PlayArrow as PlayIcon,
   ExpandMore as ExpandMoreIcon,
   CheckCircle as CheckIcon,
   Warning as WarningIcon,
-  Lock as LockIcon,
-  LockOpen as LockOpenIcon,
 } from '@mui/icons-material';
 import type { PlaybookInfo } from '../types/api';
 
 interface PlaybookCardProps {
   playbook: PlaybookInfo;
   onConfigure: (playbook: PlaybookInfo) => void;
+  onExecute?: (playbook: PlaybookInfo) => void;
 }
 
 // Get enabled playbooks from localStorage
@@ -52,7 +54,7 @@ function getTestStatus(path: string): 'tested' | 'untested' | 'example' {
   return 'untested'; // Default to untested for safety
 }
 
-export function PlaybookCard({ playbook, onConfigure }: PlaybookCardProps) {
+export function PlaybookCard({ playbook, onConfigure, onExecute }: PlaybookCardProps) {
   const [expanded, setExpanded] = useState(false);
   const [enabledPlaybooks, setEnabledPlaybooks] = useState<Set<string>>(getEnabledPlaybooks());
 
@@ -69,6 +71,15 @@ export function PlaybookCard({ playbook, onConfigure }: PlaybookCardProps) {
     }
     setEnabledPlaybooks(newEnabled);
     saveEnabledPlaybooks(newEnabled);
+  };
+
+  const handleExecuteClick = () => {
+    if (onExecute) {
+      onExecute(playbook);
+    } else {
+      // Fallback to configure if no execute handler
+      onConfigure(playbook);
+    }
   };
 
   return (
@@ -231,38 +242,62 @@ export function PlaybookCard({ playbook, onConfigure }: PlaybookCardProps) {
         </Collapse>
       </CardContent>
 
-      <CardActions sx={{ pt: 0, gap: 1 }}>
-        {/* Configure Button */}
-        <Tooltip title="Configure and execute this playbook">
-          <span style={{ flexGrow: 1 }}>
-            <Button
-              size="small"
-              variant="contained"
-              startIcon={<ConfigureIcon />}
-              onClick={() => onConfigure(playbook)}
-              fullWidth
-              disabled={isDisabled}
-              aria-label={`Configure ${playbook.name} playbook`}
-            >
-              Configure
-            </Button>
-          </span>
-        </Tooltip>
+      <CardActions sx={{ pt: 0, gap: 1, flexDirection: 'column', alignItems: 'stretch' }}>
+        {/* Enable/Disable Switch - Always available at top */}
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', px: 1 }}>
+          <Typography variant="caption" color="text.secondary">
+            {testStatus === 'tested' ? 'Tested' : 'Enable for testing'}
+          </Typography>
+          <FormControlLabel
+            control={
+              <Switch
+                checked={isManuallyEnabled || testStatus === 'tested'}
+                onChange={handleToggleEnabled}
+                disabled={testStatus === 'tested'}
+                size="small"
+              />
+            }
+            label=""
+            sx={{ m: 0 }}
+          />
+        </Box>
 
-        {/* Enable/Disable Button for Untested */}
-        {testStatus === 'untested' && (
-          <Tooltip title={isManuallyEnabled ? 'Disable this playbook' : 'Enable this playbook for testing'}>
-            <Button
-              size="small"
-              variant="outlined"
-              onClick={handleToggleEnabled}
-              sx={{ minWidth: 40, px: 1 }}
-              aria-label={isManuallyEnabled ? 'Disable playbook' : 'Enable playbook'}
-            >
-              {isManuallyEnabled ? <LockOpenIcon fontSize="small" /> : <LockIcon fontSize="small" />}
-            </Button>
+        {/* Button Row */}
+        <Box sx={{ display: 'flex', gap: 1 }}>
+          {/* Configure Button */}
+          <Tooltip title="Configure parameters for this playbook">
+            <span style={{ flex: 1 }}>
+              <Button
+                size="small"
+                variant="outlined"
+                startIcon={<ConfigureIcon />}
+                onClick={() => onConfigure(playbook)}
+                fullWidth
+                disabled={isDisabled}
+                aria-label={`Configure ${playbook.name} playbook`}
+              >
+                Configure
+              </Button>
+            </span>
           </Tooltip>
-        )}
+
+          {/* Execute Button */}
+          <Tooltip title={isDisabled ? 'Enable this playbook first' : 'Execute with current configuration'}>
+            <span style={{ flex: 1 }}>
+              <Button
+                size="small"
+                variant="contained"
+                startIcon={<PlayIcon />}
+                onClick={handleExecuteClick}
+                fullWidth
+                disabled={isDisabled}
+                aria-label={`Execute ${playbook.name} playbook`}
+              >
+                Execute
+              </Button>
+            </span>
+          </Tooltip>
+        </Box>
       </CardActions>
     </Card>
   );

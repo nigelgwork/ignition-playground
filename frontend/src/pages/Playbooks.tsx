@@ -58,6 +58,12 @@ export function Playbooks() {
     setSelectedPlaybook(playbook);
   };
 
+  const handleExecute = (playbook: PlaybookInfo) => {
+    // For now, execute opens the configure dialog
+    // In the future, this could use saved configurations
+    setSelectedPlaybook(playbook);
+  };
+
   const handleExecutionStarted = (executionId: string) => {
     setLastExecutionId(executionId);
     setExecutionStarted(true);
@@ -98,15 +104,15 @@ export function Playbooks() {
       )}
 
       {/* Organized Playbook Sections */}
-      {!isLoading && !error && playbooks.length > 0 && (
+      {!isLoading && !error && (
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
           {/* Gateway Section */}
-          {categories.gateway.length > 0 && (
-            <Accordion defaultExpanded>
-              <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                <Typography variant="h6">🔧 Gateway ({categories.gateway.length})</Typography>
-              </AccordionSummary>
-              <AccordionDetails>
+          <Accordion defaultExpanded>
+            <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+              <Typography variant="h6">🔧 Gateway ({categories.gateway.length})</Typography>
+            </AccordionSummary>
+            <AccordionDetails>
+              {categories.gateway.length > 0 ? (
                 <Box
                   sx={{
                     display: 'grid',
@@ -119,20 +125,29 @@ export function Playbooks() {
                   }}
                 >
                   {categories.gateway.map((playbook) => (
-                    <PlaybookCard key={playbook.path} playbook={playbook} onConfigure={handleConfigure} />
+                    <PlaybookCard
+                      key={playbook.path}
+                      playbook={playbook}
+                      onConfigure={handleConfigure}
+                      onExecute={handleExecute}
+                    />
                   ))}
                 </Box>
-              </AccordionDetails>
-            </Accordion>
-          )}
+              ) : (
+                <Alert severity="info">
+                  No Gateway playbooks found. Add YAML playbooks to ./playbooks/gateway/
+                </Alert>
+              )}
+            </AccordionDetails>
+          </Accordion>
 
-          {/* Designer Section */}
-          {categories.designer.length > 0 && (
-            <Accordion defaultExpanded>
-              <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                <Typography variant="h6">🎨 Designer ({categories.designer.length})</Typography>
-              </AccordionSummary>
-              <AccordionDetails>
+          {/* Designer Section - Always shown */}
+          <Accordion defaultExpanded>
+            <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+              <Typography variant="h6">🎨 Designer ({categories.designer.length})</Typography>
+            </AccordionSummary>
+            <AccordionDetails>
+              {categories.designer.length > 0 ? (
                 <Box
                   sx={{
                     display: 'grid',
@@ -145,20 +160,29 @@ export function Playbooks() {
                   }}
                 >
                   {categories.designer.map((playbook) => (
-                    <PlaybookCard key={playbook.path} playbook={playbook} onConfigure={handleConfigure} />
+                    <PlaybookCard
+                      key={playbook.path}
+                      playbook={playbook}
+                      onConfigure={handleConfigure}
+                      onExecute={handleExecute}
+                    />
                   ))}
                 </Box>
-              </AccordionDetails>
-            </Accordion>
-          )}
+              ) : (
+                <Alert severity="info">
+                  No Designer playbooks found. Add YAML playbooks to ./playbooks/designer/
+                </Alert>
+              )}
+            </AccordionDetails>
+          </Accordion>
 
           {/* Perspective Section */}
-          {categories.perspective.length > 0 && (
-            <Accordion defaultExpanded>
-              <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                <Typography variant="h6">📱 Perspective ({categories.perspective.length})</Typography>
-              </AccordionSummary>
-              <AccordionDetails>
+          <Accordion defaultExpanded>
+            <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+              <Typography variant="h6">📱 Perspective ({categories.perspective.length})</Typography>
+            </AccordionSummary>
+            <AccordionDetails>
+              {categories.perspective.length > 0 ? (
                 <Box
                   sx={{
                     display: 'grid',
@@ -171,12 +195,21 @@ export function Playbooks() {
                   }}
                 >
                   {categories.perspective.map((playbook) => (
-                    <PlaybookCard key={playbook.path} playbook={playbook} onConfigure={handleConfigure} />
+                    <PlaybookCard
+                      key={playbook.path}
+                      playbook={playbook}
+                      onConfigure={handleConfigure}
+                      onExecute={handleExecute}
+                    />
                   ))}
                 </Box>
-              </AccordionDetails>
-            </Accordion>
-          )}
+              ) : (
+                <Alert severity="info">
+                  No Perspective playbooks found. Add YAML playbooks to ./playbooks/perspective/ or ./playbooks/browser/
+                </Alert>
+              )}
+            </AccordionDetails>
+          </Accordion>
         </Box>
       )}
 
