@@ -27,18 +27,18 @@ steps:
       url: "{{ gateway_url }}"
     timeout: 30
 
-  - id: step1b_click_login
-    name: "Step 1b: Click Login Button (top right)"
-    type: browser.click
+  - id: step1b_screenshot_initial
+    name: "Step 1b: Take screenshot of gateway page"
+    type: browser.screenshot
     parameters:
-      selector: "button:has-text('Login'), a:has-text('Login'), [class*='login']"
+      path: "gateway_initial.png"
     timeout: 10
 
   - id: step1c_wait_for_form
     name: "Step 1c: Wait for login form"
     type: browser.wait
     parameters:
-      selector: "input[type='text'], input[name='username'], input[placeholder*='username' i]"
+      selector: "input[type='text'], input[name='username'], input[type='password']"
     timeout: 10
 
   - id: step2_login
@@ -57,16 +57,30 @@ steps:
       value: "{{ password }}"
     timeout: 10
 
-  - id: step2c_submit
-    name: "Step 2c: Submit Login"
+  - id: step2c_screenshot_before_submit
+    name: "Step 2c: Screenshot before submitting"
+    type: browser.screenshot
+    parameters:
+      path: "before_login.png"
+    timeout: 10
+
+  - id: step2d_submit
+    name: "Step 2d: Submit Login"
     type: browser.click
     parameters:
       selector: "button[type='submit'], button:has-text('Sign In'), button:has-text('Login'), input[type='submit']"
     timeout: 10
 
+  - id: step2e_wait_after_login
+    name: "Step 2e: Wait for page to load after login"
+    type: browser.wait
+    parameters:
+      selector: "body"
+    timeout: 15
+
   - id: step3_check_license
     name: "Step 3: Check License Status"
     type: browser.screenshot
     parameters:
-      path: "license_status.png"
+      path: "after_login.png"
     timeout: 15
