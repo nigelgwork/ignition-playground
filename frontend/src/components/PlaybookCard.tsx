@@ -338,7 +338,11 @@ export function PlaybookCard({ playbook, onConfigure, onExecute, onExport }: Pla
           </Tooltip>
 
           {/* Execute Button */}
-          <Tooltip title={isDisabled ? 'Enable this playbook first' : 'Execute with current configuration'}>
+          <Tooltip title={
+            isDisabled ? 'Enable this playbook first' :
+            !savedConfig ? 'Configure this playbook first' :
+            'Execute with saved configuration'
+          }>
             <span style={{ flex: 1 }}>
               <Button
                 size="small"
@@ -346,7 +350,7 @@ export function PlaybookCard({ playbook, onConfigure, onExecute, onExport }: Pla
                 startIcon={<PlayIcon />}
                 onClick={handleExecuteClick}
                 fullWidth
-                disabled={isDisabled}
+                disabled={isDisabled || !savedConfig}
                 aria-label={`Execute ${playbook.name} playbook`}
               >
                 Execute

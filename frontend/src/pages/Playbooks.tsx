@@ -65,10 +65,33 @@ export function Playbooks() {
     setSelectedPlaybook(playbook);
   };
 
-  const handleExecute = (playbook: PlaybookInfo) => {
-    // For now, execute opens the configure dialog
-    // In the future, this could use saved configurations
-    setSelectedPlaybook(playbook);
+  const handleExecute = async (playbook: PlaybookInfo) => {
+    // Get saved configuration from localStorage
+    const savedConfigKey = `playbook_config_${playbook.path}`;
+    const savedConfigStr = localStorage.getItem(savedConfigKey);
+
+    if (!savedConfigStr) {
+      // No saved config - open configure dialog instead
+      setSelectedPlaybook(playbook);
+      return;
+    }
+
+    try {
+      const savedConfig = JSON.parse(savedConfigStr);
+
+      // Execute directly with saved config
+      const response = await api.executions.start({
+        playbook_path: playbook.path,
+        parameters: savedConfig.parameters,
+        gateway_url: savedConfig.gatewayUrl,
+      });
+
+      // Navigate to execution detail page
+      window.location.href = `/executions/${response.execution_id}`;
+    } catch (error) {
+      console.error('Failed to execute playbook:', error);
+      alert('Failed to start execution. Please check the console for details.');
+    }
   };
 
   const handleExecutionStarted = (executionId: string) => {
