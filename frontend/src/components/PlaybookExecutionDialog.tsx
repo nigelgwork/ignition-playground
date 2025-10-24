@@ -3,6 +3,7 @@
  */
 
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Dialog,
   DialogTitle,
@@ -52,6 +53,7 @@ export function PlaybookExecutionDialog({
   onClose,
   onExecutionStarted,
 }: PlaybookExecutionDialogProps) {
+  const navigate = useNavigate();
   const [parameters, setParameters] = useState<Record<string, string>>({});
   const [gatewayUrl, setGatewayUrl] = useState('http://localhost:8088');
   const [configSaved, setConfigSaved] = useState(false);
@@ -72,6 +74,8 @@ export function PlaybookExecutionDialog({
       onClose();
       // Reset form
       setParameters({});
+      // Navigate to execution detail page to see live browser streaming
+      navigate(`/executions/${data.execution_id}`);
     },
   });
 
