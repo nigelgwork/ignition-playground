@@ -1,0 +1,73 @@
+name: "Simple Health Check"
+version: "1.0"
+description: "3-step visual health check: Open gateway, login, check license status"
+
+parameters:
+  - name: gateway_url
+    type: string
+    required: true
+    default: "http://localhost:8088"
+    description: "Gateway URL (e.g., http://localhost:8088)"
+
+  - name: username
+    type: string
+    required: true
+    description: "Gateway username"
+
+  - name: password
+    type: string
+    required: true
+    description: "Gateway password"
+
+steps:
+  - id: step1_open_gateway
+    name: "Step 1: Open Gateway Webpage"
+    type: browser.navigate
+    parameters:
+      url: "{{ gateway_url }}"
+    timeout: 30
+
+  - id: step1b_click_login
+    name: "Step 1b: Click Login Button (top right)"
+    type: browser.click
+    parameters:
+      selector: "button:has-text('Login'), a:has-text('Login'), [class*='login']"
+    timeout: 10
+
+  - id: step1c_wait_for_form
+    name: "Step 1c: Wait for login form"
+    type: browser.verify
+    parameters:
+      selector: "input[type='text'], input[name='username'], input[placeholder*='username' i]"
+      text: ""
+    timeout: 10
+
+  - id: step2_login
+    name: "Step 2: Enter Username"
+    type: browser.fill
+    parameters:
+      selector: "input[type='text'], input[name='username'], input[placeholder*='username' i]"
+      value: "{{ username }}"
+    timeout: 10
+
+  - id: step2b_password
+    name: "Step 2b: Enter Password"
+    type: browser.fill
+    parameters:
+      selector: "input[type='password'], input[name='password']"
+      value: "{{ password }}"
+    timeout: 10
+
+  - id: step2c_submit
+    name: "Step 2c: Submit Login"
+    type: browser.click
+    parameters:
+      selector: "button[type='submit'], button:has-text('Sign In'), button:has-text('Login'), input[type='submit']"
+    timeout: 10
+
+  - id: step3_check_license
+    name: "Step 3: Check License Status"
+    type: browser.screenshot
+    parameters:
+      path: "license_status.png"
+    timeout: 15

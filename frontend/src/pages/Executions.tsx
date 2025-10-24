@@ -21,6 +21,10 @@ import {
   Chip,
   IconButton,
   Tooltip,
+  Collapse,
+  List,
+  ListItem,
+  ListItemText,
 } from '@mui/material';
 import {
   PlayArrow as PlayIcon,
@@ -28,6 +32,12 @@ import {
   SkipNext as SkipIcon,
   Cancel as CancelIcon,
   Visibility as ViewIcon,
+  KeyboardArrowDown as ExpandMoreIcon,
+  KeyboardArrowUp as ExpandLessIcon,
+  CheckCircle as CompletedIcon,
+  Error as ErrorIcon,
+  Pending as PendingIcon,
+  Cancel as SkippedIcon,
 } from '@mui/icons-material';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
@@ -43,8 +53,21 @@ export function Executions() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [snackbarMessage, setSnackbarMessage] = useState('');
   const [snackbarOpen, setSnackbarOpen] = useState(false);
+  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
 
   const executionUpdates = useStore((state) => state.executionUpdates);
+
+  const toggleRowExpansion = (executionId: string) => {
+    setExpandedRows((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(executionId)) {
+        newSet.delete(executionId);
+      } else {
+        newSet.add(executionId);
+      }
+      return newSet;
+    });
+  };
 
   // Helper function to get status color
   const getStatusColor = (status: string): 'default' | 'primary' | 'warning' | 'success' | 'error' => {
@@ -59,6 +82,20 @@ export function Executions() {
         return 'error';
       default:
         return 'default';
+    }
+  };
+
+  // Helper function to get step status icon
+  const getStepStatusIcon = (status: string) => {
+    switch (status) {
+      case 'completed':
+        return <CompletedIcon color="success" fontSize="small" />;
+      case 'failed':
+        return <ErrorIcon color="error" fontSize="small" />;
+      case 'skipped':
+        return <SkippedIcon color="warning" fontSize="small" />;
+      default:
+        return <PendingIcon color="disabled" fontSize="small" />;
     }
   };
 
@@ -222,20 +259,33 @@ export function Executions() {
           <Table size="medium" sx={{ tableLayout: 'fixed', width: '100%' }}>
             <TableHead>
               <TableRow>
-                <TableCell width="20%">Playbook</TableCell>
+                <TableCell width="5%"></TableCell>
+                <TableCell width="18%">Playbook</TableCell>
                 <TableCell width="12%">Status</TableCell>
-                <TableCell width="15%">Progress</TableCell>
-                <TableCell width="18%">Started</TableCell>
-                <TableCell width="18%">Completed</TableCell>
-                <TableCell width="17%" align="right">Actions</TableCell>
+                <TableCell width="13%">Progress</TableCell>
+                <TableCell width="17%">Started</TableCell>
+                <TableCell width="17%">Completed</TableCell>
+                <TableCell width="18%" align="right">Actions</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
-              {filteredExecutions.map((execution) => (
-                <TableRow
-                  key={execution.execution_id}
-                  sx={{ '&:hover': { backgroundColor: 'action.hover' } }}
-                >
+              {filteredExecutions.map((execution) => {
+                const isExpanded = expandedRows.has(execution.execution_id);
+                return (
+                  <>
+                    <TableRow
+                      key={execution.execution_id}
+                      sx={{ '&:hover': { backgroundColor: 'action.hover' } }}
+                    >
+                      <TableCell>
+                        <IconButton
+                          size="small"
+                          onClick={() => toggleRowExpansion(execution.execution_id)}
+                          aria-label={isExpanded ? 'Collapse details' : 'Expand details'}
+                        >
+                          {isExpanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+                        </IconButton>
+                      </TableCell>
                   <TableCell>
                     <Typography variant="body2" fontWeight="medium">
                       {execution.playbook_name}
@@ -326,7 +376,68 @@ export function Executions() {
                     )}
                   </TableCell>
                 </TableRow>
-              ))}
+                <TableRow>
+                  <TableCell style={{ paddingBottom: 0, paddingTop: 0 }} colSpan={7}>
+                    <Collapse in={isExpanded} timeout="auto" unmountOnExit>
+                      <Box sx={{ margin: 2 }}>
+                        <Typography variant="h6" gutterBottom component="div">
+                          Step Details
+                        </Typography>
+                        {execution.step_results && execution.step_results.length > 0 ? (
+                          <List dense>
+                            {execution.step_results.map((step, index) => (
+                              <ListItem key={step.step_id || index}>
+                                <Box sx={{ mr: 2 }}>{getStepStatusIcon(step.status)}</Box>
+                                <ListItemText
+                                  primary={`${index + 1}. ${step.step_name || 'Unnamed Step'}`}
+                                  secondary={
+                                    <>
+                                      <Typography component="span" variant="body2" color="text.primary">
+                                        Status: {step.status.toUpperCase()}
+                                      </Typography>
+                                      {step.started_at && (
+                                        <>
+                                          {' • '}
+                                          Started: {formatTimestamp(step.started_at)}
+                                        </>
+                                      )}
+                                      {step.completed_at && (
+                                        <>
+                                          {' • '}
+                                          Completed: {formatTimestamp(step.completed_at)}
+                                        </>
+                                      )}
+                                      {step.error && (
+                                        <>
+                                          <br />
+                                          <Typography component="span" variant="body2" color="error">
+                                            Error: {step.error}
+                                          </Typography>
+                                        </>
+                                      )}
+                                    </>
+                                  }
+                                />
+                                <Chip
+                                  label={step.status}
+                                  size="small"
+                                  color={getStatusColor(step.status)}
+                                />
+                              </ListItem>
+                            ))}
+                          </List>
+                        ) : (
+                          <Typography variant="body2" color="text.secondary">
+                            No step details available
+                          </Typography>
+                        )}
+                      </Box>
+                    </Collapse>
+                  </TableCell>
+                </TableRow>
+              </>
+                );
+              })}
             </TableBody>
           </Table>
         </TableContainer>
