@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 app = FastAPI(
     title="Ignition Automation Toolkit API",
     description="REST API for Ignition Gateway automation",
-    version="1.0.1",
+    version="1.0.3",
 )
 
 # CORS middleware - Restrict to localhost only (secure default)
