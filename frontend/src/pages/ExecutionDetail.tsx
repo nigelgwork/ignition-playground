@@ -245,7 +245,7 @@ export function ExecutionDetail() {
                       color={getStatusColor(step.status) as any}
                     />
                   </ListItem>
-                  {index < execution.step_results.length - 1 && <Divider />}
+                  {execution.step_results && index < execution.step_results.length - 1 && <Divider />}
                 </Box>
               ))
             ) : (
