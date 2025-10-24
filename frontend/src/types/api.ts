@@ -43,6 +43,7 @@ export interface ExecutionStatusResponse {
   current_step_index: number;
   total_steps: number;
   error: string | null;
+  step_results?: StepResult[];
 }
 
 export interface CredentialInfo {
