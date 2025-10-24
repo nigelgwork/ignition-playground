@@ -266,7 +266,7 @@ export function PlaybookCard({ playbook, onConfigure, onExecute, onExport, onVie
 
         {/* Saved Configuration Preview */}
         {savedConfig && (
-          <Box sx={{ mt: 1, p: 1, bgcolor: 'success.dark', borderRadius: 1, border: '1px solid', borderColor: 'success.main' }}>
+          <Box sx={{ mt: 1, mb: 2, p: 1, bgcolor: 'success.dark', borderRadius: 1, border: '1px solid', borderColor: 'success.main' }}>
             <Typography variant="caption" color="success.light" fontWeight="bold">
               ✓ Configured
             </Typography>

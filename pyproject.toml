@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ignition-toolkit"
-version = "1.0.6"  # Updated: 2025-10-24 - Fixed page spacing and ExecutionDetail loading
+version = "1.0.20"  # Updated: 2025-10-24 - Playbook metadata UI integration with menu-driven actions
 description = "Lightweight automation toolkit for Ignition SCADA Gateway operations"
 readme = "README.md"
 requires-python = ">=3.10"
