@@ -22,6 +22,7 @@ from ignition_toolkit.playbook.models import ExecutionState, ExecutionStatus
 from ignition_toolkit.gateway import GatewayClient
 from ignition_toolkit.credentials import CredentialVault
 from ignition_toolkit.storage import get_database
+from ignition_toolkit import __version__
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +30,7 @@ logger = logging.getLogger(__name__)
 app = FastAPI(
     title="Ignition Automation Toolkit API",
     description="REST API for Ignition Gateway automation",
-    version="1.0.3",
+    version=__version__,
 )
 
 # CORS middleware - Restrict to localhost only (secure default)
