@@ -36,7 +36,7 @@ def vault(temp_dir):
 def database(temp_dir):
     """Create test database"""
     db_path = temp_dir / "test.db"
-    return get_database(db_path=str(db_path))
+    return get_database(database_path=db_path)
 
 
 @pytest.fixture

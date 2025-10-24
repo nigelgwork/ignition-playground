@@ -5,6 +5,7 @@ SQLite database connection and session management
 import logging
 from pathlib import Path
 from typing import Generator, Optional
+from contextlib import contextmanager
 from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy.engine import Engine
@@ -86,6 +87,7 @@ class Database:
         """
         return self.SessionLocal()
 
+    @contextmanager
     def session_scope(self) -> Generator[Session, None, None]:
         """
         Provide a transactional scope for database operations

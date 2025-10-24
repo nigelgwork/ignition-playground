@@ -2,12 +2,16 @@
 SQLAlchemy database models
 """
 
-from datetime import datetime
+from datetime import datetime, UTC
 from sqlalchemy import Column, Integer, String, DateTime, Text, ForeignKey, JSON
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import declarative_base, relationship
 
 Base = declarative_base()
+
+
+def utcnow():
+    """Return current UTC time"""
+    return datetime.now(UTC)
 
 
 class ExecutionModel(Base):
@@ -22,7 +26,7 @@ class ExecutionModel(Base):
     playbook_name = Column(String(255), nullable=False)
     playbook_version = Column(String(50), nullable=True)
     status = Column(String(50), nullable=False)  # pending, running, completed, failed, paused
-    started_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    started_at = Column(DateTime, default=utcnow, nullable=False)
     completed_at = Column(DateTime, nullable=True)
     error_message = Column(Text, nullable=True)
     config_data = Column(JSON, nullable=True)  # Runtime parameter values
@@ -96,8 +100,8 @@ class PlaybookConfigModel(Base):
     config_name = Column(String(255), nullable=False)
     description = Column(Text, nullable=True)
     parameters = Column(JSON, nullable=False)  # Saved parameter values
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=utcnow, nullable=False)
+    updated_at = Column(DateTime, default=utcnow, onupdate=utcnow, nullable=False)
 
     def to_dict(self) -> dict:
         """Convert to dictionary"""

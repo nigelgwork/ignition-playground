@@ -232,6 +232,7 @@ class StepResult:
 
     Attributes:
         step_id: Step identifier
+        step_name: Step name
         status: Execution status
         started_at: Start timestamp
         completed_at: Completion timestamp
@@ -241,6 +242,7 @@ class StepResult:
     """
 
     step_id: str
+    step_name: str
     status: StepStatus
     started_at: datetime
     completed_at: Optional[datetime] = None

@@ -4,7 +4,7 @@ Credential data models
 
 from dataclasses import dataclass
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, UTC
 
 
 @dataclass
@@ -29,7 +29,7 @@ class Credential:
 
     def __post_init__(self) -> None:
         """Set timestamps if not provided"""
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
         if self.created_at is None:
             self.created_at = now
         if self.updated_at is None:

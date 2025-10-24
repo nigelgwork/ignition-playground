@@ -65,6 +65,7 @@ class StepExecutor:
         """
         result = StepResult(
             step_id=step.id,
+            step_name=step.name,
             status=StepStatus.RUNNING,
             started_at=datetime.now(),
         )

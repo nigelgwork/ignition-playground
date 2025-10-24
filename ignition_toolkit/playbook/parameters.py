@@ -99,10 +99,18 @@ class ParameterResolver:
 
         # If the entire string is a single reference, return the actual value
         # (allows non-string values like credentials to be returned)
+        # However, for parameters and variables, convert to string to maintain template semantics
         if len(matches) == 1 and matches[0].group(0) == value:
             ref_type = matches[0].group(1)
             ref_name = matches[0].group(2)
-            return self._resolve_reference(ref_type, ref_name)
+            resolved = self._resolve_reference(ref_type, ref_name)
+
+            # For credentials, return as-is (may be Credential object)
+            # For parameters/variables in template context, convert to string
+            if ref_type == "credential":
+                return resolved
+            else:
+                return str(resolved)
 
         # Multiple references or mixed content - build string
         result = value

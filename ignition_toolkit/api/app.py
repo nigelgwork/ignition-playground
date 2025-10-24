@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 app = FastAPI(
     title="Ignition Automation Toolkit API",
     description="REST API for Ignition Gateway automation",
-    version="1.0.0",
+    version="1.0.1",
 )
 
 # CORS middleware
@@ -107,7 +107,7 @@ async def health_check():
     """Health check endpoint"""
     return {
         "status": "healthy",
-        "version": "1.0.0",
+        "version": "1.0.1",
         "timestamp": datetime.now().isoformat(),
     }
 
@@ -205,6 +205,14 @@ async def start_execution(request: ExecutionRequest, background_tasks: Backgroun
 
         engine.set_update_callback(broadcast_update)
 
+        # Generate execution ID upfront
+        import uuid
+        execution_id = str(uuid.uuid4())
+        logger.info(f"Starting execution {execution_id} for playbook: {playbook.name}")
+
+        # Store engine with real execution ID immediately
+        active_engines[execution_id] = engine
+
         # Start execution in background
         async def run_execution():
             try:
@@ -215,6 +223,7 @@ async def start_execution(request: ExecutionRequest, background_tasks: Backgroun
                     playbook,
                     request.parameters,
                     base_path=Path(request.playbook_path).parent,
+                    execution_id=execution_id,  # Pass the pre-generated ID
                 )
 
                 logger.info(
@@ -226,28 +235,88 @@ async def start_execution(request: ExecutionRequest, background_tasks: Backgroun
             finally:
                 if gateway_client:
                     await gateway_client.__aexit__(None, None, None)
-                # Remove from active engines
-                if engine.get_current_execution():
-                    exec_id = engine.get_current_execution().execution_id
-                    if exec_id in active_engines:
-                        del active_engines[exec_id]
+                # Remove from active engines after execution completes
+                if execution_id in active_engines:
+                    del active_engines[execution_id]
 
-        # Generate execution ID (will be set by engine)
-        # For now, start execution and return pending response
+        # Start execution in background
         background_tasks.add_task(run_execution)
 
-        # Store engine temporarily (will be updated with actual ID)
-        temp_id = f"pending_{datetime.now().timestamp()}"
-        active_engines[temp_id] = engine
-
         return ExecutionResponse(
-            execution_id=temp_id,
+            execution_id=execution_id,
             status="starting",
             message="Playbook execution started",
         )
 
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Failed to start execution: {e}")
+
+
+@app.get("/api/executions", response_model=List[ExecutionStatusResponse])
+async def list_executions(limit: int = 50, status: Optional[str] = None):
+    """
+    List recent executions from database and active engines
+
+    Args:
+        limit: Maximum number of executions to return (default 50)
+        status: Optional filter by status (running, completed, failed, etc.)
+    """
+    executions = []
+
+    # First, add all active executions
+    for exec_id, engine in active_engines.items():
+        state = engine.get_current_execution()
+        if state:
+            # Apply status filter if provided
+            if status and state.status.value != status:
+                continue
+
+            executions.append(ExecutionStatusResponse(
+                execution_id=state.execution_id,
+                playbook_name=state.playbook_name,
+                status=state.status.value,
+                started_at=state.started_at,
+                completed_at=state.completed_at,
+                current_step_index=state.current_step_index,
+                total_steps=len(state.step_results) + 1,
+                error=state.error,
+            ))
+
+    # Then, fetch recent executions from database
+    try:
+        database = get_database()
+        with database.session_scope() as session:
+            from ignition_toolkit.storage.models import ExecutionModel
+            query = session.query(ExecutionModel).order_by(
+                ExecutionModel.started_at.desc()
+            )
+
+            # Apply status filter if provided
+            if status:
+                query = query.filter(ExecutionModel.status == status)
+
+            db_executions = query.limit(limit).all()
+
+            # Add executions from DB that aren't already in active list
+            active_ids = {e.execution_id for e in executions}
+            for db_exec in db_executions:
+                if db_exec.execution_id not in active_ids:
+                    executions.append(ExecutionStatusResponse(
+                        execution_id=db_exec.execution_id,
+                        playbook_name=db_exec.playbook_name,
+                        status=db_exec.status,
+                        started_at=db_exec.started_at,
+                        completed_at=db_exec.completed_at,
+                        current_step_index=0,  # Not tracked in DB model
+                        total_steps=0,  # Not tracked in DB model
+                        error=db_exec.error_message,
+                    ))
+    except Exception as e:
+        logger.warning(f"Failed to fetch executions from database: {e}")
+
+    # Sort by started_at (most recent first) and limit
+    executions.sort(key=lambda x: x.started_at, reverse=True)
+    return executions[:limit]
 
 
 @app.get("/api/executions/{execution_id}", response_model=ExecutionStatusResponse)
@@ -318,6 +387,93 @@ async def cancel_execution(execution_id: str):
     await engine.cancel()
 
     return {"status": "cancelled", "execution_id": execution_id}
+
+
+# Credential management endpoints
+class CredentialInfo(BaseModel):
+    """Credential information (without password)"""
+    name: str
+    username: str
+    description: Optional[str] = ""
+
+
+class CredentialCreate(BaseModel):
+    """Credential creation request"""
+    name: str
+    username: str
+    password: str
+    description: Optional[str] = ""
+
+
+@app.get("/api/credentials", response_model=List[CredentialInfo])
+async def list_credentials():
+    """List all credentials (without passwords)"""
+    try:
+        vault = CredentialVault()
+        credentials = vault.list_credentials()
+        return [
+            CredentialInfo(
+                name=cred.name,
+                username=cred.username,
+                description=cred.description or ""
+            )
+            for cred in credentials
+        ]
+    except Exception as e:
+        logger.error(f"Error listing credentials: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/credentials")
+async def add_credential(credential: CredentialCreate):
+    """Add new credential"""
+    try:
+        vault = CredentialVault()
+        from ignition_toolkit.credentials.vault import Credential
+
+        # Check if credential already exists
+        try:
+            existing = vault.get_credential(credential.name)
+            if existing:
+                raise HTTPException(status_code=400, detail=f"Credential '{credential.name}' already exists")
+        except ValueError:
+            # Credential doesn't exist, which is what we want
+            pass
+
+        # Save new credential
+        vault.save_credential(
+            Credential(
+                name=credential.name,
+                username=credential.username,
+                password=credential.password,
+                description=credential.description
+            )
+        )
+
+        return {"message": "Credential added successfully", "name": credential.name}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error adding credential: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.delete("/api/credentials/{name}")
+async def delete_credential(name: str):
+    """Delete credential"""
+    try:
+        vault = CredentialVault()
+        success = vault.delete_credential(name)
+
+        if not success:
+            raise HTTPException(status_code=404, detail=f"Credential '{name}' not found")
+
+        return {"message": "Credential deleted successfully", "name": name}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting credential: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 # WebSocket endpoint for real-time updates

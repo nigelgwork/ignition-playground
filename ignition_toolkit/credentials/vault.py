@@ -6,7 +6,7 @@ import json
 import logging
 from pathlib import Path
 from typing import List, Optional
-from datetime import datetime
+from datetime import datetime, UTC
 
 from ignition_toolkit.credentials.models import Credential
 from ignition_toolkit.credentials.encryption import CredentialEncryption
@@ -36,7 +36,8 @@ class CredentialVault:
 
         self.vault_path = vault_path
         self.credentials_file = vault_path / "credentials.json"
-        self.encryption = CredentialEncryption(vault_path / "encryption.key")
+        self.encryption_key_path = vault_path / "encryption.key"
+        self.encryption = CredentialEncryption(self.encryption_key_path)
 
         # Ensure vault directory exists
         self.vault_path.mkdir(parents=True, exist_ok=True)
@@ -88,8 +89,8 @@ class CredentialVault:
             "username": credential.username,
             "password": encrypted_password,  # Already encrypted
             "description": credential.description,
-            "created_at": credential.created_at.isoformat() if credential.created_at else datetime.utcnow().isoformat(),
-            "updated_at": datetime.utcnow().isoformat(),
+            "created_at": credential.created_at.isoformat() if credential.created_at else datetime.now(UTC).isoformat(),
+            "updated_at": datetime.now(UTC).isoformat(),
         }
 
         self._save_credentials_file(credentials_data)

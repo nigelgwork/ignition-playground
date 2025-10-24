@@ -91,6 +91,7 @@ class PlaybookEngine:
         playbook: Playbook,
         parameters: Dict[str, Any],
         base_path: Optional[Path] = None,
+        execution_id: Optional[str] = None,
     ) -> ExecutionState:
         """
         Execute playbook with parameters
@@ -99,6 +100,7 @@ class PlaybookEngine:
             playbook: Playbook to execute
             parameters: Parameter values
             base_path: Base path for resolving relative file paths
+            execution_id: Optional execution ID (generated if not provided)
 
         Returns:
             Final execution state
@@ -110,7 +112,8 @@ class PlaybookEngine:
         self._validate_parameters(playbook, parameters)
 
         # Create execution state
-        execution_id = str(uuid.uuid4())
+        if execution_id is None:
+            execution_id = str(uuid.uuid4())
         execution_state = ExecutionState(
             execution_id=execution_id,
             playbook_name=playbook.name,
@@ -161,6 +164,7 @@ class PlaybookEngine:
                     logger.info(f"Skipping step: {step.name}")
                     step_result = StepResult(
                         step_id=step.id,
+                        step_name=step.name,
                         status=StepStatus.SKIPPED,
                         started_at=datetime.now(),
                         completed_at=datetime.now(),
@@ -283,14 +287,16 @@ class PlaybookEngine:
         try:
             with self.database.session_scope() as session:
                 execution_model = ExecutionModel(
-                    id=execution_state.execution_id,
                     playbook_name=execution_state.playbook_name,
                     status=execution_state.status.value,
                     started_at=execution_state.started_at,
-                    parameters=parameters,
+                    config_data=parameters,
                     playbook_version=playbook.version,
                 )
                 session.add(execution_model)
+                session.flush()  # Get the auto-generated ID
+                # Store the database ID for later queries
+                execution_state.db_execution_id = execution_model.id
         except Exception as e:
             logger.exception(f"Error saving execution to database: {e}")
 
@@ -298,15 +304,18 @@ class PlaybookEngine:
         """Save execution end to database"""
         try:
             with self.database.session_scope() as session:
+                if not hasattr(execution_state, 'db_execution_id'):
+                    logger.warning("No database execution ID found, skipping save")
+                    return
                 execution_model = (
                     session.query(ExecutionModel)
-                    .filter_by(id=execution_state.execution_id)
+                    .filter_by(id=execution_state.db_execution_id)
                     .first()
                 )
                 if execution_model:
                     execution_model.status = execution_state.status.value
                     execution_model.completed_at = execution_state.completed_at
-                    execution_model.error = execution_state.error
+                    execution_model.error_message = execution_state.error
         except Exception as e:
             logger.exception(f"Error updating execution in database: {e}")
 
@@ -315,16 +324,19 @@ class PlaybookEngine:
     ) -> None:
         """Save step result to database"""
         try:
+            if not hasattr(execution_state, 'db_execution_id'):
+                logger.warning("No database execution ID found, skipping step result save")
+                return
             with self.database.session_scope() as session:
                 step_model = StepResultModel(
-                    execution_id=execution_state.execution_id,
+                    execution_id=execution_state.db_execution_id,
                     step_id=step_result.step_id,
+                    step_name=step_result.step_name,
                     status=step_result.status.value,
                     started_at=step_result.started_at,
                     completed_at=step_result.completed_at,
                     output=step_result.output,
-                    error=step_result.error,
-                    retry_count=step_result.retry_count,
+                    error_message=step_result.error,
                 )
                 session.add(step_model)
         except Exception as e:
