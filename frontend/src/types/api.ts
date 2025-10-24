@@ -47,8 +47,8 @@ export interface ExecutionStatusResponse {
 
 export interface CredentialInfo {
   name: string;
+  username: string;
   description?: string;
-  created_at: string;
 }
 
 export interface HealthResponse {
