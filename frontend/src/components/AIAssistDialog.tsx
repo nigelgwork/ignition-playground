@@ -1,7 +1,7 @@
 /**
  * AIAssistDialog - Floating AI chat interface for debugging paused executions
  *
- * Displays as a collapsible chat box in the bottom-left corner.
+ * Displays as a collapsible chat box with toggle button.
  * Shows current error context, allows chat with AI, and can apply fixes.
  */
 
@@ -17,6 +17,8 @@ import {
   IconButton,
   Divider,
   Collapse,
+  Fab,
+  Tooltip,
 } from '@mui/material';
 import {
   Send as SendIcon,
@@ -24,6 +26,8 @@ import {
   AutoFixHigh as FixIcon,
   ExpandMore as ExpandMoreIcon,
   ExpandLess as ExpandLessIcon,
+  Close as CloseIcon,
+  Chat as ChatIcon,
 } from '@mui/icons-material';
 
 interface AIAssistDialogProps {
@@ -59,6 +63,7 @@ export function AIAssistDialog({
   const [inputMessage, setInputMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isExpanded, setIsExpanded] = useState(true);
+  const [isVisible, setIsVisible] = useState(false);
 
   const handleSendMessage = async () => {
     if (!inputMessage.trim() || isLoading) return;
@@ -116,172 +121,227 @@ export function AIAssistDialog({
     }
   };
 
+  const handleToggleVisibility = () => {
+    setIsVisible(!isVisible);
+    if (!isVisible) {
+      setIsExpanded(true); // Auto-expand when showing
+    }
+  };
+
   if (!open) {
     return null;
   }
 
   return (
     <>
-      {/* Floating Chat Box - Bottom Left */}
-      <Paper
-        elevation={8}
-        sx={{
-          position: 'fixed',
-          bottom: 16,
-          left: 16,
-          width: isExpanded ? 400 : 56,
-          maxHeight: isExpanded ? '70vh' : 56,
-          display: 'flex',
-          flexDirection: 'column',
-          transition: 'all 0.3s ease-in-out',
-          zIndex: 1300,
-          borderRadius: 2,
-          overflow: 'hidden',
-        }}
-      >
-        {/* Header */}
-        <Box
+      {/* Toggle Button - Fixed Bottom Left */}
+      <Tooltip title={isVisible ? 'Hide AI Assistant' : 'Show AI Assistant'} placement="right">
+        <Fab
+          color="primary"
+          size="medium"
+          onClick={handleToggleVisibility}
           sx={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 1,
-            p: 1.5,
-            bgcolor: 'primary.dark',
-            color: 'primary.contrastText',
-            cursor: 'pointer',
+            position: 'fixed',
+            bottom: 24,
+            left: 24,
+            zIndex: 1400,
+            display: isVisible ? 'none' : 'flex',
           }}
-          onClick={() => setIsExpanded(!isExpanded)}
         >
-          <BugIcon fontSize="small" />
-          {isExpanded && (
-            <>
-              <Typography variant="subtitle2" sx={{ flexGrow: 1 }}>
-                AI Debug Assistant
-              </Typography>
-              <Chip label="Paused" color="warning" size="small" />
-              <IconButton
-                size="small"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setIsExpanded(!isExpanded);
-                }}
-                sx={{ color: 'inherit' }}
-              >
-                {isExpanded ? <ExpandMoreIcon /> : <ExpandLessIcon />}
-              </IconButton>
-            </>
-          )}
-        </Box>
+          <ChatIcon />
+        </Fab>
+      </Tooltip>
 
-        {/* Chat Content */}
-        <Collapse in={isExpanded} timeout="auto">
-          {/* Error Context */}
-          {currentError && (
-            <Box sx={{ px: 2, py: 1.5, bgcolor: 'error.dark', color: 'error.contrastText' }}>
-              <Typography variant="caption" fontWeight="bold" display="block">
-                Current Error:
-              </Typography>
-              <Typography variant="body2">{currentError}</Typography>
-            </Box>
-          )}
-
-          {/* Chat Messages */}
+      {/* Floating Chat Box */}
+      {isVisible && (
+        <Paper
+          elevation={8}
+          sx={{
+            position: 'fixed',
+            bottom: 24,
+            left: 24,
+            width: isExpanded ? 420 : 56,
+            maxHeight: isExpanded ? '65vh' : 56,
+            display: 'flex',
+            flexDirection: 'column',
+            transition: 'all 0.3s ease-in-out',
+            zIndex: 1400,
+            borderRadius: 2,
+            overflow: 'hidden',
+          }}
+        >
+          {/* Header */}
           <Box
             sx={{
-              flexGrow: 1,
-              overflow: 'auto',
               display: 'flex',
-              flexDirection: 'column',
-              gap: 1.5,
-              p: 2,
-              maxHeight: 'calc(70vh - 200px)',
-              minHeight: 200,
+              alignItems: 'center',
+              gap: 1,
+              p: 1.5,
+              bgcolor: 'primary.dark',
+              color: 'primary.contrastText',
+              cursor: isExpanded ? 'default' : 'pointer',
             }}
+            onClick={() => !isExpanded && setIsExpanded(true)}
           >
-            {messages.map((msg, index) => (
-              <Box
-                key={index}
-                sx={{
-                  alignSelf: msg.role === 'user' ? 'flex-end' : 'flex-start',
-                  maxWidth: '85%',
-                }}
-              >
-                <Paper
-                  elevation={1}
-                  sx={{
-                    p: 1.5,
-                    bgcolor: msg.role === 'user' ? 'primary.dark' : 'background.paper',
-                    color: msg.role === 'user' ? 'primary.contrastText' : 'text.primary',
-                  }}
-                >
-                  <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>
-                    {msg.content}
-                  </Typography>
-                  <Typography
-                    variant="caption"
-                    color={msg.role === 'user' ? 'primary.light' : 'text.secondary'}
-                    sx={{ mt: 0.5, display: 'block' }}
-                  >
-                    {msg.timestamp.toLocaleTimeString()}
-                  </Typography>
-                </Paper>
-              </Box>
-            ))}
-
-            {isLoading && (
-              <Box sx={{ alignSelf: 'flex-start', display: 'flex', alignItems: 'center', gap: 1 }}>
-                <CircularProgress size={16} />
-                <Typography variant="body2" color="text.secondary">
-                  AI is thinking...
+            <BugIcon fontSize="small" />
+            {isExpanded && (
+              <>
+                <Typography variant="subtitle2" sx={{ flexGrow: 1 }}>
+                  AI Debug Assistant
                 </Typography>
-              </Box>
+                <Chip label="Paused" color="warning" size="small" />
+                <Tooltip title="Minimize">
+                  <IconButton
+                    size="small"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setIsExpanded(false);
+                    }}
+                    sx={{ color: 'inherit' }}
+                  >
+                    <ExpandMoreIcon />
+                  </IconButton>
+                </Tooltip>
+                <Tooltip title="Close">
+                  <IconButton
+                    size="small"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setIsVisible(false);
+                    }}
+                    sx={{ color: 'inherit' }}
+                  >
+                    <CloseIcon />
+                  </IconButton>
+                </Tooltip>
+              </>
+            )}
+            {!isExpanded && (
+              <Tooltip title="Expand">
+                <IconButton
+                  size="small"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setIsExpanded(true);
+                  }}
+                  sx={{ color: 'inherit', ml: 'auto' }}
+                >
+                  <ExpandLessIcon />
+                </IconButton>
+              </Tooltip>
             )}
           </Box>
 
-          <Divider />
+          {/* Chat Content */}
+          <Collapse in={isExpanded} timeout="auto">
+            {/* Error Context */}
+            {currentError && (
+              <Box sx={{ px: 2, py: 1.5, bgcolor: 'error.dark', color: 'error.contrastText' }}>
+                <Typography variant="caption" fontWeight="bold" display="block">
+                  Current Error:
+                </Typography>
+                <Typography variant="body2">{currentError}</Typography>
+              </Box>
+            )}
 
-          {/* Input Area */}
-          <Box sx={{ p: 1.5, display: 'flex', gap: 1 }}>
-            <TextField
-              fullWidth
-              placeholder="Describe the issue..."
-              value={inputMessage}
-              onChange={(e) => setInputMessage(e.target.value)}
-              onKeyPress={handleKeyPress}
-              disabled={isLoading}
-              multiline
-              maxRows={2}
-              size="small"
+            {/* Chat Messages */}
+            <Box
               sx={{
-                '& .MuiOutlinedInput-root': {
-                  fontSize: '0.875rem',
-                },
+                flexGrow: 1,
+                overflow: 'auto',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 1.5,
+                p: 2,
+                maxHeight: 'calc(65vh - 220px)',
+                minHeight: 200,
               }}
-            />
-            <IconButton
-              color="primary"
-              onClick={handleSendMessage}
-              disabled={!inputMessage.trim() || isLoading}
-              size="small"
             >
-              <SendIcon fontSize="small" />
-            </IconButton>
-          </Box>
+              {messages.map((msg, index) => (
+                <Box
+                  key={index}
+                  sx={{
+                    alignSelf: msg.role === 'user' ? 'flex-end' : 'flex-start',
+                    maxWidth: '85%',
+                  }}
+                >
+                  <Paper
+                    elevation={1}
+                    sx={{
+                      p: 1.5,
+                      bgcolor: msg.role === 'user' ? 'primary.dark' : 'background.paper',
+                      color: msg.role === 'user' ? 'primary.contrastText' : 'text.primary',
+                    }}
+                  >
+                    <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>
+                      {msg.content}
+                    </Typography>
+                    <Typography
+                      variant="caption"
+                      color={msg.role === 'user' ? 'primary.light' : 'text.secondary'}
+                      sx={{ mt: 0.5, display: 'block' }}
+                    >
+                      {msg.timestamp.toLocaleTimeString()}
+                    </Typography>
+                  </Paper>
+                </Box>
+              ))}
 
-          {/* Action Buttons */}
-          <Box sx={{ px: 1.5, pb: 1.5, display: 'flex', gap: 1 }}>
-            <Button
-              variant="outlined"
-              startIcon={<FixIcon />}
-              size="small"
-              disabled
-              fullWidth
-            >
-              Apply Fix
-            </Button>
-          </Box>
-        </Collapse>
-      </Paper>
+              {isLoading && (
+                <Box sx={{ alignSelf: 'flex-start', display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <CircularProgress size={16} />
+                  <Typography variant="body2" color="text.secondary">
+                    AI is thinking...
+                  </Typography>
+                </Box>
+              )}
+            </Box>
+
+            <Divider />
+
+            {/* Input Area */}
+            <Box sx={{ p: 1.5, display: 'flex', gap: 1 }}>
+              <TextField
+                fullWidth
+                placeholder="Describe the issue..."
+                value={inputMessage}
+                onChange={(e) => setInputMessage(e.target.value)}
+                onKeyPress={handleKeyPress}
+                disabled={isLoading}
+                multiline
+                maxRows={2}
+                size="small"
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    fontSize: '0.875rem',
+                  },
+                }}
+              />
+              <IconButton
+                color="primary"
+                onClick={handleSendMessage}
+                disabled={!inputMessage.trim() || isLoading}
+                size="small"
+              >
+                <SendIcon fontSize="small" />
+              </IconButton>
+            </Box>
+
+            {/* Action Buttons */}
+            <Box sx={{ px: 1.5, pb: 1.5, display: 'flex', gap: 1 }}>
+              <Button
+                variant="outlined"
+                startIcon={<FixIcon />}
+                size="small"
+                disabled
+                fullWidth
+              >
+                Apply Fix
+              </Button>
+            </Box>
+          </Collapse>
+        </Paper>
+      )}
     </>
   );
 }
