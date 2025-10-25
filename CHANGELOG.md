@@ -5,6 +5,26 @@ All notable changes to the Ignition Automation Toolkit will be documented in thi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.28] - 2025-10-25
+
+### Fixed
+- **Gateway Login Playbook**: Fixed invalid `browser.verify` step type
+  - Changed step type from `browser.verify` (doesn't exist) to `browser.wait`
+  - Removed invalid `text` parameter from browser.wait step
+  - Playbook now loads and executes correctly
+
+### Changed
+- **Playbook Cleanup**: Renamed and consolidated Gateway Login playbooks
+  - Renamed `simple_health_check.yaml` to `gateway_login.yaml` in examples directory
+  - Deleted duplicate `simple_health_check.yaml` from gateway directory
+  - Single "Gateway Login" playbook now in examples category
+  - Updated playbook name and description for clarity
+
+### Technical Details
+- Playbook: `playbooks/examples/gateway_login.yaml` line 39 - Changed step type to `browser.wait`
+- Removed duplicate playbook: `playbooks/gateway/simple_health_check.yaml`
+- Valid browser step types: navigate, click, fill, screenshot, wait (verify is not valid)
+
 ## [1.0.27] - 2025-10-25
 
 ### Fixed

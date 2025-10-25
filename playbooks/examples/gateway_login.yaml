@@ -1,6 +1,6 @@
-name: "Simple Health Check"
+name: "Gateway Login"
 version: "1.0"
-description: "3-step visual health check: Open gateway, login, check license status"
+description: "Visual login test: Open gateway webpage, login with credentials, verify successful authentication"
 
 parameters:
   - name: gateway_url
@@ -24,21 +24,21 @@ steps:
     name: "Step 1: Open Gateway Webpage"
     type: browser.navigate
     parameters:
-      url: "{{ parameter.gateway_url }}"
+      url: "{{ gateway_url }}"
     timeout: 30
 
-  - id: step1b_screenshot_initial
-    name: "Step 1b: Take screenshot of gateway page"
-    type: browser.screenshot
+  - id: step1b_click_login
+    name: "Step 1b: Click Login Button (top right)"
+    type: browser.click
     parameters:
-      path: "gateway_initial.png"
+      selector: "button:has-text('Login'), a:has-text('Login'), [class*='login']"
     timeout: 10
 
   - id: step1c_wait_for_form
     name: "Step 1c: Wait for login form"
     type: browser.wait
     parameters:
-      selector: "input[type='text'], input[name='username'], input[type='password']"
+      selector: "input[type='text'], input[name='username'], input[placeholder*='username' i]"
     timeout: 10
 
   - id: step2_login
@@ -46,7 +46,7 @@ steps:
     type: browser.fill
     parameters:
       selector: "input[type='text'], input[name='username'], input[placeholder*='username' i]"
-      value: "{{ parameter.username }}"
+      value: "{{ username }}"
     timeout: 10
 
   - id: step2b_password
@@ -54,33 +54,19 @@ steps:
     type: browser.fill
     parameters:
       selector: "input[type='password'], input[name='password']"
-      value: "{{ parameter.password }}"
+      value: "{{ password }}"
     timeout: 10
 
-  - id: step2c_screenshot_before_submit
-    name: "Step 2c: Screenshot before submitting"
-    type: browser.screenshot
-    parameters:
-      path: "before_login.png"
-    timeout: 10
-
-  - id: step2d_submit
-    name: "Step 2d: Submit Login"
+  - id: step2c_submit
+    name: "Step 2c: Submit Login"
     type: browser.click
     parameters:
       selector: "button[type='submit'], button:has-text('Sign In'), button:has-text('Login'), input[type='submit']"
     timeout: 10
 
-  - id: step2e_wait_after_login
-    name: "Step 2e: Wait for page to load after login"
-    type: browser.wait
-    parameters:
-      selector: "body"
-    timeout: 15
-
   - id: step3_check_license
     name: "Step 3: Check License Status"
     type: browser.screenshot
     parameters:
-      path: "after_login.png"
+      path: "license_status.png"
     timeout: 15
