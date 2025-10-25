@@ -178,6 +178,7 @@ class ExecutionStatusResponse(BaseModel):
     current_step_index: int
     total_steps: int
     error: Optional[str]
+    debug_mode: bool = False
     step_results: Optional[List[StepResultResponse]] = None
 
 
@@ -538,6 +539,7 @@ async def list_executions(limit: int = 50, status: Optional[str] = None):
                 current_step_index=state.current_step_index,
                 total_steps=len(state.step_results) + 1,
                 error=state.error,
+                debug_mode=engine.state_manager.is_debug_mode_enabled(),
                 step_results=step_results,
             ))
 
@@ -609,6 +611,7 @@ async def get_execution_status(execution_id: str):
                 current_step_index=state.current_step_index,
                 total_steps=len(state.step_results),  # Now accurate with pre-population
                 error=state.error,
+                debug_mode=engine.state_manager.is_debug_mode_enabled(),
                 step_results=step_results,
             )
 

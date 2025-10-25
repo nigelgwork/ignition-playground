@@ -73,6 +73,13 @@ export function ExecutionDetail() {
   const wsUpdate = executionUpdates.get(executionId);
   const execution = wsUpdate || executionFromAPI;
 
+  // Sync debug mode from execution data
+  useEffect(() => {
+    if (execution?.debug_mode !== undefined) {
+      setDebugMode(execution.debug_mode);
+    }
+  }, [execution?.debug_mode]);
+
   // Calculate and update runtime every second
   useEffect(() => {
     if (!execution?.started_at) {

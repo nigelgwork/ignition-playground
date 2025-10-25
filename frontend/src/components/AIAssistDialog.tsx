@@ -63,7 +63,7 @@ export function AIAssistDialog({
   const [inputMessage, setInputMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isExpanded, setIsExpanded] = useState(true);
-  const [isVisible, setIsVisible] = useState(false);
+  const [isVisible, setIsVisible] = useState(true); // Auto-show when open=true
 
   const handleSendMessage = async () => {
     if (!inputMessage.trim() || isLoading) return;

@@ -60,6 +60,7 @@ export interface ExecutionStatusResponse {
   current_step_index: number;
   total_steps: number;
   error: string | null;
+  debug_mode?: boolean;
   step_results?: StepResult[];
 }
 
@@ -101,6 +102,7 @@ export interface ExecutionUpdate {
   current_step_index: number;
   total_steps: number;
   error: string | null;
+  debug_mode?: boolean;
   started_at: string | null;
   completed_at: string | null;
   step_results: StepResult[];
