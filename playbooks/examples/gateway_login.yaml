@@ -1,6 +1,6 @@
 name: "Gateway Login"
-version: "1.0"
-description: "Visual login test: Open gateway webpage, login with credentials, verify successful authentication"
+version: "1.1"
+description: "Visual login test: Open gateway webpage, login with credentials (single-step), verify successful authentication"
 
 parameters:
   - name: gateway_url
@@ -20,53 +20,60 @@ parameters:
     description: "Gateway password"
 
 steps:
-  - id: step1_open_gateway
+  - id: step1
     name: "Step 1: Open Gateway Webpage"
     type: browser.navigate
     parameters:
       url: "{{ gateway_url }}"
     timeout: 30
 
-  - id: step1b_click_login
-    name: "Step 1b: Click Login Button (top right)"
+  - id: step2
+    name: "Step 2: Click Login Button"
     type: browser.click
     parameters:
-      selector: "button:has-text('Login'), a:has-text('Login'), [class*='login']"
+      selector: "a.login-link, a[href*='login'], button.login-button, #login-button, [data-testid='login'], nav a:has-text('Login')"
     timeout: 10
 
-  - id: step1c_wait_for_form
-    name: "Step 1c: Wait for login form"
+  - id: step3
+    name: "Step 3: Wait for login form"
     type: browser.wait
     parameters:
-      selector: "input[type='text'], input[name='username'], input[placeholder*='username' i]"
+      selector: "input[name='j_username'], input[name='username'], input[type='text']"
     timeout: 10
 
-  - id: step2_login
-    name: "Step 2: Enter Username"
+  - id: step4
+    name: "Step 4: Enter Username"
     type: browser.fill
     parameters:
-      selector: "input[type='text'], input[name='username'], input[placeholder*='username' i]"
+      selector: "input[name='j_username'], input[name='username'], input[type='text'], input[placeholder*='username' i]"
       value: "{{ username }}"
     timeout: 10
 
-  - id: step2b_password
-    name: "Step 2b: Enter Password"
+  - id: step5
+    name: "Step 5: Enter Password"
     type: browser.fill
     parameters:
-      selector: "input[type='password'], input[name='password']"
+      selector: "input[name='j_password'], input[name='password'], input[type='password']"
       value: "{{ password }}"
     timeout: 10
 
-  - id: step2c_submit
-    name: "Step 2c: Submit Login"
+  - id: step6
+    name: "Step 6: Submit Login"
     type: browser.click
     parameters:
       selector: "button[type='submit'], button:has-text('Sign In'), button:has-text('Login'), input[type='submit']"
     timeout: 10
 
-  - id: step3_check_license
-    name: "Step 3: Check License Status"
+  - id: step7
+    name: "Step 7: Wait for Dashboard"
+    type: browser.wait
+    parameters:
+      selector: ".home-page, .ia_homePage, [data-page='home'], nav"
+    timeout: 15
+
+  - id: step8
+    name: "Step 8: Capture Success Screenshot"
     type: browser.screenshot
     parameters:
-      path: "license_status.png"
-    timeout: 15
+      path: "gateway_logged_in.png"
+    timeout: 10

@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 from datetime import datetime
 
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, BackgroundTasks
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, BackgroundTasks, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
@@ -23,6 +23,7 @@ from ignition_toolkit.playbook.metadata import PlaybookMetadataStore
 from ignition_toolkit.gateway import GatewayClient
 from ignition_toolkit.credentials import CredentialVault
 from ignition_toolkit.storage import get_database
+from ignition_toolkit.ai import AIAssistant
 from ignition_toolkit import __version__
 from ignition_toolkit.startup.lifecycle import lifespan
 from ignition_toolkit.api.routers import health_router
@@ -60,11 +61,27 @@ active_engines: Dict[str, PlaybookEngine] = {}
 engine_completion_times: Dict[str, datetime] = {}  # Track when engines completed for TTL cleanup
 websocket_connections: List[WebSocket] = []
 
+# AI Assistant (will use ANTHROPIC_API_KEY from environment)
+ai_assistant = AIAssistant()
+
 # Configuration
 EXECUTION_TTL_MINUTES = 30  # Keep completed executions for 30 minutes
 
 # Initialize playbook metadata store
 metadata_store = PlaybookMetadataStore()
+
+
+# Custom StaticFiles class with cache-busting headers
+class NoCacheStaticFiles(StaticFiles):
+    """StaticFiles subclass that adds no-cache headers to prevent browser caching"""
+
+    async def get_response(self, path: str, scope) -> Response:
+        response = await super().get_response(path, scope)
+        # Add no-cache headers to all static files
+        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
+        return response
 
 
 # Pydantic models for API
@@ -368,6 +385,29 @@ def validate_playbook_path(path_str: str) -> Path:
     return playbook_path
 
 
+def get_relative_playbook_path(path_str: str) -> str:
+    """
+    Convert a playbook path (full or relative) to a relative path from playbooks directory
+
+    Args:
+        path_str: User-provided playbook path (can be full or relative)
+
+    Returns:
+        Relative path string from playbooks directory (e.g., "gateway/reset_gateway_trial.yaml")
+    """
+    playbooks_dir = Path("./playbooks").resolve()
+    playbook_path = Path(path_str).resolve()
+
+    # Convert to relative path from playbooks directory
+    try:
+        relative_path = playbook_path.relative_to(playbooks_dir)
+        return str(relative_path)
+    except ValueError:
+        # If path is not relative to playbooks_dir, try using it as-is
+        # (might already be relative)
+        return path_str
+
+
 @app.post("/api/executions", response_model=ExecutionResponse)
 async def start_execution(request: ExecutionRequest, background_tasks: BackgroundTasks):
     """Start playbook execution"""
@@ -644,6 +684,11 @@ async def get_execution_status(execution_id: str):
                     for step in db_steps
                 ]
 
+                # Extract debug_mode from execution_metadata
+                debug_mode = False
+                if db_exec.execution_metadata and isinstance(db_exec.execution_metadata, dict):
+                    debug_mode = db_exec.execution_metadata.get('debug_mode', False)
+
                 return ExecutionStatusResponse(
                     execution_id=db_exec.execution_id,
                     playbook_name=db_exec.playbook_name,
@@ -653,6 +698,7 @@ async def get_execution_status(execution_id: str):
                     current_step_index=len(db_steps) - 1 if db_steps else 0,
                     total_steps=len(db_steps),
                     error=db_exec.error_message,
+                    debug_mode=debug_mode,
                     step_results=step_results,
                 )
     except Exception as e:
@@ -783,6 +829,31 @@ async def get_debug_dom(execution_id: str):
             return {"html": html}
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Failed to get DOM: {str(e)}")
+    else:
+        raise HTTPException(status_code=400, detail="No browser available for this execution")
+
+
+class BrowserClickRequest(BaseModel):
+    """Request to click at coordinates in browser"""
+    x: int
+    y: int
+
+
+@app.post("/api/executions/{execution_id}/browser/click")
+async def browser_click_at_coordinates(execution_id: str, request: BrowserClickRequest):
+    """Click at specific coordinates in the browser"""
+    if execution_id not in active_engines:
+        raise HTTPException(status_code=404, detail="Execution not found")
+
+    engine = active_engines[execution_id]
+
+    # Click in browser if available
+    if engine._browser_manager:
+        try:
+            await engine._browser_manager.click_at_coordinates(request.x, request.y)
+            return {"status": "success", "message": f"Clicked at ({request.x}, {request.y})"}
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Failed to click: {str(e)}")
     else:
         raise HTTPException(status_code=400, detail="No browser available for this execution")
 
@@ -1050,8 +1121,10 @@ async def delete_credential(name: str):
 async def mark_playbook_verified(playbook_path: str):
     """Mark a playbook as verified"""
     try:
-        metadata_store.mark_verified(playbook_path, verified_by="user")
-        meta = metadata_store.get_metadata(playbook_path)
+        # Convert to relative path for metadata store
+        relative_path = get_relative_playbook_path(playbook_path)
+        metadata_store.mark_verified(relative_path, verified_by="user")
+        meta = metadata_store.get_metadata(relative_path)
         return {
             "status": "success",
             "playbook_path": playbook_path,
@@ -1068,7 +1141,9 @@ async def mark_playbook_verified(playbook_path: str):
 async def unmark_playbook_verified(playbook_path: str):
     """Unmark a playbook as verified"""
     try:
-        metadata_store.unmark_verified(playbook_path)
+        # Convert to relative path for metadata store
+        relative_path = get_relative_playbook_path(playbook_path)
+        metadata_store.unmark_verified(relative_path)
         return {
             "status": "success",
             "playbook_path": playbook_path,
@@ -1084,7 +1159,9 @@ async def unmark_playbook_verified(playbook_path: str):
 async def enable_playbook(playbook_path: str):
     """Enable a playbook"""
     try:
-        metadata_store.set_enabled(playbook_path, True)
+        # Convert to relative path for metadata store
+        relative_path = get_relative_playbook_path(playbook_path)
+        metadata_store.set_enabled(relative_path, True)
         return {
             "status": "success",
             "playbook_path": playbook_path,
@@ -1100,7 +1177,9 @@ async def enable_playbook(playbook_path: str):
 async def disable_playbook(playbook_path: str):
     """Disable a playbook"""
     try:
-        metadata_store.set_enabled(playbook_path, False)
+        # Convert to relative path for metadata store
+        relative_path = get_relative_playbook_path(playbook_path)
+        metadata_store.set_enabled(relative_path, False)
         return {
             "status": "success",
             "playbook_path": playbook_path,
@@ -1229,12 +1308,50 @@ async def broadcast_screenshot_frame(execution_id: str, screenshot_b64: str):
 # AI Assistant Endpoints
 # ============================================================================
 
+class AICredentialCreate(BaseModel):
+    """Request to create AI credential"""
+    name: str  # Unique name for the credential
+    provider: str  # "openai", "anthropic", "gemini", "local"
+    api_key: Optional[str] = None
+    api_base_url: Optional[str] = None  # For local LLMs
+    model_name: Optional[str] = None
+    enabled: bool = False
+
+class AICredentialInfo(BaseModel):
+    """Response with AI credential info"""
+    id: int
+    name: str
+    provider: str
+    api_base_url: Optional[str]
+    model_name: Optional[str]
+    enabled: str  # "true" or "false"
+    has_api_key: bool
+
+# Legacy models for backward compatibility
+class AISettingsRequest(BaseModel):
+    """Request to save AI settings (legacy singleton)"""
+    provider: str  # "openai", "anthropic", "local"
+    api_key: Optional[str] = None
+    api_base_url: Optional[str] = None  # For local LLMs
+    model_name: Optional[str] = None
+    enabled: bool = False
+
+class AISettingsResponse(BaseModel):
+    """Response with AI settings (legacy singleton)"""
+    id: int
+    provider: str
+    api_base_url: Optional[str]
+    model_name: Optional[str]
+    enabled: str  # "true" or "false"
+    has_api_key: bool
+
 class AIAssistRequest(BaseModel):
     """Request for AI assistance during execution"""
     execution_id: str
     user_message: str
     current_step_id: Optional[str] = None
     error_context: Optional[str] = None
+    credential_name: Optional[str] = None  # Name of AI credential to use
 
 class AIAssistResponse(BaseModel):
     """Response from AI assistant"""
@@ -1242,61 +1359,362 @@ class AIAssistResponse(BaseModel):
     suggested_fix: Optional[Dict[str, Any]] = None
     can_auto_apply: bool = False
 
+@app.get("/api/ai-credentials", response_model=List[AICredentialInfo])
+async def list_ai_credentials():
+    """List all AI credentials"""
+    database = get_database()
+    with database.session_scope() as session:
+        from ignition_toolkit.storage.models import AISettingsModel
+        credentials = session.query(AISettingsModel).all()
+        return [AICredentialInfo(**cred.to_dict()) for cred in credentials]
+
+@app.post("/api/ai-credentials", response_model=AICredentialInfo)
+async def create_ai_credential(request: AICredentialCreate):
+    """Create a new AI credential"""
+    database = get_database()
+    with database.session_scope() as session:
+        from ignition_toolkit.storage.models import AISettingsModel
+
+        # Check if name already exists
+        existing = session.query(AISettingsModel).filter_by(name=request.name).first()
+        if existing:
+            raise HTTPException(status_code=400, detail=f"AI credential with name '{request.name}' already exists")
+
+        credential = AISettingsModel(
+            name=request.name,
+            provider=request.provider,
+            api_key=request.api_key,
+            api_base_url=request.api_base_url,
+            model_name=request.model_name,
+            enabled="true" if request.enabled else "false"
+        )
+        session.add(credential)
+        session.commit()
+        session.refresh(credential)
+        return AICredentialInfo(**credential.to_dict())
+
+@app.put("/api/ai-credentials/{name}", response_model=AICredentialInfo)
+async def update_ai_credential(name: str, request: AICredentialCreate):
+    """Update an existing AI credential"""
+    database = get_database()
+    with database.session_scope() as session:
+        from ignition_toolkit.storage.models import AISettingsModel
+
+        credential = session.query(AISettingsModel).filter_by(name=name).first()
+        if not credential:
+            raise HTTPException(status_code=404, detail=f"AI credential '{name}' not found")
+
+        # Update fields
+        if request.name != name:
+            # Check if new name conflicts
+            existing = session.query(AISettingsModel).filter_by(name=request.name).first()
+            if existing:
+                raise HTTPException(status_code=400, detail=f"AI credential with name '{request.name}' already exists")
+            credential.name = request.name
+
+        credential.provider = request.provider
+        if request.api_key:  # Only update if provided
+            credential.api_key = request.api_key
+        credential.api_base_url = request.api_base_url
+        credential.model_name = request.model_name
+        credential.enabled = "true" if request.enabled else "false"
+
+        session.commit()
+        session.refresh(credential)
+        return AICredentialInfo(**credential.to_dict())
+
+@app.delete("/api/ai-credentials/{name}", response_model=AICredentialInfo)
+async def delete_ai_credential(name: str):
+    """Delete an AI credential"""
+    database = get_database()
+    with database.session_scope() as session:
+        from ignition_toolkit.storage.models import AISettingsModel
+
+        credential = session.query(AISettingsModel).filter_by(name=name).first()
+        if not credential:
+            raise HTTPException(status_code=404, detail=f"AI credential '{name}' not found")
+
+        result = AICredentialInfo(**credential.to_dict())
+        session.delete(credential)
+        session.commit()
+        return result
+
+# Legacy endpoints for backward compatibility
+@app.get("/api/ai-settings", response_model=AISettingsResponse)
+async def get_ai_settings():
+    """Get AI settings (legacy singleton - returns first credential)"""
+    database = get_database()
+    with database.session_scope() as session:
+        from ignition_toolkit.storage.models import AISettingsModel
+        settings = session.query(AISettingsModel).first()
+        if not settings:
+            # Return default/empty settings
+            return AISettingsResponse(
+                id=0,
+                provider="openai",
+                api_base_url=None,
+                model_name="gpt-4",
+                enabled="false",
+                has_api_key=False
+            )
+        return AISettingsResponse(**settings.to_dict())
+
+@app.post("/api/ai-settings", response_model=AISettingsResponse)
+async def save_ai_settings(request: AISettingsRequest):
+    """Save AI settings (legacy singleton - creates/updates first credential)"""
+    database = get_database()
+    with database.session_scope() as session:
+        from ignition_toolkit.storage.models import AISettingsModel
+
+        settings = session.query(AISettingsModel).first()
+        if settings:
+            # Update existing
+            settings.provider = request.provider
+            if request.api_key:  # Only update if provided
+                settings.api_key = request.api_key
+            settings.api_base_url = request.api_base_url
+            settings.model_name = request.model_name
+            settings.enabled = "true" if request.enabled else "false"
+        else:
+            # Create new with default name
+            settings = AISettingsModel(
+                name="default",
+                provider=request.provider,
+                api_key=request.api_key,
+                api_base_url=request.api_base_url,
+                model_name=request.model_name,
+                enabled="true" if request.enabled else "false"
+            )
+            session.add(settings)
+
+        session.commit()
+        session.refresh(settings)
+        return AISettingsResponse(**settings.to_dict())
+
 @app.post("/api/ai/assist", response_model=AIAssistResponse)
 async def ai_assist(request: AIAssistRequest):
     """
     AI assistance for debugging playbook executions.
-    This endpoint is called by the frontend and answered by Claude Code itself!
+    Calls Claude API to provide intelligent debugging suggestions.
     """
     try:
-        # Build basic context
+        # Build execution context
         context_parts = [
-            f"User question: {request.user_message}",
             f"Execution ID: {request.execution_id}",
         ]
 
-        # Try to get execution context if available
+        playbook_name = None
+        current_step_index = None
+        status_str = None
+        step_results_list = []
+
+        # Try to get execution context from active engines first
         engine = active_engines.get(request.execution_id)
         if engine:
             execution_state = engine.get_current_execution()
             if execution_state:
-                context_parts.append(f"Playbook: {execution_state.playbook_name}")
-                context_parts.append(f"Status: {execution_state.status}")
-
-                # Get current step info
+                playbook_name = execution_state.playbook_name
                 current_step_index = execution_state.current_step_index
-                if current_step_index is not None and current_step_index < len(execution_state.step_results):
-                    step_result = execution_state.step_results[current_step_index]
-                    context_parts.append(f"Current Step: {step_result.step_name} ({step_result.step_type})")
-                    context_parts.append(f"Step Status: {step_result.status}")
-                    if step_result.error:
-                        context_parts.append(f"Error: {step_result.error}")
-                    if step_result.error_message:
-                        context_parts.append(f"Error Message: {step_result.error_message}")
+                status_str = execution_state.status.value
+                step_results_list = execution_state.step_results
+                logger.info(f"AI Assist - Found active engine: playbook={playbook_name}, step_index={current_step_index}, status={status_str}, num_results={len(step_results_list)}")
         else:
-            # Execution not in active engines, but still provide context
-            context_parts.append("Note: Execution not currently active in engine")
+            # If not in active engines, load from database
+            try:
+                database = get_database()
+                with database.session_scope() as session:
+                    from ignition_toolkit.storage.models import ExecutionModel, StepResultModel
+
+                    db_exec = session.query(ExecutionModel).filter(
+                        ExecutionModel.execution_id == request.execution_id
+                    ).first()
+
+                    if db_exec:
+                        playbook_name = db_exec.playbook_name
+                        status_str = db_exec.status
+
+                        # Get step results from database
+                        db_steps = session.query(StepResultModel).filter(
+                            StepResultModel.execution_id == db_exec.id
+                        ).order_by(StepResultModel.id).all()
+
+                        # Find the current step index (last failed or paused step)
+                        current_step_index = len(db_steps) - 1 if db_steps else 0
+
+                        # Convert to ExecutionResult objects for compatibility
+                        from ignition_toolkit.playbook.models import ExecutionResult, ExecutionStatus
+                        step_results_list = [
+                            ExecutionResult(
+                                step_id=step.step_id,
+                                step_name=step.step_name,
+                                status=ExecutionStatus(step.status),
+                                error=step.error_message,
+                                started_at=step.started_at,
+                                completed_at=step.completed_at
+                            )
+                            for step in db_steps
+                        ]
+            except Exception as e:
+                logger.warning(f"AI Assist: Failed to load execution from database: {e}")
+
+        # If we have playbook info, build the context
+        if playbook_name:
+            context_parts.append(f"Playbook: {playbook_name}")
+            context_parts.append(f"Status: {status_str}")
+
+            # Show current step info from execution results
+            if step_results_list and len(step_results_list) > 0:
+                last_result = step_results_list[-1]
+                context_parts.append(f"Current Step: {last_result.step_name} (ID: {last_result.step_id})")
+                context_parts.append(f"Step Status: {last_result.status.value}")
+                if last_result.error:
+                    context_parts.append(f"Error: {last_result.error}")
+
+            # Try to load the playbook to get additional step details
+            playbooks_dir = Path("./playbooks")
+            playbook = None
+            for yaml_file in playbooks_dir.rglob("*.yaml"):
+                try:
+                    temp_playbook = loader.load_from_file(yaml_file)
+                    if temp_playbook.name == playbook_name:
+                        playbook = temp_playbook
+                        break
+                except:
+                    continue
+
+            # If we have the playbook and current step index, add parameter details
+            if playbook and current_step_index is not None and current_step_index < len(playbook.steps):
+                current_step = playbook.steps[current_step_index]
+                context_parts.append(f"Step Type: {current_step.type}")
+                if hasattr(current_step, 'parameters'):
+                    context_parts.append(f"Step Parameters: {current_step.parameters}")
+        else:
+            # No execution found at all
+            context_parts.append("Note: Execution not found in active engines or database")
             if request.current_step_id:
                 context_parts.append(f"Step mentioned: {request.current_step_id}")
             if request.error_context:
                 context_parts.append(f"Error context: {request.error_context}")
 
-        # Return context for Claude Code to analyze
-        # This message is shown to the user and also provides context for Claude Code
-        response_message = (
-            "📋 **Debug Context:**\n\n" +
-            "\n".join(f"• {part}" for part in context_parts) +
-            "\n\n💡 **How I can help:**\n" +
-            "I'm Claude Code, and I can see your execution context above. " +
-            "Please describe what you're trying to fix or what behavior you're seeing, " +
-            "and I'll analyze the issue and suggest solutions."
+        # Format context for AI
+        execution_context = "\n".join(f"• {part}" for part in context_parts)
+
+        # Get AI settings from database
+        database = get_database()
+
+        # Extract settings values inside session scope to avoid detached instance errors
+        with database.session_scope() as session:
+            from ignition_toolkit.storage.models import AISettingsModel
+
+            # Query by credential_name if provided, otherwise get first enabled
+            if request.credential_name:
+                settings = session.query(AISettingsModel).filter(
+                    AISettingsModel.name == request.credential_name
+                ).first()
+            else:
+                settings = session.query(AISettingsModel).filter(
+                    AISettingsModel.enabled == "true"
+                ).first()
+
+            # Fallback to any credential if none found
+            if not settings:
+                settings = session.query(AISettingsModel).first()
+
+            # Check if AI is configured and enabled
+            if not settings or settings.enabled != "true" or not settings.api_key:
+                return AIAssistResponse(
+                    message=(
+                        "⚙️ **AI is not configured**\n\n"
+                        "To enable AI chat, please go to the Credentials page and configure your AI provider.\n\n"
+                        "**Current Context:**\n" + execution_context + "\n\n"
+                        "**Your Question:** " + request.user_message
+                    ),
+                    suggested_fix=None,
+                    can_auto_apply=False
+                )
+
+            # Extract all values while still in session scope
+            provider = settings.provider
+            api_key = settings.api_key
+            api_base_url = settings.api_base_url
+            model_name = settings.model_name
+
+        # Build the prompt for the AI
+        ai_prompt = (
+            f"{execution_context}\n\n"
+            f"User question: {request.user_message}\n\n"
+            f"Please help debug this Ignition SCADA playbook automation issue. "
+            f"Provide specific, actionable suggestions."
         )
 
-        return AIAssistResponse(
-            message=response_message,
-            suggested_fix=None,
-            can_auto_apply=False
-        )
+        # Call AI based on provider (using extracted values, not detached object)
+        try:
+            if provider == "openai" or provider == "local":
+                # Use OpenAI SDK (works for both OpenAI and local LLMs)
+                import openai
+                client = openai.OpenAI(
+                    api_key=api_key,
+                    base_url=api_base_url if provider == "local" else None
+                )
+
+                response = client.chat.completions.create(
+                    model=model_name or "gpt-4",
+                    messages=[
+                        {"role": "system", "content": "You are a helpful debugging assistant for Ignition SCADA playbook automation. Provide clear, actionable suggestions."},
+                        {"role": "user", "content": ai_prompt}
+                    ],
+                    max_tokens=1024
+                )
+
+                ai_message = response.choices[0].message.content
+
+            elif provider == "anthropic":
+                # Use Anthropic SDK
+                import anthropic
+                client = anthropic.Anthropic(api_key=api_key)
+
+                response = client.messages.create(
+                    model=model_name or "claude-3-5-sonnet-20241022",
+                    max_tokens=1024,
+                    messages=[
+                        {"role": "user", "content": ai_prompt}
+                    ]
+                )
+
+                ai_message = response.content[0].text
+
+            elif provider == "gemini":
+                # Use Google Generative AI SDK
+                import google.generativeai as genai
+                genai.configure(api_key=api_key)
+
+                model = genai.GenerativeModel(model_name or "gemini-1.5-flash")
+                response = model.generate_content(ai_prompt)
+
+                ai_message = response.text
+
+            else:
+                ai_message = f"⚠️ Unknown AI provider: {provider}. Please update your settings."
+
+            return AIAssistResponse(
+                message=ai_message,
+                suggested_fix=None,
+                can_auto_apply=False
+            )
+
+        except Exception as ai_error:
+            logger.error(f"AI API call failed: {ai_error}")
+            return AIAssistResponse(
+                message=(
+                    f"⚠️ **AI API Error**\n\n"
+                    f"Failed to call {provider} API: {str(ai_error)}\n\n"
+                    f"Please check your API key and settings in the Credentials page.\n\n"
+                    f"**Current Context:**\n{execution_context}\n\n"
+                    f"**Your Question:** {request.user_message}"
+                ),
+                suggested_fix=None,
+                can_auto_apply=False
+            )
 
     except Exception as e:
         logger.exception(f"AI assist error: {e}")
@@ -1349,23 +1767,43 @@ async def edit_step(request: StepEditRequest):
 
 
 # ============================================================================
+# AI Credentials Management (Stub - returns empty list for now)
+# ============================================================================
+
+@app.get("/api/ai-credentials")
+async def list_ai_credentials():
+    """List all AI credentials (stub - returns empty for now)"""
+    return []
+
+@app.delete("/api/ai-credentials/{credential_id}")
+async def delete_ai_credential(credential_id: int):
+    """Delete AI credential (stub)"""
+    return {"message": "Deleted (stub)"}
+
+
+# ============================================================================
 # Frontend Serving
 # ============================================================================
 
 # Serve frontend (React build) - MUST be at the END to avoid catching API routes
 if frontend_dist.exists() and (frontend_dist / "index.html").exists():
-    # Mount static assets directory
+    # Mount static assets directory with no-cache headers
     assets_dir = frontend_dist / "assets"
     if assets_dir.exists():
-        app.mount("/assets", StaticFiles(directory=str(assets_dir)), name="assets")
+        app.mount("/assets", NoCacheStaticFiles(directory=str(assets_dir)), name="assets")
 
-    # Serve index.html for all routes (SPA routing)
+    # Serve index.html for all routes (SPA routing) with cache-busting headers
     @app.get("/{full_path:path}")
     async def serve_frontend(full_path: str):
-        """Serve React SPA - returns index.html for all non-API routes"""
+        """Serve React SPA - returns index.html for all non-API routes with no-cache headers"""
         # Serve index.html for all other routes (React Router handles routing)
         index_path = frontend_dist / "index.html"
-        return FileResponse(str(index_path))
+        response = FileResponse(str(index_path))
+        # Add cache-busting headers to prevent browser caching of index.html
+        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
+        return response
 else:
     logger.warning("Frontend build not found at frontend/dist - run 'npm run build' in frontend/ directory")
 

@@ -11,6 +11,7 @@ from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy.engine import Engine
 
 from ignition_toolkit.storage.models import Base
+from ignition_toolkit.config import get_toolkit_data_dir
 
 logger = logging.getLogger(__name__)
 
@@ -36,10 +37,12 @@ class Database:
         Initialize database connection
 
         Args:
-            database_path: Path to SQLite database file. If None, uses ./data/toolkit.db
+            database_path: Path to SQLite database file. If None, uses consistent data directory
         """
         if database_path is None:
-            database_path = Path("./data/toolkit.db")
+            # Use consistent data directory instead of relative path
+            data_dir = get_toolkit_data_dir()
+            database_path = data_dir / "ignition_toolkit.db"
 
         self.database_path = database_path
 

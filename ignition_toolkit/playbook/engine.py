@@ -370,6 +370,7 @@ class PlaybookEngine:
                     started_at=execution_state.started_at,
                     config_data=parameters,
                     playbook_version=playbook.version,
+                    execution_metadata={"debug_mode": self.state_manager.is_debug_mode_enabled()},
                 )
                 session.add(execution_model)
                 session.flush()  # Get the auto-generated ID

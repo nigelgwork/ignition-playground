@@ -96,7 +96,8 @@ export function ExecutionControls({
 
   const isRunning = status === 'running';
   const isPaused = status === 'paused';
-  const isDisabled = disabled || !isRunning;
+  const isActive = isRunning || isPaused;  // Execution is active if running or paused
+  const isDisabled = disabled || !isActive;  // Only disable if not active at all
 
   return (
     <Box sx={{ display: 'flex', gap: 1 }}>
@@ -121,7 +122,7 @@ export function ExecutionControls({
           <span>
             <Button
               onClick={handlePause}
-              disabled={isDisabled || isPaused || loading !== null}
+              disabled={disabled || !isRunning || isPaused || loading !== null}
               startIcon={
                 loading === 'pause' ? (
                   <CircularProgress size={16} />
@@ -140,7 +141,7 @@ export function ExecutionControls({
           <span>
             <Button
               onClick={handleResume}
-              disabled={!isPaused || loading !== null}
+              disabled={disabled || !isPaused || loading !== null}
               startIcon={
                 loading === 'resume' ? (
                   <CircularProgress size={16} />

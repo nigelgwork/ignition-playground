@@ -12,6 +12,7 @@ import { Playbooks } from './pages/Playbooks';
 import { Executions } from './pages/Executions';
 import { ExecutionDetail } from './pages/ExecutionDetail';
 import { Credentials } from './pages/Credentials';
+import { AICredentials } from './pages/AICredentials';
 import { useWebSocket } from './hooks/useWebSocket';
 import { useStore } from './store';
 
@@ -141,6 +142,7 @@ function AppContent() {
           <Route path="executions" element={<Executions />} />
           <Route path="executions/:executionId" element={<ExecutionDetail />} />
           <Route path="credentials" element={<Credentials />} />
+          <Route path="ai" element={<AICredentials />} />
         </Route>
       </Routes>
     </ThemeProvider>

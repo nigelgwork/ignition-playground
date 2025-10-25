@@ -5,6 +5,63 @@ All notable changes to the Ignition Automation Toolkit will be documented in thi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.34] - 2025-10-25
+
+### Fixed
+- **Disabled Playbook Badge Not Working**: Fixed path mismatch issue
+  - Problem: Frontend sent full paths, backend stored metadata with relative paths
+  - Created `get_relative_playbook_path()` helper function (app.py:388)
+  - Updated enable/disable/verify/unverify endpoints to use relative paths
+  - Disabled badge now appears correctly when playbook is disabled
+  - Execute button properly disabled when playbook is disabled
+  - Verified/Unverified status now works correctly
+
+- **Debug Mode Not Persisting to Execution Page**: Fixed metadata storage
+  - Problem: Debug mode not saved to database, lost when navigating to execution detail
+  - Added debug_mode to execution_metadata when creating executions (engine.py:373)
+  - Extract debug_mode from execution_metadata when retrieving from database (app.py:687-701)
+  - Debug mode toggle on playbook card now persists through execution
+
+- **Gateway Login Playbook Failing at Step 5**: Fixed for modern Ignition 8.x
+  - Problem: Playbook tried to click non-existent "Continue" button
+  - Modern Ignition uses single-step login (both username and password on same page)
+  - Removed Continue button click step
+  - Updated playbook from 8 steps to simpler 8-step flow
+  - Added "Wait for Dashboard" step for better verification
+  - Updated version to 1.1 and description
+  - File: `playbooks/examples/gateway_login.yaml`
+
+### Technical Details
+- Backend: `ignition_toolkit/api/app.py` lines 388-408 - Path conversion helper
+- Backend: `ignition_toolkit/api/app.py` lines 1119, 1139, 1157, 1175 - Metadata endpoints fixed
+- Backend: `ignition_toolkit/playbook/engine.py` line 373 - Debug mode storage
+- Backend: `ignition_toolkit/api/app.py` lines 687-703 - Debug mode retrieval
+- Playbook: `playbooks/examples/gateway_login.yaml` - Updated for single-step login
+- Frontend version: 1.0.34
+- Backend version: 1.0.34
+
+## [1.0.32] - 2025-10-25
+
+### Fixed
+- **Browser Caching Issues**: Permanent solution implemented with no-cache headers
+  - Custom NoCacheStaticFiles class extends FastAPI StaticFiles
+  - Adds Cache-Control, Pragma, and Expires headers to all static assets
+  - index.html served with explicit no-cache headers
+  - Frontend changes now immediately visible without hard refresh (Ctrl+F5)
+  - Eliminates "frontend not loading" issues caused by aggressive browser caching
+
+- **AI Assistant Z-Index**: Fixed positioning to appear above sidebar
+  - Increased z-index from 1400 → 2000 (well above sidebar's 1200)
+  - Positioned at left: 260px (just right of 240px sidebar)
+  - Visible on left side, in front of sidebar as requested
+
+### Technical Details
+- Backend: `app.py` lines 70-80 - Custom NoCacheStaticFiles class
+- Backend: `app.py` lines 1371, 1379-1383 - No-cache headers on index.html
+- Frontend: `AIAssistDialog.tsx` lines 147, 168 - z-index 2000, left: 260px
+- Frontend version: 1.0.33
+- Backend version: 1.0.32
+
 ## [1.0.30] - 2025-10-25
 
 ### Added

@@ -27,6 +27,7 @@ import { useStore } from '../store';
 import { api } from '../api/client';
 import type { HealthResponse } from '../types/api';
 import { GlobalCredentialSelector } from './GlobalCredentialSelector';
+import packageJson from '../../package.json';
 
 const DRAWER_WIDTH = 240;
 
@@ -34,6 +35,7 @@ const navItems = [
   { path: '/', label: 'Playbooks' },
   { path: '/executions', label: 'Executions' },
   { path: '/credentials', label: 'Credentials' },
+  { path: '/ai', label: 'AI' },
 ];
 
 export function Layout() {
@@ -41,18 +43,15 @@ export function Layout() {
   const isWSConnected = useStore((state) => state.isWSConnected);
   const theme = useStore((state) => state.theme);
   const setTheme = useStore((state) => state.setTheme);
-  const [version, setVersion] = useState<string>('');
   const [health, setHealth] = useState<'healthy' | 'unhealthy'>('healthy');
 
-  // Fetch version and health on mount
+  // Fetch health on mount
   useEffect(() => {
     api.health()
       .then((data: HealthResponse) => {
-        setVersion(data.version || '1.0.17');
         setHealth(data.status === 'healthy' ? 'healthy' : 'unhealthy');
       })
       .catch(() => {
-        setVersion('1.0.17'); // Fallback version
         setHealth('unhealthy');
       });
   }, []);
@@ -79,6 +78,14 @@ export function Layout() {
             label={health === 'healthy' ? 'Healthy' : 'Unhealthy'}
             size="small"
             color={health === 'healthy' ? 'success' : 'error'}
+            sx={{ mr: 2 }}
+          />
+
+          {/* Frontend Version */}
+          <Chip
+            label={`UI v${packageJson.version}`}
+            size="small"
+            variant="outlined"
             sx={{ mr: 2 }}
           />
 
@@ -184,7 +191,7 @@ export function Layout() {
           }}
         >
           <Typography variant="caption" color="text.secondary">
-            v{version}
+            UI v{packageJson.version}
           </Typography>
           <Typography variant="caption" display="block" color="text.secondary">
             Ignition Playground

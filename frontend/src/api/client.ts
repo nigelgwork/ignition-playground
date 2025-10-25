@@ -176,6 +176,16 @@ export const api = {
 
     getDebugDOM: (executionId: string) =>
       fetchJSON<{ html: string }>(`/api/executions/${executionId}/debug/dom`),
+
+    // Browser interaction
+    clickAtCoordinates: (executionId: string, x: number, y: number) =>
+      fetchJSON<{ status: string; message: string }>(
+        `/api/executions/${executionId}/browser/click`,
+        {
+          method: 'POST',
+          body: JSON.stringify({ x, y }),
+        }
+      ),
   },
 
   /**

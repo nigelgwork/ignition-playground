@@ -5,7 +5,7 @@
  * Shows current error context, allows chat with AI, and can apply fixes.
  */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Box,
   Button,
@@ -19,6 +19,10 @@ import {
   Collapse,
   Fab,
   Tooltip,
+  Select,
+  MenuItem,
+  FormControl,
+  InputLabel,
 } from '@mui/material';
 import {
   Send as SendIcon,
@@ -29,6 +33,7 @@ import {
   Close as CloseIcon,
   Chat as ChatIcon,
 } from '@mui/icons-material';
+import { useQuery } from '@tanstack/react-query';
 
 interface AIAssistDialogProps {
   open: boolean;
@@ -44,26 +49,86 @@ interface ChatMessage {
   timestamp: Date;
 }
 
+interface AICredentialInfo {
+  id: number;
+  name: string;
+  provider: string;
+  api_base_url: string | null;
+  model_name: string | null;
+  enabled: string;
+  has_api_key: boolean;
+}
+
 export function AIAssistDialog({
   open,
   onClose: _onClose,
   executionId: _executionId,
   currentError,
-  currentStep,
+  currentStep: _currentStep,
 }: AIAssistDialogProps) {
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    {
-      role: 'assistant',
-      content: `I can help you debug this issue. The execution is paused at step "${currentStep || 'unknown'}"${
-        currentError ? ` with error: "${currentError}"` : ''
-      }. What would you like me to help you with?`,
-      timestamp: new Date(),
-    },
-  ]);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputMessage, setInputMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isExpanded, setIsExpanded] = useState(true);
   const [isVisible, setIsVisible] = useState(true); // Auto-show when open=true
+  const [initialLoadDone, setInitialLoadDone] = useState(false);
+  const [selectedCredential, setSelectedCredential] = useState<string>('');
+
+  // Fetch AI credentials
+  const { data: credentials = [] } = useQuery<AICredentialInfo[]>({
+    queryKey: ['ai-credentials'],
+    queryFn: () => fetch('/api/ai-credentials').then((r) => r.json()),
+    enabled: open, // Only fetch when dialog is open
+  });
+
+  // Auto-select first enabled credential
+  useEffect(() => {
+    if (credentials.length > 0 && !selectedCredential) {
+      const enabledCred = credentials.find((c) => c.enabled === 'true');
+      if (enabledCred) {
+        setSelectedCredential(enabledCred.name);
+      } else if (credentials.length > 0) {
+        setSelectedCredential(credentials[0].name);
+      }
+    }
+  }, [credentials, selectedCredential]);
+
+  // Load initial context from backend when dialog opens
+  useEffect(() => {
+    if (open && !initialLoadDone) {
+      setIsLoading(true);
+      fetch('/api/ai/assist', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          execution_id: _executionId,
+          user_message: 'What is the current status?',
+        }),
+      })
+        .then((res) => res.json())
+        .then((data) => {
+          setMessages([
+            {
+              role: 'assistant',
+              content: data.message || `I can help you debug this issue.${currentError ? ` Error: "${currentError}"` : ''} What would you like me to help you with?`,
+              timestamp: new Date(),
+            },
+          ]);
+          setInitialLoadDone(true);
+        })
+        .catch(() => {
+          setMessages([
+            {
+              role: 'assistant',
+              content: `I can help you debug this issue.${currentError ? ` Error: "${currentError}"` : ''} What would you like me to help you with?`,
+              timestamp: new Date(),
+            },
+          ]);
+          setInitialLoadDone(true);
+        })
+        .finally(() => setIsLoading(false));
+    }
+  }, [open, _executionId, currentError, initialLoadDone]);
 
   const handleSendMessage = async () => {
     if (!inputMessage.trim() || isLoading) return;
@@ -86,8 +151,8 @@ export function AIAssistDialog({
         body: JSON.stringify({
           execution_id: _executionId,
           user_message: inputMessage,
-          current_step_id: currentStep,
           error_context: currentError,
+          credential_name: selectedCredential,
         }),
       });
 
@@ -143,8 +208,8 @@ export function AIAssistDialog({
           sx={{
             position: 'fixed',
             bottom: 24,
-            left: 24,
-            zIndex: 1400,
+            left: 260,
+            zIndex: 2000,
             display: isVisible ? 'none' : 'flex',
           }}
         >
@@ -159,13 +224,13 @@ export function AIAssistDialog({
           sx={{
             position: 'fixed',
             bottom: 24,
-            left: 24,
+            left: 260,
             width: isExpanded ? 420 : 56,
             maxHeight: isExpanded ? '65vh' : 56,
             display: 'flex',
             flexDirection: 'column',
             transition: 'all 0.3s ease-in-out',
-            zIndex: 1400,
+            zIndex: 2000,
             borderRadius: 2,
             overflow: 'hidden',
           }}
@@ -234,6 +299,31 @@ export function AIAssistDialog({
 
           {/* Chat Content */}
           <Collapse in={isExpanded} timeout="auto">
+            {/* AI Credential Selector */}
+            <Box sx={{ px: 2, py: 1.5, bgcolor: 'background.default' }}>
+              <FormControl fullWidth size="small">
+                <InputLabel>AI Provider</InputLabel>
+                <Select
+                  value={selectedCredential}
+                  label="AI Provider"
+                  onChange={(e) => setSelectedCredential(e.target.value)}
+                  disabled={credentials.length === 0}
+                >
+                  {credentials.length === 0 && (
+                    <MenuItem value="" disabled>
+                      No AI credentials configured
+                    </MenuItem>
+                  )}
+                  {credentials.map((cred) => (
+                    <MenuItem key={cred.name} value={cred.name}>
+                      {cred.name} ({cred.provider} - {cred.model_name || 'default'})
+                      {cred.enabled === 'false' && ' [Disabled]'}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Box>
+
             {/* Error Context */}
             {currentError && (
               <Box sx={{ px: 2, py: 1.5, bgcolor: 'error.dark', color: 'error.contrastText' }}>

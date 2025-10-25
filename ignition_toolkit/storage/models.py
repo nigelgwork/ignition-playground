@@ -136,3 +136,37 @@ class PlaybookConfigModel(Base):
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
         }
+
+
+class AISettingsModel(Base):
+    """
+    Stores AI provider settings for the AI assist feature
+
+    Supports multiple AI providers (OpenAI, Anthropic, Local LLMs)
+    Now supports multiple credential entries with unique names
+    """
+    __tablename__ = "ai_settings"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    name = Column(String(100), nullable=False, unique=True)  # Unique credential name
+    provider = Column(String(50), nullable=False)  # "openai", "anthropic", "gemini", "local"
+    api_key = Column(Text, nullable=True)  # Encrypted API key
+    api_base_url = Column(String(500), nullable=True)  # For local LLMs (e.g., http://localhost:1234/v1)
+    model_name = Column(String(100), nullable=True)  # e.g., "gpt-4", "claude-3-sonnet", "llama-3"
+    enabled = Column(String(10), nullable=False, default="false")  # "true" or "false" string
+    created_at = Column(DateTime, default=utcnow, nullable=False)
+    updated_at = Column(DateTime, default=utcnow, onupdate=utcnow, nullable=False)
+
+    def to_dict(self) -> dict:
+        """Convert to dictionary (excluding sensitive data)"""
+        return {
+            "id": self.id,
+            "name": self.name,
+            "provider": self.provider,
+            "api_base_url": self.api_base_url,
+            "model_name": self.model_name,
+            "enabled": self.enabled,
+            "has_api_key": bool(self.api_key),  # Don't expose the actual key
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+        }

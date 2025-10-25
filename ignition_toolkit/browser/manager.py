@@ -4,6 +4,10 @@ Browser manager - Playwright browser automation
 Handles browser lifecycle and basic operations with screenshot streaming.
 """
 
+# Import config first to set environment variables before Playwright import
+from ignition_toolkit.config import setup_environment
+setup_environment()
+
 import asyncio
 import base64
 import logging
@@ -156,6 +160,18 @@ class BrowserManager:
         page = await self.get_page()
         logger.info(f"Clicking: {selector}")
         await page.click(selector, timeout=timeout)
+
+    async def click_at_coordinates(self, x: int, y: int) -> None:
+        """
+        Click at specific coordinates
+
+        Args:
+            x: X coordinate (pixels from left)
+            y: Y coordinate (pixels from top)
+        """
+        page = await self.get_page()
+        logger.info(f"Clicking at coordinates: ({x}, {y})")
+        await page.mouse.click(x, y)
 
     async def fill(self, selector: str, value: str, timeout: int = 30000) -> None:
         """

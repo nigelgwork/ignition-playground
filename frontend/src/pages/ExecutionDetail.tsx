@@ -110,8 +110,8 @@ export function ExecutionDetail() {
 
     setRuntime(calculateRuntime());
 
-    // Only update if still running
-    if (execution.status === 'running') {
+    // Update timer every second if not completed
+    if (execution.status !== 'completed' && execution.status !== 'failed' && execution.status !== 'cancelled') {
       const interval = setInterval(() => {
         setRuntime(calculateRuntime());
       }, 1000);

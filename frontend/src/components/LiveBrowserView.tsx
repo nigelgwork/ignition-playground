@@ -5,9 +5,10 @@
  */
 
 import { useState, useRef } from 'react';
-import { Box, Paper, Typography, Chip, Tooltip } from '@mui/material';
+import { Box, Paper, Typography, Chip, Tooltip, Snackbar, Alert } from '@mui/material';
 import { Computer as BrowserIcon, Pause as PausedIcon, TouchApp as ClickIcon } from '@mui/icons-material';
 import { useStore } from '../store';
+import { api } from '../api/client';
 
 interface LiveBrowserViewProps {
   executionId: string;
@@ -24,9 +25,14 @@ export function LiveBrowserView({ executionId }: LiveBrowserViewProps) {
   const screenshot = currentScreenshots.get(executionId);
   const [clickCoords, setClickCoords] = useState<ClickCoordinate | null>(null);
   const [showClickIndicator, setShowClickIndicator] = useState(false);
+  const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'error' }>({
+    open: false,
+    message: '',
+    severity: 'success',
+  });
   const imgRef = useRef<HTMLImageElement>(null);
 
-  const handleImageClick = (event: React.MouseEvent<HTMLImageElement>) => {
+  const handleImageClick = async (event: React.MouseEvent<HTMLImageElement>) => {
     if (!imgRef.current) return;
 
     const rect = imgRef.current.getBoundingClientRect();
@@ -51,8 +57,23 @@ export function LiveBrowserView({ executionId }: LiveBrowserViewProps) {
     setShowClickIndicator(true);
     setTimeout(() => setShowClickIndicator(false), 1000);
 
-    // Log for debugging/AI context
-    console.log(`Browser click detected: (${naturalX}, ${naturalY})`);
+    // Send click to backend to execute in actual browser
+    try {
+      await api.executions.clickAtCoordinates(executionId, naturalX, naturalY);
+      console.log(`Browser click executed: (${naturalX}, ${naturalY})`);
+      setSnackbar({
+        open: true,
+        message: `Clicked at (${naturalX}, ${naturalY})`,
+        severity: 'success',
+      });
+    } catch (error) {
+      console.error('Failed to click in browser:', error);
+      setSnackbar({
+        open: true,
+        message: `Failed to click: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        severity: 'error',
+      });
+    }
   };
 
   return (
@@ -231,6 +252,22 @@ export function LiveBrowserView({ executionId }: LiveBrowserViewProps) {
           />
         </Box>
       )}
+
+      {/* Snackbar for click feedback */}
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={3000}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+      >
+        <Alert
+          onClose={() => setSnackbar({ ...snackbar, open: false })}
+          severity={snackbar.severity}
+          sx={{ width: '100%' }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Paper>
   );
 }

@@ -10,6 +10,7 @@ from datetime import datetime, UTC
 
 from ignition_toolkit.credentials.models import Credential
 from ignition_toolkit.credentials.encryption import CredentialEncryption
+from ignition_toolkit.config import get_toolkit_data_dir, migrate_credentials_if_needed
 
 logger = logging.getLogger(__name__)
 
@@ -18,8 +19,11 @@ class CredentialVault:
     """
     Secure credential storage with Fernet encryption
 
-    Credentials are stored in ~/.ignition-toolkit/credentials.json (encrypted)
-    Encryption key is stored in ~/.ignition-toolkit/encryption.key
+    Credentials are stored in data/.ignition-toolkit/credentials.json (encrypted)
+    Encryption key is stored in data/.ignition-toolkit/encryption.key
+
+    Location is determined by get_toolkit_data_dir() which provides a consistent
+    path regardless of HOME environment variable changes.
 
     Both files are excluded from git via .gitignore
     """
@@ -29,10 +33,13 @@ class CredentialVault:
         Initialize credential vault
 
         Args:
-            vault_path: Path to vault directory. If None, uses ~/.ignition-toolkit/
+            vault_path: Path to vault directory. If None, uses get_toolkit_data_dir()
         """
         if vault_path is None:
-            vault_path = Path.home() / ".ignition-toolkit"
+            # Use consistent data directory instead of Path.home()
+            vault_path = get_toolkit_data_dir()
+            # Migrate old credentials if this is first time using new location
+            migrate_credentials_if_needed()
 
         self.vault_path = vault_path
         self.credentials_file = vault_path / "credentials.json"

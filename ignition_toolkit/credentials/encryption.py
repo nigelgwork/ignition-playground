@@ -23,10 +23,11 @@ class CredentialEncryption:
         Initialize encryption handler
 
         Args:
-            key_path: Path to encryption key file. If None, uses default location.
+            key_path: Path to encryption key file. If None, uses consistent data directory.
         """
         if key_path is None:
-            key_path = Path.home() / ".ignition-toolkit" / "encryption.key"
+            from ignition_toolkit.config import get_toolkit_data_dir
+            key_path = get_toolkit_data_dir() / "encryption.key"
 
         self.key_path = key_path
         self._fernet: Optional[Fernet] = None
