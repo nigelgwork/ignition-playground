@@ -1,6 +1,6 @@
 name: "Gateway Login"
-version: "1.1"
-description: "Visual login test: Open gateway webpage, login with credentials (single-step), verify successful authentication"
+version: "1.2"
+description: "Visual login test: Open gateway webpage, login with credentials (two-step with Continue button), verify successful authentication"
 
 parameters:
   - name: gateway_url
@@ -50,29 +50,38 @@ steps:
     timeout: 10
 
   - id: step5
-    name: "Step 5: Enter Password"
+    name: "Step 5: Click Continue Button"
+    type: browser.click
+    parameters:
+      selector: "button:has-text('Continue'), button[type='button']:has-text('Continue'), input[value='Continue'], button.continue-button, #continue-button, button:has-text('Next'), button.next-button"
+      timeout: 30000
+    timeout: 30
+    retry_count: 2
+
+  - id: step6
+    name: "Step 6: Enter Password"
     type: browser.fill
     parameters:
       selector: "input[name='j_password'], input[name='password'], input[type='password']"
       value: "{{ password }}"
     timeout: 10
 
-  - id: step6
-    name: "Step 6: Submit Login"
+  - id: step7
+    name: "Step 7: Submit Login"
     type: browser.click
     parameters:
       selector: "button[type='submit'], button:has-text('Sign In'), button:has-text('Login'), input[type='submit']"
     timeout: 10
 
-  - id: step7
-    name: "Step 7: Wait for Dashboard"
+  - id: step8
+    name: "Step 8: Wait for Dashboard"
     type: browser.wait
     parameters:
       selector: ".home-page, .ia_homePage, [data-page='home'], nav"
     timeout: 15
 
-  - id: step8
-    name: "Step 8: Capture Success Screenshot"
+  - id: step9
+    name: "Step 9: Capture Success Screenshot"
     type: browser.screenshot
     parameters:
       path: "gateway_logged_in.png"
