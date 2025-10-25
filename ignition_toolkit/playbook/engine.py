@@ -236,6 +236,13 @@ class PlaybookEngine:
                 if self.database:
                     await self._save_step_result(execution_state, step_result)
 
+                # Auto-pause after each step in debug mode
+                if self.state_manager.is_debug_mode_enabled():
+                    logger.info("Debug mode: Auto-pausing after step completion")
+                    await self.state_manager.pause()
+                    execution_state.status = ExecutionStatus.PAUSED
+                    await self._notify_update(execution_state)
+
                 # Handle failure
                 if step_result.status == StepStatus.FAILED:
                     logger.error(f"Step failed: {step.name} - {step_result.error}")
@@ -413,6 +420,10 @@ class PlaybookEngine:
     async def skip_current_step(self) -> None:
         """Skip current step"""
         await self.state_manager.skip_current_step()
+
+    async def skip_back_step(self) -> None:
+        """Skip back to previous step"""
+        await self.state_manager.skip_back_step()
 
     async def cancel(self) -> None:
         """Cancel execution"""

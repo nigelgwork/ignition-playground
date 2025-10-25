@@ -40,6 +40,7 @@ import { api } from '../api/client';
 import { LiveBrowserView } from '../components/LiveBrowserView';
 import { ExecutionControls } from '../components/ExecutionControls';
 import { DebugPanel } from '../components/DebugPanel';
+import { AIAssistDialog } from '../components/AIAssistDialog';
 import { useStore } from '../store';
 import type { ExecutionStatusResponse } from '../types/api';
 
@@ -48,6 +49,7 @@ export function ExecutionDetail() {
   const navigate = useNavigate();
   const executionUpdates = useStore((state) => state.executionUpdates);
   const [debugMode, setDebugMode] = useState(false);
+  const [aiDialogOpen, setAiDialogOpen] = useState(false);
   const [showDebugPanel, setShowDebugPanel] = useState(false);
   const [runtime, setRuntime] = useState<string>('0s');
 
@@ -205,11 +207,11 @@ export function ExecutionDetail() {
       <Paper
         elevation={1}
         sx={{
-          p: 2,
+          p: 1,
           borderRadius: 0,
           display: 'flex',
           alignItems: 'center',
-          gap: 2,
+          gap: 1.5,
           flexShrink: 0,
         }}
       >
@@ -218,14 +220,17 @@ export function ExecutionDetail() {
           onClick={() => navigate('/executions')}
           variant="outlined"
           size="small"
+          sx={{ minWidth: 'auto', px: 1.5 }}
         >
           Back
         </Button>
 
         <Box sx={{ flexGrow: 1 }}>
-          <Typography variant="h6">{execution.playbook_name}</Typography>
-          <Typography variant="caption" color="text.secondary">
-            Execution ID: {executionId}
+          <Typography variant="subtitle1" sx={{ fontSize: '0.95rem', fontWeight: 600, lineHeight: 1.3 }}>
+            {execution.playbook_name}
+            <Typography component="span" variant="caption" color="text.secondary" sx={{ ml: 1.5, fontSize: '0.7rem' }}>
+              ID: {executionId.slice(0, 8)}...
+            </Typography>
           </Typography>
         </Box>
 
@@ -233,6 +238,7 @@ export function ExecutionDetail() {
           label={execution.status}
           color={getStatusColor(execution.status) as any}
           size="small"
+          sx={{ height: '24px', fontSize: '0.7rem' }}
         />
 
         <Tooltip title="Auto-pause on failures for debugging">
@@ -270,6 +276,8 @@ export function ExecutionDetail() {
         <ExecutionControls
           executionId={executionId}
           status={execution.status}
+          debugMode={debugMode}
+          onAIAssist={() => setAiDialogOpen(true)}
         />
       </Paper>
 
@@ -324,24 +332,27 @@ export function ExecutionDetail() {
             </Typography>
           </Box>
 
-          <List>
+          <List sx={{ py: 0 }}>
             {execution.step_results && execution.step_results.length > 0 ? (
               execution.step_results.map((step, index) => (
                 <Box key={step.step_id || index}>
                   <ListItem
                     sx={{
+                      py: 0.5,
+                      px: 1,
+                      minHeight: '36px',
                       bgcolor:
                         index === execution.current_step_index
                           ? 'action.selected'
                           : 'transparent',
                     }}
                   >
-                    <Box sx={{ mr: 2 }}>{getStatusIcon(step.status)}</Box>
+                    <Box sx={{ mr: 1, display: 'flex', alignItems: 'center', fontSize: '1rem' }}>{getStatusIcon(step.status)}</Box>
                     <ListItemText
                       primary={step.step_name || `Step ${index + 1}`}
                       secondary={
                         step.error ? (
-                          <Typography variant="caption" color="error">
+                          <Typography variant="caption" color="error" sx={{ fontSize: '0.65rem' }}>
                             Error: {step.error}
                           </Typography>
                         ) : step.completed_at ? (
@@ -352,19 +363,22 @@ export function ExecutionDetail() {
                           step.status
                         )
                       }
+                      primaryTypographyProps={{ variant: 'body2', fontSize: '0.8rem' }}
+                      secondaryTypographyProps={{ variant: 'caption', fontSize: '0.7rem' }}
                     />
                     <Chip
                       label={step.status}
                       size="small"
                       color={getStatusColor(step.status) as any}
+                      sx={{ height: '20px', fontSize: '0.65rem', '& .MuiChip-label': { px: 1, py: 0 } }}
                     />
                   </ListItem>
                   {execution.step_results && index < execution.step_results.length - 1 && <Divider />}
                 </Box>
               ))
             ) : (
-              <ListItem>
-                <ListItemText primary="No steps executed yet" />
+              <ListItem sx={{ py: 1 }}>
+                <ListItemText primary="No steps executed yet" primaryTypographyProps={{ variant: 'body2', fontSize: '0.8rem' }} />
               </ListItem>
             )}
           </List>
@@ -377,6 +391,21 @@ export function ExecutionDetail() {
           <LiveBrowserView executionId={executionId} />
         )}
       </Box>
+
+      {/* AI Assist Dialog */}
+      <AIAssistDialog
+        open={aiDialogOpen}
+        onClose={() => setAiDialogOpen(false)}
+        executionId={executionId}
+        currentError={execution.error || undefined}
+        currentStep={
+          execution.step_results &&
+          execution.current_step_index !== undefined &&
+          execution.step_results[execution.current_step_index]
+            ? execution.step_results[execution.current_step_index].step_name
+            : undefined
+        }
+      />
     </Box>
   );
 }

@@ -146,6 +146,12 @@ export const api = {
         { method: 'POST' }
       ),
 
+    skipBack: (executionId: string) =>
+      fetchJSON<{ status: string; execution_id: string }>(
+        `/api/executions/${executionId}/skip_back`,
+        { method: 'POST' }
+      ),
+
     cancel: (executionId: string) =>
       fetchJSON<{ status: string; execution_id: string }>(
         `/api/executions/${executionId}/cancel`,

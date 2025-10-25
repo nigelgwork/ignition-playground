@@ -16,7 +16,9 @@ import {
   Pause as PauseIcon,
   PlayArrow as ResumeIcon,
   SkipNext as SkipIcon,
+  SkipPrevious as SkipBackIcon,
   Stop as StopIcon,
+  Psychology as AIIcon,
 } from '@mui/icons-material';
 import { api } from '../api/client';
 
@@ -24,12 +26,16 @@ interface ExecutionControlsProps {
   executionId: string;
   status: string;
   disabled?: boolean;
+  debugMode?: boolean;
+  onAIAssist?: () => void;
 }
 
 export function ExecutionControls({
   executionId,
   status,
   disabled = false,
+  debugMode = false,
+  onAIAssist,
 }: ExecutionControlsProps) {
   const [loading, setLoading] = useState<string | null>(null);
 
@@ -66,6 +72,17 @@ export function ExecutionControls({
     }
   };
 
+  const handleSkipBack = async () => {
+    try {
+      setLoading('skip_back');
+      await api.executions.skipBack(executionId);
+    } catch (error) {
+      console.error('Failed to skip back:', error);
+    } finally {
+      setLoading(null);
+    }
+  };
+
   const handleStop = async () => {
     try {
       setLoading('stop');
@@ -83,6 +100,21 @@ export function ExecutionControls({
 
   return (
     <Box sx={{ display: 'flex', gap: 1 }}>
+      {/* AI Assist Button (show when paused OR in debug mode) */}
+      {(isPaused || debugMode) && onAIAssist && (
+        <Tooltip title={debugMode ? "AI assistant available in debug mode" : "Get AI help to debug this issue"}>
+          <Button
+            onClick={onAIAssist}
+            variant="contained"
+            color="secondary"
+            size="small"
+            startIcon={<AIIcon />}
+          >
+            Ask AI
+          </Button>
+        </Tooltip>
+      )}
+
       <ButtonGroup variant="outlined" size="small">
         {/* Pause Button */}
         <Tooltip title="Pause execution after current step">
@@ -118,6 +150,25 @@ export function ExecutionControls({
               }
             >
               Resume
+            </Button>
+          </span>
+        </Tooltip>
+
+        {/* Skip Back Button */}
+        <Tooltip title="Skip back to previous step">
+          <span>
+            <Button
+              onClick={handleSkipBack}
+              disabled={isDisabled || loading !== null}
+              startIcon={
+                loading === 'skip_back' ? (
+                  <CircularProgress size={16} />
+                ) : (
+                  <SkipBackIcon />
+                )
+              }
+            >
+              Back
             </Button>
           </span>
         </Tooltip>

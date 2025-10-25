@@ -1,20 +1,59 @@
 /**
  * LiveBrowserView - Display live browser screenshots from WebSocket stream
  *
- * Shows browser automation in real-time at 2 FPS
+ * Shows browser automation in real-time at 2 FPS with click detection
  */
 
-import { Box, Paper, Typography, Chip } from '@mui/material';
-import { Computer as BrowserIcon, Pause as PausedIcon } from '@mui/icons-material';
+import { useState, useRef } from 'react';
+import { Box, Paper, Typography, Chip, Tooltip } from '@mui/material';
+import { Computer as BrowserIcon, Pause as PausedIcon, TouchApp as ClickIcon } from '@mui/icons-material';
 import { useStore } from '../store';
 
 interface LiveBrowserViewProps {
   executionId: string;
 }
 
+interface ClickCoordinate {
+  x: number;
+  y: number;
+  timestamp: Date;
+}
+
 export function LiveBrowserView({ executionId }: LiveBrowserViewProps) {
   const currentScreenshots = useStore((state) => state.currentScreenshots);
   const screenshot = currentScreenshots.get(executionId);
+  const [clickCoords, setClickCoords] = useState<ClickCoordinate | null>(null);
+  const [showClickIndicator, setShowClickIndicator] = useState(false);
+  const imgRef = useRef<HTMLImageElement>(null);
+
+  const handleImageClick = (event: React.MouseEvent<HTMLImageElement>) => {
+    if (!imgRef.current) return;
+
+    const rect = imgRef.current.getBoundingClientRect();
+    const x = Math.round(event.clientX - rect.left);
+    const y = Math.round(event.clientY - rect.top);
+
+    // Calculate relative coordinates (0-1 scale for responsive sizing)
+    const relativeX = x / rect.width;
+    const relativeY = y / rect.height;
+
+    // Get actual browser coordinates (based on original image size)
+    const naturalX = Math.round(relativeX * imgRef.current.naturalWidth);
+    const naturalY = Math.round(relativeY * imgRef.current.naturalHeight);
+
+    setClickCoords({
+      x: naturalX,
+      y: naturalY,
+      timestamp: new Date(),
+    });
+
+    // Show click indicator animation
+    setShowClickIndicator(true);
+    setTimeout(() => setShowClickIndicator(false), 1000);
+
+    // Log for debugging/AI context
+    console.log(`Browser click detected: (${naturalX}, ${naturalY})`);
+  };
 
   return (
     <Paper
@@ -42,6 +81,25 @@ export function LiveBrowserView({ executionId }: LiveBrowserViewProps) {
         <Typography variant="h6" sx={{ flexGrow: 1 }}>
           Live Browser View
         </Typography>
+        {clickCoords && (
+          <Tooltip title="Last click coordinates">
+            <Chip
+              icon={<ClickIcon />}
+              label={`(${clickCoords.x}, ${clickCoords.y})`}
+              size="small"
+              color="primary"
+              variant="outlined"
+            />
+          </Tooltip>
+        )}
+        <Tooltip title="Click on browser to get coordinates">
+          <Chip
+            label="Interactive"
+            size="small"
+            color="info"
+            variant="outlined"
+          />
+        </Tooltip>
         <Chip
           label="2 FPS"
           size="small"
@@ -63,16 +121,69 @@ export function LiveBrowserView({ executionId }: LiveBrowserViewProps) {
         }}
       >
         {screenshot ? (
-          <img
-            src={`data:image/jpeg;base64,${screenshot.screenshot}`}
-            alt="Browser screenshot"
-            style={{
-              maxWidth: '100%',
-              maxHeight: '100%',
-              objectFit: 'contain',
-              borderRadius: '4px',
+          <Box
+            sx={{
+              position: 'relative',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: '100%',
+              height: '100%',
             }}
-          />
+          >
+            <Tooltip
+              title={
+                clickCoords
+                  ? `Click coordinates: (${clickCoords.x}, ${clickCoords.y})`
+                  : 'Click on the browser to get coordinates'
+              }
+              placement="top"
+            >
+              <img
+                ref={imgRef}
+                src={`data:image/jpeg;base64,${screenshot.screenshot}`}
+                alt="Browser screenshot"
+                onClick={handleImageClick}
+                style={{
+                  maxWidth: '100%',
+                  maxHeight: '100%',
+                  objectFit: 'contain',
+                  borderRadius: '4px',
+                  cursor: 'crosshair',
+                  transition: 'transform 0.1s',
+                }}
+              />
+            </Tooltip>
+
+            {/* Click indicator animation */}
+            {showClickIndicator && clickCoords && (
+              <Box
+                sx={{
+                  position: 'absolute',
+                  pointerEvents: 'none',
+                  animation: 'ripple 1s ease-out',
+                  '@keyframes ripple': {
+                    '0%': {
+                      width: '10px',
+                      height: '10px',
+                      opacity: 1,
+                    },
+                    '100%': {
+                      width: '100px',
+                      height: '100px',
+                      opacity: 0,
+                    },
+                  },
+                  border: '3px solid',
+                  borderColor: 'primary.main',
+                  borderRadius: '50%',
+                  transform: 'translate(-50%, -50%)',
+                  left: '50%',
+                  top: '50%',
+                }}
+              />
+            )}
+          </Box>
         ) : (
           <Box
             sx={{

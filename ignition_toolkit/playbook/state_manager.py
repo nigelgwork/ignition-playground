@@ -48,6 +48,7 @@ class StateManager:
         self._signal_event.set()  # Start in running state
         self._lock = asyncio.Lock()
         self._skip_requested = False
+        self._skip_back_requested = False
         self._debug_mode_enabled = False
         self._debug_context = {}  # Stores screenshot, HTML, step info on failure
 
@@ -97,6 +98,19 @@ class StateManager:
         """Clear skip flag after processing"""
         self._skip_requested = False
 
+    def is_skip_back_requested(self) -> bool:
+        """
+        Check if execution should skip back to previous step
+
+        Returns:
+            True if skip back requested
+        """
+        return self._skip_back_requested
+
+    def clear_skip_back(self) -> None:
+        """Clear skip back flag after processing"""
+        self._skip_back_requested = False
+
     async def pause(self) -> None:
         """Request execution to pause after current step"""
         async with self._lock:
@@ -123,6 +137,16 @@ class StateManager:
                 self._signal = ControlSignal.NONE
                 self._signal_event.set()
 
+    async def skip_back_step(self) -> None:
+        """Skip back to previous step (re-run from previous step)"""
+        async with self._lock:
+            logger.info("Skip back to previous step requested")
+            self._skip_back_requested = True
+            # If paused, also resume
+            if self._signal == ControlSignal.PAUSE:
+                self._signal = ControlSignal.NONE
+                self._signal_event.set()
+
     async def cancel(self) -> None:
         """Cancel execution"""
         async with self._lock:
@@ -135,6 +159,7 @@ class StateManager:
         self._signal = ControlSignal.NONE
         self._signal_event.set()
         self._skip_requested = False
+        self._skip_back_requested = False
         self._debug_context = {}
 
     def is_paused(self) -> bool:

@@ -219,70 +219,22 @@ export function PlaybookCard({ playbook, onConfigure, onExecute, onExport, onVie
         display: 'flex',
         flexDirection: 'column',
         position: 'relative',
-        opacity: isDisabled ? 0.3 : 1,
-        border: isDisabled ? '4px solid' : '2px solid',
-        borderColor: isDisabled ? 'error.main' : 'divider',
+        opacity: isDisabled ? 0.7 : 1,
+        border: '2px solid',
+        borderColor: isDisabled ? 'warning.main' : 'divider',
         borderRadius: 2,
-        backgroundColor: isDisabled ? '#1a0000' : 'background.paper',
+        backgroundColor: 'background.paper',
         transition: 'all 0.3s ease-in-out',
-        '&:hover': isDisabled ? {} : {
+        '&:hover': {
           transform: 'translateY(-6px)',
           boxShadow: (theme) => theme.shadows[12],
-          borderColor: 'primary.main',
-          borderWidth: '3px',
+          borderColor: isDisabled ? 'warning.main' : 'primary.main',
+          borderWidth: isDisabled ? '2px' : '3px',
           backgroundColor: 'action.hover',
         },
-        cursor: isDisabled ? 'not-allowed' : 'grab',
-        filter: isDisabled ? 'grayscale(100%) brightness(0.4)' : 'none',
+        cursor: 'grab',
       }}
     >
-      {/* Disabled overlay */}
-      {isDisabled && (
-        <Box
-          sx={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: 'rgba(0, 0, 0, 0.85)',
-            zIndex: 1,
-            borderRadius: 2,
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            pointerEvents: 'none',
-            gap: 2,
-          }}
-        >
-          <Box
-            sx={{
-              fontSize: '4rem',
-              filter: 'grayscale(100%)',
-            }}
-          >
-            🚫
-          </Box>
-          <Chip
-            label="DISABLED"
-            color="error"
-            size="medium"
-            sx={{
-              fontSize: '1.8rem',
-              fontWeight: 'bold',
-              py: 3,
-              px: 5,
-              height: 'auto',
-              border: '3px solid',
-              borderColor: 'error.main',
-            }}
-          />
-          <Typography variant="caption" color="error.light" sx={{ fontSize: '0.9rem', fontWeight: 'bold' }}>
-            Enable to use this playbook
-          </Typography>
-        </Box>
-      )}
       <CardContent sx={{ flexGrow: 1, pb: 0 }}>
         <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
           <Typography variant="h6" gutterBottom sx={{ flexGrow: 1 }}>
@@ -354,7 +306,7 @@ export function PlaybookCard({ playbook, onConfigure, onExecute, onExport, onVie
             <Chip
               label="Disabled"
               size="small"
-              color="error"
+              color="warning"
               variant="outlined"
             />
           )}
@@ -398,7 +350,7 @@ export function PlaybookCard({ playbook, onConfigure, onExecute, onExport, onVie
         )}
 
         {/* Debug Mode Toggle */}
-        <Box sx={{ mt: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
+        <Box sx={{ mt: 1, mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
           <DebugIcon fontSize="small" color={debugMode ? 'primary' : 'disabled'} />
           <FormControlLabel
             control={

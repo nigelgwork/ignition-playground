@@ -699,6 +699,18 @@ async def skip_step(execution_id: str):
     return {"status": "skipped", "execution_id": execution_id}
 
 
+@app.post("/api/executions/{execution_id}/skip_back")
+async def skip_back_step(execution_id: str):
+    """Skip back to previous step"""
+    if execution_id not in active_engines:
+        raise HTTPException(status_code=404, detail="Execution not found")
+
+    engine = active_engines[execution_id]
+    await engine.skip_back_step()
+
+    return {"status": "skipped_back", "execution_id": execution_id}
+
+
 @app.post("/api/executions/{execution_id}/cancel")
 async def cancel_execution(execution_id: str):
     """Cancel execution"""

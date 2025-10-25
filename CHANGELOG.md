@@ -5,6 +5,90 @@ All notable changes to the Ignition Automation Toolkit will be documented in thi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.27] - 2025-10-25
+
+### Fixed
+- **Debug Mode Step-by-Step Execution**: Debug mode now auto-pauses after each step
+  - Modified `engine.py` to pause after each step completion when debug mode is enabled
+  - User must manually click "Resume" to execute next step
+  - Allows step-by-step debugging with full control
+  - Sets execution status to PAUSED after each step
+
+### Changed
+- **AI Dialog Availability**: AI assistant now accessible throughout debug mode
+  - "Ask AI" button visible when debug mode is enabled OR execution is paused
+  - Previously only available when paused
+  - Can interact with AI at any time during debug session
+  - Updated ExecutionControls to accept debugMode prop
+
+### Technical Details
+- Backend: `engine.py` lines 239-244 - Auto-pause logic in debug mode
+- Frontend: `ExecutionControls.tsx` - AI button conditional updated to `(isPaused || debugMode)`
+- Frontend: `ExecutionDetail.tsx` - Pass debugMode prop to ExecutionControls
+- Known limitation: Steps will still timeout if paused during execution (pause happens between steps, not during)
+
+## [1.0.26] - 2025-10-25
+
+### Fixed
+- **Disabled Playbook Visibility**: Improved disabled playbook styling to be subtle and accessible
+  - Changed from heavy overlay to subtle warning border (orange) with 0.7 opacity
+  - Removed blocking overlay - all buttons now accessible (users can enable/configure)
+  - Added small "Disabled" warning chip instead of large error overlay
+  - Removed pulsing animation that was distracting
+
+- **Debug Mode Spacing**: Fixed debug mode switch bleeding into button below
+  - Added `mb: 2` margin-bottom to debug mode toggle Box
+  - Proper spacing between debug toggle and action buttons
+
+### Added
+- **AI Prompt Dialog for Paused Executions**: Complete AI chat interface for debugging
+  - Created `AIAssistDialog.tsx` component with chat interface
+  - "Ask AI" button appears when execution is paused
+  - Shows current error context and step information
+  - Ready for Anthropic API integration (placeholder implemented)
+  - Includes "Apply Suggested Fix" button for future functionality
+
+- **Skip Backward Capability**: Navigate backward through execution steps
+  - Backend: Added `skip_back_step()` to StateManager and PlaybookEngine
+  - Backend: New `/api/executions/{id}/skip_back` POST endpoint
+  - Frontend: Added `skipBack()` to API client
+  - Frontend: Added "Back" button to ExecutionControls with SkipPrevious icon
+
+- **Interactive Browser View**: Click detection and coordinate display
+  - Image now has crosshair cursor and click handler
+  - Calculates and displays actual browser coordinates
+  - Shows coordinates in header chip with click icon
+  - Animated ripple effect on click for visual feedback
+  - "Interactive" badge in header
+  - Logs coordinates to console for debugging/AI context
+
+### Changed
+- **Compact Step Cards**: Reduced step card size by ~50%
+  - ListItem padding: `py: 0.5, px: 1, minHeight: 36px`
+  - Primary text: `fontSize: 0.8rem`
+  - Secondary text: `fontSize: 0.7rem`
+  - Chip: `height: 20px, fontSize: 0.65rem`
+  - Reduced icon margin spacing
+
+- **Compact Execution Header**: Reduced header size by ~50%
+  - Paper padding: `p: 1` (was `p: 2`)
+  - Moved execution ID inline with playbook name
+  - Typography: `0.95rem` for name, `0.7rem` for ID
+  - Chip height: `24px`
+  - Truncated ID to first 8 characters for brevity
+
+### Technical Details
+- Frontend: PlaybookCard.tsx - Subtle disabled styling with warning theme
+- Frontend: ExecutionDetail.tsx - Compact header and step cards
+- Frontend: ExecutionControls.tsx - AI assist button, skip back button
+- Frontend: LiveBrowserView.tsx - Interactive click detection with ripple animation
+- Frontend: AIAssistDialog.tsx - NEW chat interface component
+- Frontend: API client - Added skipBack() method
+- Backend: StateManager - Added skip_back_step(), is_skip_back_requested(), clear_skip_back()
+- Backend: PlaybookEngine - Added skip_back_step() method
+- Backend: app.py - New /api/executions/{id}/skip_back endpoint
+- Verified: Pause timeout already implements indefinite wait (no changes needed)
+
 ## [1.0.13] - 2025-10-24
 
 ### Fixed

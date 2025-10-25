@@ -8,7 +8,7 @@ This file provides guidance to Claude Code when working with the Ignition Automa
 
 **Ignition Automation Toolkit** is a visual acceptance testing platform for Ignition SCADA (Gateway, Perspective, Designer) with domain-separated playbook libraries, real-time visual feedback, and optional AI-assisted test creation.
 
-**Current Version:** 1.0.3 (Production Ready)
+**Current Version:** 1.0.27 (Production Ready)
 **Phase:** 8/8 Complete - All Core Features Implemented ✅
 **Target Platform:** Ignition SCADA 8.3+
 **Primary Language:** Python 3.10+
@@ -35,7 +35,7 @@ Backend (Python 3.10+):
   - Playwright (browser automation for Perspective tests) ✅
   - SQLAlchemy + SQLite (execution history, state management) ✅
   - httpx (async HTTP for Gateway REST API) ✅
-  - Anthropic SDK (AI-injectable steps) ⚠️ (exists, not integrated in UI yet)
+  - Anthropic SDK (AI-injectable steps) ✅ (integrated in v1.0.26)
 
 Frontend (Production React App):
   - React 18 + TypeScript ✅
@@ -138,7 +138,7 @@ ignition-playground/
 - Playbook syntax reference
 - Version tracking and changelog
 
-**Status:** Production Ready (v1.0.3) - All core features implemented
+**Status:** Production Ready (v1.0.27) - All core features implemented
 
 ## 🔑 Key Design Patterns
 
@@ -329,16 +329,19 @@ git push origin main
 
 > **See [ROADMAP.md](/docs/ROADMAP.md) for planned features and priorities.**
 
-**Production Ready (v1.0.3)** - All 8 phases complete
+**Production Ready (v1.0.27)** - All 8 phases complete
 
-**Next Priorities (v1.0.4):**
-1. Playbook duplication in UI
-2. YAML playbook editor
-3. AI chat interface for playbook creation/editing
+**Recently Completed (v1.0.4 - v1.0.27):**
+1. ✅ Live browser streaming at 2 FPS (v1.0.4)
+2. ✅ Interactive browser view with click detection (v1.0.26)
+3. ✅ AI chat interface for debugging paused executions (v1.0.26)
+4. ✅ Skip backward capability (v1.0.26)
+5. ✅ Debug mode with step-by-step execution (v1.0.27)
 
-**Future (v1.1.0):**
-1. Embedded Playwright browser view for Perspective tests (CRITICAL)
-2. Visual feedback panel showing live test execution
+**Next Priorities (v1.1.0):**
+1. One-click playbook duplication UI
+2. Dedicated YAML playbook editor with syntax highlighting
+3. Visual regression testing with screenshot comparison
 
 ## 📊 Progress Tracking
 
@@ -390,7 +393,7 @@ This project is a **fresh start** from `ignition-auto-test`. Key differences:
 
 ---
 
-**Last Updated**: 2025-10-24
+**Last Updated**: 2025-10-25
 **Maintainer**: Nigel G
-**Status**: Production Ready (v1.0.3) - All 8 Phases Complete ✅
+**Status**: Production Ready (v1.0.27) - All 8 Phases Complete ✅
 **Confidence Level**: High ✨
