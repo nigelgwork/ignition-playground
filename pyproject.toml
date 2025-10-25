@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ignition-toolkit"
-version = "1.0.29"  # Updated: 2025-10-25 - AI assistance integration and debug mode pause on failure
+version = "1.0.30"  # Updated: 2025-10-25 - Floating AI chat and connection error fixes
 description = "Lightweight automation toolkit for Ignition SCADA Gateway operations"
 readme = "README.md"
 requires-python = ">=3.10"

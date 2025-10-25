@@ -5,6 +5,48 @@ All notable changes to the Ignition Automation Toolkit will be documented in thi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.30] - 2025-10-25
+
+### Added
+- **Floating AI Chat Box**: Redesigned AI assistant as collapsible bottom-left chat widget
+  - Positioned in bottom-left corner, doesn't block execution view
+  - Click header to expand/collapse (400px expanded, 56px collapsed)
+  - Smooth transitions with 0.3s animation
+  - User can monitor execution while chatting with AI
+  - Shows error context banner when step fails
+  - Chat history persists during session
+
+### Changed
+- **AI Assist Endpoint**: Graceful error handling instead of HTTP errors
+  - Never throws 404 - always returns helpful response
+  - Provides context even when execution not in active_engines
+  - User-friendly formatted debug context with bullets
+  - Friendly Claude Code introduction message
+  - Catches all exceptions and returns helpful fallback
+
+### Fixed
+- **AI Connection Error**: "Error connecting to AI assistant" message eliminated
+  - Previously: 404 when execution not found → frontend shows error
+  - Now: Always returns 200 with context → frontend shows helpful message
+  - Backend endpoint returns formatted debug context
+  - Shows available context even in edge cases
+
+- **StateManager.pause() Argument Error**: Fixed wrong number of arguments
+  - Previously: `pause(execution_state.execution_id)` → TypeError
+  - Now: `pause()` with no arguments (correct signature)
+  - Fixed in engine.py line 264
+
+- **Missing 'Any' Import**: Fixed NameError preventing backend startup
+  - Added `Any` to typing imports in app.py
+  - Backend now starts correctly
+
+### Technical Details
+- Frontend: `AIAssistDialog.tsx` - Floating chat box with Material-UI Collapse
+- Backend: `app.py` lines 1248-1305 - Graceful AI assist endpoint
+- Backend: `engine.py` line 264 - Fixed pause() call
+- Frontend version: 1.0.31 (built with floating chat)
+- Backend version: 1.0.30
+
 ## [1.0.29] - 2025-10-25
 
 ### Added
