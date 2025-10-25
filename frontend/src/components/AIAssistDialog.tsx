@@ -74,17 +74,40 @@ export function AIAssistDialog({
     setInputMessage('');
     setIsLoading(true);
 
-    // TODO: Integrate with Anthropic API via backend endpoint
-    // For now, show a placeholder response
-    setTimeout(() => {
+    try {
+      // Call AI assist endpoint
+      const response = await fetch('/api/ai/assist', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          execution_id: _executionId,
+          user_message: inputMessage,
+          current_step_id: currentStep,
+          error_context: currentError,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('AI assist failed');
+      }
+
+      const data = await response.json();
       const assistantMessage: ChatMessage = {
         role: 'assistant',
-        content: 'AI integration coming soon! This will use the Anthropic API to analyze your execution context and suggest fixes.',
+        content: data.message || 'I can help you debug this issue. Please describe what you need help with in the Claude Code chat.',
         timestamp: new Date(),
       };
       setMessages((prev) => [...prev, assistantMessage]);
+    } catch (error) {
+      const errorMessage: ChatMessage = {
+        role: 'assistant',
+        content: 'Error connecting to AI assistant. Please use Claude Code chat directly to get help.',
+        timestamp: new Date(),
+      };
+      setMessages((prev) => [...prev, errorMessage]);
+    } finally {
       setIsLoading(false);
-    }, 1000);
+    }
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {

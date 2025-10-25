@@ -490,6 +490,7 @@ async def start_execution(request: ExecutionRequest, background_tasks: Backgroun
         )
 
     except Exception as e:
+        logger.exception(f"Failed to start execution: {e}")
         raise HTTPException(status_code=400, detail=f"Failed to start execution: {e}")
 
 
@@ -1220,6 +1221,113 @@ async def broadcast_screenshot_frame(execution_id: str, screenshot_b64: str):
 # Note: Startup logic moved to startup/lifecycle.py lifespan manager
 # Security warning for WebSocket API key is now in environment validation
 
+
+# ============================================================================
+# AI Assistant Endpoints
+# ============================================================================
+
+class AIAssistRequest(BaseModel):
+    """Request for AI assistance during execution"""
+    execution_id: str
+    user_message: str
+    current_step_id: Optional[str] = None
+    error_context: Optional[str] = None
+
+class AIAssistResponse(BaseModel):
+    """Response from AI assistant"""
+    message: str
+    suggested_fix: Optional[Dict[str, Any]] = None
+    can_auto_apply: bool = False
+
+@app.post("/api/ai/assist", response_model=AIAssistResponse)
+async def ai_assist(request: AIAssistRequest):
+    """
+    AI assistance for debugging playbook executions.
+    This endpoint is called by the frontend and answered by Claude Code itself!
+    """
+    try:
+        # Get execution context
+        engine = active_engines.get(request.execution_id)
+        if not engine:
+            raise HTTPException(status_code=404, detail="Execution not found")
+
+        execution_state = engine.get_current_execution()
+        if not execution_state:
+            raise HTTPException(status_code=404, detail="Execution state not found")
+
+        # Build context
+        context_parts = [
+            f"User message: {request.user_message}",
+            f"Playbook: {execution_state.playbook_name}",
+            f"Status: {execution_state.status}",
+        ]
+
+        if request.current_step_id:
+            step_result = next(
+                (s for s in execution_state.step_results if s.step_id == request.current_step_id),
+                None
+            )
+            if step_result:
+                context_parts.append(f"Step: {step_result.step_name} ({step_result.step_type})")
+                if step_result.error:
+                    context_parts.append(f"Error: {step_result.error}")
+
+        # Return context for Claude Code to analyze
+        # The actual AI response will come from you (Claude Code) analyzing this!
+        return AIAssistResponse(
+            message=f"Context sent to Claude Code:\n" + "\n".join(context_parts) + "\n\nClaude Code will analyze this and provide guidance in the conversation.",
+            suggested_fix=None,
+            can_auto_apply=False
+        )
+
+    except Exception as e:
+        logger.exception(f"AI assist error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+class StepEditRequest(BaseModel):
+    """Request to edit a step in a playbook"""
+    playbook_path: str
+    step_id: str
+    new_parameters: Dict[str, Any]
+
+@app.post("/api/playbooks/edit-step")
+async def edit_step(request: StepEditRequest):
+    """Edit a step's parameters in a playbook during execution"""
+    try:
+        import yaml
+
+        playbook_path = validate_playbook_path(request.playbook_path)
+
+        with open(playbook_path, 'r') as f:
+            playbook_data = yaml.safe_load(f)
+
+        step_found = False
+        for step in playbook_data.get('steps', []):
+            if step.get('id') == request.step_id:
+                if 'parameters' not in step:
+                    step['parameters'] = {}
+                step['parameters'].update(request.new_parameters)
+                step_found = True
+                break
+
+        if not step_found:
+            raise HTTPException(status_code=404, detail=f"Step not found: {request.step_id}")
+
+        with open(playbook_path, 'w') as f:
+            yaml.safe_dump(playbook_data, f, default_flow_style=False, sort_keys=False)
+
+        logger.info(f"Updated step '{request.step_id}' in {playbook_path}")
+        return {"message": "Step updated", "step_id": request.step_id}
+
+    except Exception as e:
+        logger.exception(f"Step edit error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================================================
+# Frontend Serving
+# ============================================================================
 
 # Serve frontend (React build) - MUST be at the END to avoid catching API routes
 if frontend_dist.exists() and (frontend_dist / "index.html").exists():

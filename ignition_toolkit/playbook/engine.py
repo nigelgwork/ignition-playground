@@ -91,6 +91,15 @@ class PlaybookEngine:
         """
         self._update_callback = callback
 
+    def enable_debug(self, execution_id: str) -> None:
+        """
+        Enable debug mode for an execution (auto-pause after each step)
+
+        Args:
+            execution_id: The execution ID to enable debug mode for
+        """
+        self.state_manager.enable_debug_mode()
+
     async def execute_playbook(
         self,
         playbook: Playbook,
@@ -246,6 +255,16 @@ class PlaybookEngine:
                 # Handle failure
                 if step_result.status == StepStatus.FAILED:
                     logger.error(f"Step failed: {step.name} - {step_result.error}")
+
+                    # In debug mode, pause on failure instead of aborting
+                    if self.state_manager._debug_mode_enabled:
+                        logger.info("Debug mode: Pausing on failed step for debugging")
+                        execution_state.status = ExecutionStatus.PAUSED
+                        step_result.error_message = f"Step failed in debug mode: {step_result.error}. Use AI assist or skip to continue."
+                        await self.state_manager.pause(execution_state.execution_id)
+                        await self._notify_update(execution_state)
+                        # Wait for manual resume/skip instead of aborting
+                        continue
 
                     if step.on_failure == OnFailureAction.ABORT:
                         execution_state.status = ExecutionStatus.FAILED
