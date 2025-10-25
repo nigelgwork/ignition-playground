@@ -5,6 +5,42 @@ All notable changes to the Ignition Automation Toolkit will be documented in thi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.29] - 2025-10-25
+
+### Added
+- **AI Assistance Integration**: Claude Code integration for debugging executions
+  - New `/api/ai/assist` endpoint to collect execution context
+  - New `/api/playbooks/edit-step` endpoint for live playbook fixes
+  - AIAssistDialog component now calls backend API instead of showing placeholder
+  - Users can describe issues and get help from Claude Code directly
+
+- **PlaybookEngine Debug Method**: Added `enable_debug()` method
+  - Required for debug mode to function correctly
+  - Delegates to StateManager's `enable_debug_mode()`
+
+### Changed
+- **Debug Mode Pause on Failure**: Executions now PAUSE on step failure instead of aborting
+  - In debug mode, failed steps pause execution for troubleshooting
+  - User can use AI assist to diagnose and fix issues
+  - Resume or skip controls work on failed steps
+  - Error message indicates debug mode pause: "Use AI assist or skip to continue"
+
+### Fixed
+- **Missing enable_debug Method**: PlaybookEngine was missing `enable_debug()` method
+  - API was calling non-existent method causing 400 errors
+  - Added method to engine.py (lines 94-101)
+
+- **Execution Lockout on Failure**: Debug mode executions no longer stop on first failure
+  - Previously: Step failure → execution aborted → no way to fix
+  - Now: Step failure → execution paused → fix with AI → resume
+
+### Technical Details
+- Backend: `ignition_toolkit/api/app.py` lines 1225-1326 - AI endpoints
+- Backend: `ignition_toolkit/playbook/engine.py` lines 94-101 - enable_debug method
+- Backend: `ignition_toolkit/playbook/engine.py` lines 259-267 - Pause on failure in debug mode
+- Frontend: `frontend/src/components/AIAssistDialog.tsx` lines 77-111 - API integration
+- Frontend: Built and deployed with v1.0.30
+
 ## [1.0.28] - 2025-10-25
 
 ### Fixed
