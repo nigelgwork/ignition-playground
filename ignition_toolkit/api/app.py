@@ -1262,15 +1262,16 @@ async def ai_assist(request: AIAssistRequest):
             f"Status: {execution_state.status}",
         ]
 
-        if request.current_step_id:
-            step_result = next(
-                (s for s in execution_state.step_results if s.step_id == request.current_step_id),
-                None
-            )
-            if step_result:
-                context_parts.append(f"Step: {step_result.step_name} ({step_result.step_type})")
-                if step_result.error:
-                    context_parts.append(f"Error: {step_result.error}")
+        # Get current step info
+        current_step_index = execution_state.current_step_index
+        if current_step_index is not None and current_step_index < len(execution_state.step_results):
+            step_result = execution_state.step_results[current_step_index]
+            context_parts.append(f"Current Step: {step_result.step_name} ({step_result.step_type})")
+            context_parts.append(f"Step Status: {step_result.status}")
+            if step_result.error:
+                context_parts.append(f"Error: {step_result.error}")
+            if step_result.error_message:
+                context_parts.append(f"Error Message: {step_result.error_message}")
 
         # Return context for Claude Code to analyze
         # The actual AI response will come from you (Claude Code) analyzing this!

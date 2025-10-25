@@ -1,31 +1,29 @@
 /**
- * AIAssistDialog - AI chat interface for debugging paused executions
+ * AIAssistDialog - Floating AI chat interface for debugging paused executions
  *
- * Displays when execution is paused and user needs AI help to debug issues.
+ * Displays as a collapsible chat box in the bottom-left corner.
  * Shows current error context, allows chat with AI, and can apply fixes.
  */
 
 import { useState } from 'react';
 import {
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
+  Box,
   Button,
   TextField,
-  Box,
   Typography,
   Paper,
   Chip,
   CircularProgress,
   IconButton,
   Divider,
+  Collapse,
 } from '@mui/material';
 import {
   Send as SendIcon,
-  Close as CloseIcon,
   BugReport as BugIcon,
   AutoFixHigh as FixIcon,
+  ExpandMore as ExpandMoreIcon,
+  ExpandLess as ExpandLessIcon,
 } from '@mui/icons-material';
 
 interface AIAssistDialogProps {
@@ -44,7 +42,7 @@ interface ChatMessage {
 
 export function AIAssistDialog({
   open,
-  onClose,
+  onClose: _onClose,
   executionId: _executionId,
   currentError,
   currentStep,
@@ -60,6 +58,7 @@ export function AIAssistDialog({
   ]);
   const [inputMessage, setInputMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(true);
 
   const handleSendMessage = async () => {
     if (!inputMessage.trim() || isLoading) return;
@@ -117,135 +116,172 @@ export function AIAssistDialog({
     }
   };
 
+  if (!open) {
+    return null;
+  }
+
   return (
-    <Dialog
-      open={open}
-      onClose={onClose}
-      maxWidth="md"
-      fullWidth
-      PaperProps={{
-        sx: {
-          height: '80vh',
-          display: 'flex',
-          flexDirection: 'column',
-        },
-      }}
-    >
-      <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1, pb: 1 }}>
-        <BugIcon color="primary" />
-        <Typography variant="h6" component="span" sx={{ flexGrow: 1 }}>
-          AI Debug Assistant
-        </Typography>
-        <Chip label="Paused" color="warning" size="small" />
-        <IconButton size="small" onClick={onClose} edge="end">
-          <CloseIcon />
-        </IconButton>
-      </DialogTitle>
-
-      <Divider />
-
-      {/* Error Context */}
-      {currentError && (
-        <Box sx={{ px: 2, py: 1.5, bgcolor: 'error.dark', color: 'error.contrastText' }}>
-          <Typography variant="caption" fontWeight="bold" display="block">
-            Current Error:
-          </Typography>
-          <Typography variant="body2">{currentError}</Typography>
-        </Box>
-      )}
-
-      {/* Chat Messages */}
-      <DialogContent
+    <>
+      {/* Floating Chat Box - Bottom Left */}
+      <Paper
+        elevation={8}
         sx={{
-          flexGrow: 1,
-          overflow: 'auto',
+          position: 'fixed',
+          bottom: 16,
+          left: 16,
+          width: isExpanded ? 400 : 56,
+          maxHeight: isExpanded ? '70vh' : 56,
           display: 'flex',
           flexDirection: 'column',
-          gap: 2,
-          p: 2,
+          transition: 'all 0.3s ease-in-out',
+          zIndex: 1300,
+          borderRadius: 2,
+          overflow: 'hidden',
         }}
       >
-        {messages.map((msg, index) => (
+        {/* Header */}
+        <Box
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 1,
+            p: 1.5,
+            bgcolor: 'primary.dark',
+            color: 'primary.contrastText',
+            cursor: 'pointer',
+          }}
+          onClick={() => setIsExpanded(!isExpanded)}
+        >
+          <BugIcon fontSize="small" />
+          {isExpanded && (
+            <>
+              <Typography variant="subtitle2" sx={{ flexGrow: 1 }}>
+                AI Debug Assistant
+              </Typography>
+              <Chip label="Paused" color="warning" size="small" />
+              <IconButton
+                size="small"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsExpanded(!isExpanded);
+                }}
+                sx={{ color: 'inherit' }}
+              >
+                {isExpanded ? <ExpandMoreIcon /> : <ExpandLessIcon />}
+              </IconButton>
+            </>
+          )}
+        </Box>
+
+        {/* Chat Content */}
+        <Collapse in={isExpanded} timeout="auto">
+          {/* Error Context */}
+          {currentError && (
+            <Box sx={{ px: 2, py: 1.5, bgcolor: 'error.dark', color: 'error.contrastText' }}>
+              <Typography variant="caption" fontWeight="bold" display="block">
+                Current Error:
+              </Typography>
+              <Typography variant="body2">{currentError}</Typography>
+            </Box>
+          )}
+
+          {/* Chat Messages */}
           <Box
-            key={index}
             sx={{
-              alignSelf: msg.role === 'user' ? 'flex-end' : 'flex-start',
-              maxWidth: '75%',
+              flexGrow: 1,
+              overflow: 'auto',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 1.5,
+              p: 2,
+              maxHeight: 'calc(70vh - 200px)',
+              minHeight: 200,
             }}
           >
-            <Paper
-              elevation={1}
-              sx={{
-                p: 1.5,
-                bgcolor: msg.role === 'user' ? 'primary.dark' : 'background.paper',
-                color: msg.role === 'user' ? 'primary.contrastText' : 'text.primary',
-              }}
-            >
-              <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>
-                {msg.content}
-              </Typography>
-              <Typography
-                variant="caption"
-                color={msg.role === 'user' ? 'primary.light' : 'text.secondary'}
-                sx={{ mt: 0.5, display: 'block' }}
+            {messages.map((msg, index) => (
+              <Box
+                key={index}
+                sx={{
+                  alignSelf: msg.role === 'user' ? 'flex-end' : 'flex-start',
+                  maxWidth: '85%',
+                }}
               >
-                {msg.timestamp.toLocaleTimeString()}
-              </Typography>
-            </Paper>
+                <Paper
+                  elevation={1}
+                  sx={{
+                    p: 1.5,
+                    bgcolor: msg.role === 'user' ? 'primary.dark' : 'background.paper',
+                    color: msg.role === 'user' ? 'primary.contrastText' : 'text.primary',
+                  }}
+                >
+                  <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>
+                    {msg.content}
+                  </Typography>
+                  <Typography
+                    variant="caption"
+                    color={msg.role === 'user' ? 'primary.light' : 'text.secondary'}
+                    sx={{ mt: 0.5, display: 'block' }}
+                  >
+                    {msg.timestamp.toLocaleTimeString()}
+                  </Typography>
+                </Paper>
+              </Box>
+            ))}
+
+            {isLoading && (
+              <Box sx={{ alignSelf: 'flex-start', display: 'flex', alignItems: 'center', gap: 1 }}>
+                <CircularProgress size={16} />
+                <Typography variant="body2" color="text.secondary">
+                  AI is thinking...
+                </Typography>
+              </Box>
+            )}
           </Box>
-        ))}
 
-        {isLoading && (
-          <Box sx={{ alignSelf: 'flex-start', display: 'flex', alignItems: 'center', gap: 1 }}>
-            <CircularProgress size={20} />
-            <Typography variant="body2" color="text.secondary">
-              AI is thinking...
-            </Typography>
+          <Divider />
+
+          {/* Input Area */}
+          <Box sx={{ p: 1.5, display: 'flex', gap: 1 }}>
+            <TextField
+              fullWidth
+              placeholder="Describe the issue..."
+              value={inputMessage}
+              onChange={(e) => setInputMessage(e.target.value)}
+              onKeyPress={handleKeyPress}
+              disabled={isLoading}
+              multiline
+              maxRows={2}
+              size="small"
+              sx={{
+                '& .MuiOutlinedInput-root': {
+                  fontSize: '0.875rem',
+                },
+              }}
+            />
+            <IconButton
+              color="primary"
+              onClick={handleSendMessage}
+              disabled={!inputMessage.trim() || isLoading}
+              size="small"
+            >
+              <SendIcon fontSize="small" />
+            </IconButton>
           </Box>
-        )}
-      </DialogContent>
 
-      <Divider />
-
-      {/* Input Area */}
-      <DialogActions sx={{ p: 2, gap: 1 }}>
-        <TextField
-          fullWidth
-          placeholder="Describe the issue or ask for help..."
-          value={inputMessage}
-          onChange={(e) => setInputMessage(e.target.value)}
-          onKeyPress={handleKeyPress}
-          disabled={isLoading}
-          multiline
-          maxRows={3}
-          size="small"
-        />
-        <Button
-          variant="contained"
-          onClick={handleSendMessage}
-          disabled={!inputMessage.trim() || isLoading}
-          endIcon={<SendIcon />}
-          sx={{ minWidth: 100 }}
-        >
-          Send
-        </Button>
-      </DialogActions>
-
-      {/* Action Buttons */}
-      <Box sx={{ px: 2, pb: 2, display: 'flex', gap: 1 }}>
-        <Button
-          variant="outlined"
-          startIcon={<FixIcon />}
-          size="small"
-          disabled
-          fullWidth
-        >
-          Apply Suggested Fix
-        </Button>
-        <Button variant="outlined" onClick={onClose} size="small" fullWidth>
-          Close & Resume
-        </Button>
-      </Box>
-    </Dialog>
+          {/* Action Buttons */}
+          <Box sx={{ px: 1.5, pb: 1.5, display: 'flex', gap: 1 }}>
+            <Button
+              variant="outlined"
+              startIcon={<FixIcon />}
+              size="small"
+              disabled
+              fullWidth
+            >
+              Apply Fix
+            </Button>
+          </Box>
+        </Collapse>
+      </Paper>
+    </>
   );
 }

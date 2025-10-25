@@ -261,7 +261,7 @@ class PlaybookEngine:
                         logger.info("Debug mode: Pausing on failed step for debugging")
                         execution_state.status = ExecutionStatus.PAUSED
                         step_result.error_message = f"Step failed in debug mode: {step_result.error}. Use AI assist or skip to continue."
-                        await self.state_manager.pause(execution_state.execution_id)
+                        await self.state_manager.pause()
                         await self._notify_update(execution_state)
                         # Wait for manual resume/skip instead of aborting
                         continue
