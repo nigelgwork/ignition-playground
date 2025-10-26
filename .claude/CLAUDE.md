@@ -12,7 +12,7 @@ This file provides guidance to Claude Code when working with the Ignition Automa
 **Phase:** 8/8 Complete - All Core Features Implemented ✅
 **Target Platform:** Ignition SCADA 8.3+
 **Primary Language:** Python 3.10+
-**Key Technologies:** FastAPI, Playwright, SQLite, Anthropic SDK, React 18, Material-UI v5
+**Key Technologies:** FastAPI, Playwright, SQLite, Anthropic SDK, React 19, Material-UI v7
 
 ## 🎯 Core Principles
 
@@ -38,8 +38,8 @@ Backend (Python 3.10+):
   - Anthropic SDK (AI-injectable steps) ✅ (integrated in v1.0.26)
 
 Frontend (Production React App):
-  - React 18 + TypeScript ✅
-  - Material-UI v5 with custom Warp Terminal theme ✅
+  - React 19 + TypeScript ✅
+  - Material-UI v7 with custom Warp Terminal theme ✅
   - React Router v6 (navigation) ✅
   - Zustand (global state management) ✅
   - React Query / TanStack Query (API calls) ✅
@@ -71,7 +71,7 @@ ignition-playground/
 │   ├── perspective/            # Perspective-only playbooks
 │   ├── designer/               # Designer playbooks (future)
 │   └── examples/               # Example playbooks
-├── frontend/                   # Production React 18 + TypeScript app
+├── frontend/                   # Production React 19 + TypeScript app
 │   ├── src/
 │   │   ├── pages/              # Playbooks, Executions, Credentials pages
 │   │   ├── components/         # Reusable UI components
@@ -116,7 +116,7 @@ ignition-playground/
 ### Phase 5: API & Frontend ✅
 - FastAPI REST API (9+ endpoints)
 - WebSocket real-time updates
-- React 18 + TypeScript frontend
+- React 19 + TypeScript frontend
 - Playbooks, Executions, Credentials pages
 - Real-time execution monitoring
 
