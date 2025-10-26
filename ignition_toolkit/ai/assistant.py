@@ -39,13 +39,13 @@ class AIAssistant:
         )
     """
 
-    def __init__(self, api_key: Optional[str] = None, model: str = "claude-3-5-sonnet-20241022"):
+    def __init__(self, api_key: Optional[str] = None, model: str = "claude-sonnet-4-5-20250929"):
         """
         Initialize AI assistant
 
         Args:
             api_key: Anthropic API key (optional, will read from ANTHROPIC_API_KEY env var)
-            model: Model to use (default: claude-3-5-sonnet-20241022)
+            model: Model to use (default: claude-sonnet-4-5-20250929)
         """
         self.api_key = api_key or os.getenv("ANTHROPIC_API_KEY")
         self.model = model
