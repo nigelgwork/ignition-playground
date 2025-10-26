@@ -394,6 +394,55 @@ pytest tests/test_ai/ -v  # if exists
 
 ---
 
+## 🔄 Server Restart Procedure
+
+**IMPORTANT:** After ANY code changes (Python backend or JavaScript frontend), ALWAYS restart both servers to ensure changes are loaded.
+
+### Kill Existing Servers
+```bash
+# Find and kill existing uvicorn processes
+pkill -f uvicorn || true
+
+# Find and kill existing vite dev server
+pkill -f "vite" || true
+
+# Or kill by port (if needed)
+lsof -ti:8000 | xargs kill -9 2>/dev/null || true  # Backend
+lsof -ti:5173 | xargs kill -9 2>/dev/null || true  # Frontend dev
+```
+
+### Start Backend Server
+```bash
+cd /git/ignition-playground
+PLAYWRIGHT_BROWSERS_PATH=/git/ignition-playground/data/.playwright-browsers \
+./venv/bin/uvicorn ignition_toolkit.api.app:app --reload --port 8000
+```
+
+### Start Frontend (Development Mode)
+```bash
+cd /git/ignition-playground/frontend
+export NVM_DIR="$HOME/.nvm" && [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+npm run dev
+```
+
+### Verify Services Running
+```bash
+# Check backend
+curl http://localhost:8000/api/health
+
+# Check frontend (in browser)
+# Navigate to http://localhost:5173
+```
+
+### When to Restart
+- ✅ **After package updates** (Python or JavaScript)
+- ✅ **After code changes** (backend or frontend)
+- ✅ **After git pull** (if changes affect code)
+- ✅ **Before testing new features**
+- ✅ **If UI appears broken or outdated**
+
+---
+
 ## 🧪 Testing Matrix
 
 After each group update, run these tests:
@@ -403,10 +452,10 @@ After each group update, run these tests:
 | **Unit Tests** | `pytest tests/ -v` | All tests pass |
 | **CLI** | `ignition-toolkit --version` | Displays version |
 | **Credentials** | `ignition-toolkit credential list` | No errors |
-| **Server Start** | `./venv/bin/uvicorn ...` | Starts without errors |
+| **Server Restart** | See "Server Restart Procedure" above | Both servers running |
 | **API Health** | `curl localhost:8000/api/health` | Returns {"status": "ok"} |
 | **Frontend Build** | `cd frontend && npm run build` | Builds successfully |
-| **Frontend Preview** | `npm run preview` | UI loads, no console errors |
+| **Frontend Access** | Open http://localhost:5173 | UI loads, no console errors |
 | **WebSocket** | Open UI, check console | WebSocket connects |
 | **Browser** | Test Perspective playbook | Playwright works |
 
