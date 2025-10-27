@@ -193,8 +193,10 @@ class PlaybookEngine:
                 state_manager=self.state_manager,
             )
 
-            # Execute steps
-            for step_index, step in enumerate(playbook.steps):
+            # Execute steps (using while loop to support skip back)
+            step_index = 0
+            while step_index < len(playbook.steps):
+                step = playbook.steps[step_index]
                 execution_state.current_step_index = step_index
 
                 # Check control signals
@@ -207,6 +209,21 @@ class PlaybookEngine:
                     if self.database:
                         await self._save_execution_end(execution_state)
                     return execution_state
+
+                # Check if skip back requested
+                if self.state_manager.is_skip_back_requested():
+                    if step_index > 0:
+                        logger.info(f"Skipping back from step {step_index} to step {step_index - 1}")
+                        step_index -= 1  # Go back 1 position
+                        self.state_manager.clear_skip_back()
+                        # Remove the last step result to re-execute it
+                        if execution_state.step_results:
+                            execution_state.step_results.pop()
+                        await self._notify_update(execution_state)
+                        continue  # Skip to the top of the loop to execute the previous step
+                    else:
+                        logger.warning("Cannot skip back - already at first step")
+                        self.state_manager.clear_skip_back()
 
                 # Check if skip requested
                 if self.state_manager.is_skip_requested():
@@ -223,6 +240,7 @@ class PlaybookEngine:
                     await self._notify_update(execution_state)
                     if self.database:
                         await self._save_step_result(execution_state, step_result)
+                    step_index += 1
                     continue
 
                 # Execute step
@@ -277,6 +295,7 @@ class PlaybookEngine:
 
                     elif step.on_failure == OnFailureAction.CONTINUE:
                         logger.warning(f"Continuing after failure (on_failure=continue)")
+                        step_index += 1
                         continue
 
                     elif step.on_failure == OnFailureAction.ROLLBACK:
@@ -288,6 +307,9 @@ class PlaybookEngine:
                         if self.database:
                             await self._save_execution_end(execution_state)
                         return execution_state
+
+                # Move to next step (normal flow)
+                step_index += 1
 
             # All steps completed
             execution_state.status = ExecutionStatus.COMPLETED

@@ -187,6 +187,8 @@ class StepExecutor:
             return await self._execute_gateway_step(step.type, resolved_params)
         elif step.type.value.startswith("browser."):
             return await self._execute_browser_step(step.type, resolved_params)
+        elif step.type.value.startswith("playbook."):
+            return await self._execute_playbook_step(step.type, resolved_params)
         elif step.type.value.startswith("utility."):
             return await self._execute_utility_step(step.type, resolved_params)
         elif step.type.value.startswith("ai."):
@@ -336,11 +338,153 @@ class StepExecutor:
                 await self.browser_manager.wait_for_selector(selector, timeout=timeout)
                 return {"selector": selector, "status": "found"}
 
+            elif step_type == StepType.BROWSER_VERIFY:
+                selector = params.get("selector")
+                exists = params.get("exists", True)  # Default: verify element exists
+                timeout = params.get("timeout", 5000)  # Shorter timeout for verification
+
+                try:
+                    # Try to find the element
+                    await self.browser_manager.wait_for_selector(selector, timeout=timeout)
+                    element_found = True
+                except Exception:
+                    element_found = False
+
+                # Check if result matches expectation
+                if exists and not element_found:
+                    raise StepExecutionError(
+                        "browser",
+                        f"Verification failed: Expected element '{selector}' to exist, but it was not found"
+                    )
+                elif not exists and element_found:
+                    raise StepExecutionError(
+                        "browser",
+                        f"Verification failed: Expected element '{selector}' to NOT exist, but it was found"
+                    )
+
+                # Verification passed
+                verification_result = "exists" if exists else "does not exist"
+                return {
+                    "selector": selector,
+                    "exists": element_found,
+                    "expected": exists,
+                    "status": "verified",
+                    "message": f"Element '{selector}' {verification_result} as expected"
+                }
+
             else:
                 raise StepExecutionError("browser", f"Unknown browser step type: {step_type}")
 
         except Exception as e:
             raise StepExecutionError("browser", f"Browser operation failed: {e}")
+
+    async def _execute_playbook_step(
+        self, step_type: StepType, params: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """
+        Execute nested playbook as a single step (composable playbooks)
+
+        Args:
+            step_type: Playbook step type
+            params: Resolved parameters
+
+        Returns:
+            Aggregated step output from nested playbook execution
+
+        Raises:
+            StepExecutionError: If playbook execution fails or validation fails
+        """
+        if step_type == StepType.PLAYBOOK_RUN:
+            playbook_path = params.get("playbook")
+
+            if not playbook_path:
+                raise StepExecutionError("playbook", "Missing required parameter: playbook")
+
+            # Convert to absolute path
+            from ignition_toolkit.playbook.loader import PlaybookLoader
+            from ignition_toolkit.playbook.metadata import PlaybookMetadataStore
+
+            loader = PlaybookLoader(base_path=self.base_path / "playbooks")
+            metadata_store = PlaybookMetadataStore()
+
+            # Resolve playbook path (handle both relative and absolute paths)
+            if not playbook_path.startswith("playbooks/"):
+                playbook_path = f"playbooks/{playbook_path}"
+
+            full_path = self.base_path / playbook_path
+
+            if not full_path.exists():
+                raise StepExecutionError(
+                    "playbook",
+                    f"Playbook not found: {playbook_path}"
+                )
+
+            # Get relative path for metadata lookup
+            relative_path = playbook_path.replace("playbooks/", "")
+
+            # Verify that playbook is marked as verified
+            metadata = metadata_store.get_metadata(relative_path)
+            if not metadata.verified:
+                raise StepExecutionError(
+                    "playbook",
+                    f"Playbook '{relative_path}' must be verified before it can be used as a step. "
+                    f"Mark it as verified via the UI 3-dot menu."
+                )
+
+            # Check for circular dependencies (basic check)
+            # TODO: Implement full call stack tracking for deeper nesting
+            if hasattr(self, '_execution_stack'):
+                if playbook_path in self._execution_stack:
+                    raise StepExecutionError(
+                        "playbook",
+                        f"Circular dependency detected: playbook '{playbook_path}' calls itself"
+                    )
+            else:
+                self._execution_stack = []
+
+            # Add to execution stack
+            self._execution_stack.append(playbook_path)
+
+            # Check nesting depth
+            MAX_NESTING_DEPTH = 3
+            if len(self._execution_stack) > MAX_NESTING_DEPTH:
+                self._execution_stack.pop()
+                raise StepExecutionError(
+                    "playbook",
+                    f"Maximum nesting depth ({MAX_NESTING_DEPTH}) exceeded. "
+                    f"Current stack: {' -> '.join(self._execution_stack)}"
+                )
+
+            try:
+                # Load nested playbook
+                nested_playbook = loader.load_from_file(full_path)
+
+                # Extract parameters for child playbook (remove 'playbook' key)
+                child_params = {k: v for k, v in params.items() if k != "playbook"}
+
+                # Execute nested playbook
+                # NOTE: This is a simplified version - in production we would create
+                # a full PlaybookEngine instance with proper state management
+                logger.info(f"Executing nested playbook: {playbook_path}")
+                logger.info(f"Child parameters: {child_params}")
+
+                # For now, return a placeholder indicating nested execution
+                # Full implementation would require PlaybookEngine integration
+                return {
+                    "playbook": playbook_path,
+                    "status": "nested_execution_placeholder",
+                    "message": "Nested playbook execution not fully implemented yet",
+                    "verified": True,
+                    "parameters": child_params,
+                    "steps_count": len(nested_playbook.steps)
+                }
+
+            finally:
+                # Remove from execution stack
+                self._execution_stack.pop()
+
+        else:
+            raise StepExecutionError("playbook", f"Unknown playbook step type: {step_type}")
 
     async def _execute_utility_step(
         self, step_type: StepType, params: Dict[str, Any]

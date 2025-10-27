@@ -39,6 +39,8 @@ interface AppState {
   // WebSocket connection status
   isWSConnected: boolean;
   setWSConnected: (connected: boolean) => void;
+  wsConnectionStatus: 'connected' | 'connecting' | 'disconnected' | 'reconnecting';
+  setWSConnectionStatus: (status: 'connected' | 'connecting' | 'disconnected' | 'reconnecting') => void;
 
   // Theme mode
   theme: 'dark' | 'light';
@@ -73,6 +75,12 @@ export const useStore = create<AppState>((set) => ({
 
   isWSConnected: false,
   setWSConnected: (connected) => set({ isWSConnected: connected }),
+
+  wsConnectionStatus: 'connecting',
+  setWSConnectionStatus: (status) => set({
+    wsConnectionStatus: status,
+    isWSConnected: status === 'connected'
+  }),
 
   theme: getInitialTheme(),
   setTheme: (theme) => {

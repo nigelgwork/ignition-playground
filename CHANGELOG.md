@@ -5,6 +5,172 @@ All notable changes to the Ignition Automation Toolkit will be documented in thi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.3.0] - 2025-10-27
+
+### Added
+- **Claude Code Integration (Phase 2 - Embedded Terminal)**: Real-time Claude Code interaction in the browser
+  - Embedded xterm.js terminal with WebSocket PTY proxy
+  - Mode toggle: Switch between "Embedded" and "Manual" modes
+  - WebSocket endpoint: `/ws/claude-code/{execution_id}`
+  - Full bidirectional I/O: Type commands directly in browser terminal
+  - Process lifecycle management: Automatic cleanup on disconnect
+  - Custom Warp Terminal-inspired theme
+  - xterm.js loaded via CDN (no npm dependency issues)
+  - Backend: PTY process spawning, stdin/stdout proxying, signal handling
+  - Frontend: `EmbeddedTerminal.tsx` component, updated `ClaudeCodeDialog.tsx`
+  - Files: `ignition_toolkit/api/app.py`, `frontend/src/components/EmbeddedTerminal.tsx`, `frontend/src/components/ClaudeCodeDialog.tsx`, `frontend/index.html`
+
+### Technical Details
+- WebSocket binary frames for terminal I/O
+- PTY (pseudoterminal) using built-in Python `pty` module
+- Process group management with `os.setsid()` for clean termination
+- Graceful shutdown: SIGTERM followed by SIGKILL if needed
+- Terminal auto-resize with FitAddon
+- Support for clickable links with WebLinksAddon
+- Connection status messages and error handling
+
+## [2.2.0] - 2025-10-27
+
+### Added
+- **Claude Code Integration (Phase 1 - Manual Launch)**: Debug paused executions with Claude Code CLI
+  - "Claude Code" button appears when execution is paused or in debug mode
+  - Generates pre-configured `claude-code` command with full execution context
+  - Opens playbook YAML file with execution details (step results, errors, parameters)
+  - Copy-to-clipboard functionality for easy command execution
+  - Context includes current step, error messages, and masked sensitive parameters
+  - Backend endpoint: `POST /api/ai/claude-code-session`
+  - Frontend components: `ClaudeCodeDialog.tsx`, updates to `ExecutionControls.tsx`
+  - Documentation: `docs/CLAUDE_CODE_INTEGRATION.md`
+  - **Phase 2 Planned**: Embedded terminal with WebSocket proxy (see `docs/CLAUDE_CODE_PHASE2_PLAN.md`)
+  - Files: `ignition_toolkit/api/app.py`, `frontend/src/components/ClaudeCodeDialog.tsx`, `frontend/src/components/ExecutionControls.tsx`, `frontend/src/pages/ExecutionDetail.tsx`, `frontend/src/api/client.ts`
+
+- **Nested Playbook Execution (`playbook.run` step type)**: Use verified playbooks as building blocks
+  - Composable playbook architecture - build complex workflows from tested components
+  - Verification enforcement: Only verified playbooks can be used as steps
+  - Circular dependency detection prevents infinite loops
+  - Maximum nesting depth limit (3 levels)
+  - Parameter mapping from parent to child playbooks
+  - Single-step visibility in execution view (child steps hidden)
+  - Files: `ignition_toolkit/playbook/models.py`, `ignition_toolkit/playbook/step_executor.py`
+  - Documentation: `docs/FEATURE_REQUEST_NESTED_PLAYBOOKS.md`, `docs/playbook_syntax.md`
+
+- **Delete Playbook Functionality**: Remove unwanted playbooks via UI
+  - Delete menu item in playbook card 3-dot menu (red text, confirmation dialog)
+  - Backend endpoint: `DELETE /api/playbooks/{path}`
+  - Deletes both YAML file and metadata
+  - Safety check: Only allows deleting from `playbooks/` directory
+  - Files: `ignition_toolkit/api/app.py`, `frontend/src/api/client.ts`, `frontend/src/components/PlaybookCard.tsx`
+
+### Fixed
+- **Documentation Version Sync**: Updated CLAUDE.md to show correct v2.2.0 instead of v2.1.0
+- **Frontend Build**: Rebuilt frontend to display v2.2.0 in UI (was incorrectly showing v1.0.28)
+
+### Technical Details
+- Frontend version: 2.2.0
+- Backend version: 2.2.0
+- Feature request captured in `docs/FEATURE_REQUEST_NESTED_PLAYBOOKS.md`
+- Full implementation with safety checks and error handling
+- Claude Code integration is Phase 1 (manual launch) - Phase 2 (embedded terminal) is future enhancement
+
+## [2.1.0] - 2025-10-27
+
+### Added
+- **browser.verify Step Type**: New verification step for asserting element presence/absence
+  - Verifies if elements exist or don't exist on page
+  - Supports `exists: true` (default) or `exists: false` parameter
+  - Shorter default timeout (5s) suitable for verification checks
+  - Clear error messages on verification failure
+  - Added to StepType enum in `ignition_toolkit/playbook/models.py`
+  - Implementation in `ignition_toolkit/playbook/step_executor.py`
+  - Used in gateway_login.yaml playbook for trial warning detection
+
+### Fixed
+- **WebSocket Stability - Reconnection Loop Fixed**: Comprehensive fix for rapid connect/disconnect cycles
+  - **Root Cause**: Callback dependency hell causing infinite reconnection loops
+  - **Solution 1 - Callback Refs Pattern**: Store callbacks in refs to break dependency cycle
+    - `useWebSocket` hook now uses `callbacksRef` instead of callback dependencies
+    - Connection remains stable across component re-renders
+    - File: `frontend/src/hooks/useWebSocket.ts`
+  - **Solution 2 - Heartbeat Mechanism**: Keep connections alive through proxies/firewalls
+    - Frontend sends ping every 30 seconds
+    - Backend responds with pong
+    - Prevents idle connection termination
+    - Files: `frontend/src/hooks/useWebSocket.ts`, `ignition_toolkit/api/app.py`
+  - **Solution 3 - Removed Duplicate Endpoints**: Fixed AI credentials routing
+    - Removed duplicate `/api/ai-credentials` endpoint definition
+    - Only one definition now (line 1362-1440)
+    - File: `ignition_toolkit/api/app.py`
+  - **Result**: WebSocket connection now rock-solid, no more status indicator flickering
+
+- **Gateway Login Playbook - License Steps Optional**: Made license checking steps non-critical
+  - Steps 10-13 now have `on_failure: continue`
+  - Playbook completes successfully even if license navigation UI changes
+  - Core login test (Steps 1-9) remains strict
+  - File: `playbooks/examples/gateway_login.yaml`
+
+### Changed
+- **Version Numbering**: Jumped from v1.0.34 to v2.1.0
+  - Major version bump (2.x) reflects WebSocket architecture improvements
+  - Minor version bump (x.1.x) reflects browser.verify feature addition
+  - Skipped v2.0.x to align with significant stability improvements
+
+### Technical Details
+- WebSocket fixes documented in `WEBSOCKET_STABILITY_FIX.md`
+- Frontend version: 2.1.0
+- Backend version: 2.1.0
+- All 8 phases complete (100% project completion)
+
+## [2.0.1] - 2025-10-26
+
+### Fixed
+- **WebSocket Auto-Reconnect**: Enhanced reliability and connection management
+  - Exponential backoff: 1s → 1.5s → 2.25s → ... → max 30s
+  - Connection status tracking: connected | connecting | reconnecting | disconnected
+  - Intentional close detection to prevent reconnect loops
+  - State persistence across component remounts
+
+### Added
+- **Server Management Scripts**: Reliable lifecycle management
+  - `stop_server.sh`: Clean shutdown, kills uvicorn and curl processes
+  - `start_server.sh`: Pre-flight checks, prevents multiple instances
+  - `update_version.sh`: All-in-one update procedure with health checks
+
+- **WebSocket Connection Indicator**: Visual status in UI
+  - Green (solid): Connected
+  - Yellow (pulsing): Connecting/Reconnecting
+  - Red (solid): Disconnected
+  - Located in Layout component header
+
+### Technical Details
+- Documentation in `WEBSOCKET_RELIABILITY_UPDATE.md`
+- Frontend version: 2.0.1
+- Backend version: 2.0.1
+
+## [2.0.0] - 2025-10-26
+
+### Changed
+- **React Upgrade**: Updated from React 18 to React 19
+  - All React dependencies updated to v19
+  - TypeScript types updated for React 19
+  - No breaking changes in component APIs
+  - Improved concurrent rendering performance
+
+- **Material-UI v7**: Upgraded from MUI v6 to v7
+  - Latest stable Material-UI components
+  - Enhanced theme customization
+  - Warp Terminal inspired color palette
+
+- **Anthropic SDK**: Upgraded from 0.7.0 to 0.71.0
+  - Latest Claude API features
+  - Improved streaming support
+  - Better error handling
+  - Migration documented in `ANTHROPIC_SDK_MIGRATION.md`
+
+### Technical Details
+- Frontend version: 2.0.0
+- Backend version: 2.0.0
+- Node.js recommended: 20.19+ or 22.12+
+
 ## [1.0.34] - 2025-10-25
 
 ### Fixed

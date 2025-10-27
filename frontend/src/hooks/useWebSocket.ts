@@ -1,12 +1,18 @@
 /**
  * WebSocket hook for real-time execution updates
+ * Features: Auto-reconnect with exponential backoff, connection status tracking
  */
 
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef, useCallback, useState } from 'react';
 import type { WebSocketMessage, ExecutionUpdate, ScreenshotFrame } from '../types/api';
 
 const WS_URL = import.meta.env.VITE_WS_URL || 'ws://localhost:5000/ws/executions';
 const WS_API_KEY = import.meta.env.VITE_WS_API_KEY || 'dev-key-change-in-production';
+const INITIAL_RECONNECT_DELAY = 1000; // 1 second
+const MAX_RECONNECT_DELAY = 30000; // 30 seconds
+const RECONNECT_BACKOFF_MULTIPLIER = 1.5;
+
+export type ConnectionStatus = 'connected' | 'connecting' | 'disconnected' | 'reconnecting';
 
 interface UseWebSocketOptions {
   onExecutionUpdate?: (update: ExecutionUpdate) => void;
@@ -19,19 +25,59 @@ interface UseWebSocketOptions {
 export function useWebSocket(options: UseWebSocketOptions = {}) {
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<number | undefined>(undefined);
+  const reconnectDelayRef = useRef<number>(INITIAL_RECONNECT_DELAY);
+  const reconnectAttemptsRef = useRef<number>(0);
+  const intentionalCloseRef = useRef<boolean>(false);
+  const heartbeatIntervalRef = useRef<number | undefined>(undefined);
+
+  const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('connecting');
+
   const { onExecutionUpdate, onScreenshotFrame, onError, onOpen, onClose } = options;
 
+  // Store callbacks in refs to avoid dependency issues
+  const callbacksRef = useRef({ onExecutionUpdate, onScreenshotFrame, onError, onOpen, onClose });
+
+  // Update refs when callbacks change (without triggering reconnects)
+  useEffect(() => {
+    callbacksRef.current = { onExecutionUpdate, onScreenshotFrame, onError, onOpen, onClose };
+  }, [onExecutionUpdate, onScreenshotFrame, onError, onOpen, onClose]);
+
   const connect = useCallback(() => {
-    if (wsRef.current?.readyState === WebSocket.OPEN) {
+    // Don't connect if already connected or intentionally closed
+    if (wsRef.current?.readyState === WebSocket.OPEN || intentionalCloseRef.current) {
       return;
     }
+
+    // Clear any pending reconnect timeouts
+    if (reconnectTimeoutRef.current) {
+      clearTimeout(reconnectTimeoutRef.current);
+      reconnectTimeoutRef.current = undefined;
+    }
+
+    setConnectionStatus(reconnectAttemptsRef.current > 0 ? 'reconnecting' : 'connecting');
 
     try {
       const ws = new WebSocket(`${WS_URL}?api_key=${WS_API_KEY}`);
 
       ws.onopen = () => {
-        console.log('[WebSocket] Connected');
-        onOpen?.();
+        console.log('[WebSocket] Connected successfully');
+        setConnectionStatus('connected');
+
+        // Reset reconnect state on successful connection
+        reconnectDelayRef.current = INITIAL_RECONNECT_DELAY;
+        reconnectAttemptsRef.current = 0;
+
+        callbacksRef.current.onOpen?.();
+
+        // Start heartbeat to keep connection alive
+        if (heartbeatIntervalRef.current) {
+          clearInterval(heartbeatIntervalRef.current);
+        }
+        heartbeatIntervalRef.current = window.setInterval(() => {
+          if (ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ type: 'ping', timestamp: Date.now() }));
+          }
+        }, 30000); // Send ping every 30 seconds
       };
 
       ws.onmessage = (event) => {
@@ -39,11 +85,14 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
           const message: WebSocketMessage = JSON.parse(event.data);
 
           if (message.type === 'execution_update' && message.data) {
-            onExecutionUpdate?.(message.data as ExecutionUpdate);
+            callbacksRef.current.onExecutionUpdate?.(message.data as ExecutionUpdate);
           } else if (message.type === 'screenshot_frame' && message.data) {
-            onScreenshotFrame?.(message.data as ScreenshotFrame);
+            callbacksRef.current.onScreenshotFrame?.(message.data as ScreenshotFrame);
+          } else if (message.type === 'pong') {
+            // Heartbeat response - connection is alive
+            console.debug('[WebSocket] Heartbeat received');
           } else if (message.type === 'error') {
-            console.error('[WebSocket] Error:', message.error);
+            console.error('[WebSocket] Server error:', message.error);
           }
         } catch (error) {
           console.error('[WebSocket] Failed to parse message:', error);
@@ -51,44 +100,89 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
       };
 
       ws.onerror = (event) => {
-        console.error('[WebSocket] Error:', event);
-        onError?.(event);
+        console.error('[WebSocket] Connection error:', event);
+        setConnectionStatus('disconnected');
+        callbacksRef.current.onError?.(event);
       };
 
-      ws.onclose = () => {
-        console.log('[WebSocket] Disconnected');
-        onClose?.();
+      ws.onclose = (event) => {
+        console.log('[WebSocket] Disconnected', event.code, event.reason);
+        setConnectionStatus('disconnected');
 
-        // Attempt to reconnect after 5 seconds
-        reconnectTimeoutRef.current = setTimeout(() => {
-          console.log('[WebSocket] Reconnecting...');
-          connect();
-        }, 5000);
+        // Clear heartbeat interval
+        if (heartbeatIntervalRef.current) {
+          clearInterval(heartbeatIntervalRef.current);
+          heartbeatIntervalRef.current = undefined;
+        }
+
+        callbacksRef.current.onClose?.();
+
+        // Only auto-reconnect if not intentionally closed
+        if (!intentionalCloseRef.current) {
+          reconnectAttemptsRef.current += 1;
+
+          // Calculate next reconnect delay with exponential backoff
+          const nextDelay = Math.min(
+            reconnectDelayRef.current * RECONNECT_BACKOFF_MULTIPLIER,
+            MAX_RECONNECT_DELAY
+          );
+          reconnectDelayRef.current = nextDelay;
+
+          console.log(
+            `[WebSocket] Reconnecting in ${Math.round(nextDelay / 1000)}s (attempt ${reconnectAttemptsRef.current})...`
+          );
+
+          reconnectTimeoutRef.current = window.setTimeout(() => {
+            connect();
+          }, nextDelay);
+        }
       };
 
       wsRef.current = ws;
     } catch (error) {
       console.error('[WebSocket] Connection failed:', error);
+      setConnectionStatus('disconnected');
     }
-  }, [onExecutionUpdate, onScreenshotFrame, onError, onOpen, onClose]);
+  }, []); // ✅ NO dependencies - callbacks stored in refs
 
   const disconnect = useCallback(() => {
+    // Mark as intentional close to prevent auto-reconnect
+    intentionalCloseRef.current = true;
+
+    // Clear reconnect timeout
     if (reconnectTimeoutRef.current) {
       clearTimeout(reconnectTimeoutRef.current);
+      reconnectTimeoutRef.current = undefined;
     }
+
+    // Clear heartbeat interval
+    if (heartbeatIntervalRef.current) {
+      clearInterval(heartbeatIntervalRef.current);
+      heartbeatIntervalRef.current = undefined;
+    }
+
+    // Close WebSocket connection
     if (wsRef.current) {
       wsRef.current.close();
       wsRef.current = null;
     }
+
+    setConnectionStatus('disconnected');
   }, []);
 
   useEffect(() => {
+    // Reset intentional close flag when component mounts
+    intentionalCloseRef.current = false;
     connect();
-    return disconnect;
+
+    return () => {
+      disconnect();
+    };
   }, [connect, disconnect]);
 
   return {
-    isConnected: wsRef.current?.readyState === WebSocket.OPEN,
+    connectionStatus,
+    isConnected: connectionStatus === 'connected',
     disconnect,
     reconnect: connect,
   };

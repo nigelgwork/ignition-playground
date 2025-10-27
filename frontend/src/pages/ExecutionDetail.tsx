@@ -41,6 +41,7 @@ import { LiveBrowserView } from '../components/LiveBrowserView';
 import { ExecutionControls } from '../components/ExecutionControls';
 import { DebugPanel } from '../components/DebugPanel';
 import { AIAssistDialog } from '../components/AIAssistDialog';
+import { ClaudeCodeDialog } from '../components/ClaudeCodeDialog';
 import { useStore } from '../store';
 import type { ExecutionStatusResponse } from '../types/api';
 
@@ -50,6 +51,7 @@ export function ExecutionDetail() {
   const executionUpdates = useStore((state) => state.executionUpdates);
   const [debugMode, setDebugMode] = useState(false);
   const [aiDialogOpen, setAiDialogOpen] = useState(false);
+  const [claudeCodeDialogOpen, setClaudeCodeDialogOpen] = useState(false);
   const [showDebugPanel, setShowDebugPanel] = useState(false);
   const [runtime, setRuntime] = useState<string>('0s');
 
@@ -285,6 +287,7 @@ export function ExecutionDetail() {
           status={execution.status}
           debugMode={debugMode}
           onAIAssist={() => setAiDialogOpen(true)}
+          onClaudeCode={() => setClaudeCodeDialogOpen(true)}
         />
       </Paper>
 
@@ -412,6 +415,13 @@ export function ExecutionDetail() {
             ? execution.step_results[execution.current_step_index].step_name
             : undefined
         }
+      />
+
+      {/* Claude Code Dialog */}
+      <ClaudeCodeDialog
+        open={claudeCodeDialogOpen}
+        onClose={() => setClaudeCodeDialogOpen(false)}
+        executionId={executionId}
       />
     </Box>
   );

@@ -8,7 +8,7 @@ This file provides guidance to Claude Code when working with the Ignition Automa
 
 **Ignition Automation Toolkit** is a visual acceptance testing platform for Ignition SCADA (Gateway, Perspective, Designer) with domain-separated playbook libraries, real-time visual feedback, and optional AI-assisted test creation.
 
-**Current Version:** 1.0.27 (Production Ready)
+**Current Version:** 2.3.0 (Production Ready)
 **Phase:** 8/8 Complete - All Core Features Implemented ✅
 **Target Platform:** Ignition SCADA 8.3+
 **Primary Language:** Python 3.10+
@@ -331,17 +331,23 @@ git push origin main
 
 **Production Ready (v1.0.27)** - All 8 phases complete
 
-**Recently Completed (v1.0.4 - v1.0.27):**
+**Recently Completed (v1.0.4 - v2.2.0):**
 1. ✅ Live browser streaming at 2 FPS (v1.0.4)
 2. ✅ Interactive browser view with click detection (v1.0.26)
 3. ✅ AI chat interface for debugging paused executions (v1.0.26)
 4. ✅ Skip backward capability (v1.0.26)
 5. ✅ Debug mode with step-by-step execution (v1.0.27)
+6. ✅ WebSocket stability fixes (v2.1.0)
+7. ✅ browser.verify step type (v2.1.0)
+8. ✅ Nested playbook execution (playbook.run) (v2.2.0)
+9. ✅ Delete playbook functionality (v2.2.0)
+10. ✅ Claude Code integration Phase 1 - Manual Launch (v2.2.0)
 
-**Next Priorities (v1.1.0):**
-1. One-click playbook duplication UI
-2. Dedicated YAML playbook editor with syntax highlighting
-3. Visual regression testing with screenshot comparison
+**Next Priorities (v2.3.0+):**
+1. Claude Code integration Phase 2 - Embedded Terminal (see docs/CLAUDE_CODE_PHASE2_PLAN.md)
+2. One-click playbook duplication UI
+3. Dedicated YAML playbook editor with syntax highlighting
+4. Visual regression testing with screenshot comparison
 
 ## 📊 Progress Tracking
 

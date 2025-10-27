@@ -34,13 +34,14 @@ const DRAWER_WIDTH = 240;
 const navItems = [
   { path: '/', label: 'Playbooks' },
   { path: '/executions', label: 'Executions' },
-  { path: '/credentials', label: 'Credentials' },
-  { path: '/ai', label: 'AI' },
+  { path: '/credentials', label: 'Gateway Credentials' },
+  { path: '/ai', label: 'AI Credentials' },
 ];
 
 export function Layout() {
   const location = useLocation();
   const isWSConnected = useStore((state) => state.isWSConnected);
+  const wsConnectionStatus = useStore((state) => state.wsConnectionStatus);
   const theme = useStore((state) => state.theme);
   const setTheme = useStore((state) => state.setTheme);
   const [health, setHealth] = useState<'healthy' | 'unhealthy'>('healthy');
@@ -95,14 +96,25 @@ export function Layout() {
               width: 12,
               height: 12,
               borderRadius: '50%',
-              bgcolor: isWSConnected ? 'success.main' : 'error.main',
+              bgcolor: wsConnectionStatus === 'connected'
+                ? 'success.main'
+                : wsConnectionStatus === 'connecting' || wsConnectionStatus === 'reconnecting'
+                ? 'warning.main'
+                : 'error.main',
               mr: 1,
+              animation: wsConnectionStatus === 'connecting' || wsConnectionStatus === 'reconnecting'
+                ? 'pulse 1.5s ease-in-out infinite'
+                : 'none',
+              '@keyframes pulse': {
+                '0%, 100%': { opacity: 1 },
+                '50%': { opacity: 0.4 },
+              },
             }}
             role="status"
-            aria-label={isWSConnected ? 'WebSocket connected' : 'WebSocket disconnected'}
+            aria-label={`WebSocket ${wsConnectionStatus}`}
           />
-          <Typography variant="body2" color="inherit" sx={{ mr: 2 }}>
-            {isWSConnected ? 'Connected' : 'Disconnected'}
+          <Typography variant="body2" color="inherit" sx={{ mr: 2, textTransform: 'capitalize' }}>
+            {wsConnectionStatus}
           </Typography>
 
           {/* Theme Toggle */}

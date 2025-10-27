@@ -106,7 +106,7 @@ export function Credentials() {
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
         <Box>
           <Typography variant="h4" gutterBottom>
-            Credentials
+            Gateway Credentials
           </Typography>
           <Typography variant="body1" color="text.secondary">
             Manage Gateway login credentials (stored encrypted locally)

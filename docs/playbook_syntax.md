@@ -119,7 +119,62 @@ parameters:
   parameters:
     selector: ".success-message"
     timeout: 10000
+
+# Verify element exists or doesn't exist
+- id: verify_login
+  type: browser.verify
+  parameters:
+    selector: ".user-profile"
+    exists: true  # Verifies element EXISTS (default)
+    timeout: 5000
+
+# Verify element does NOT exist (e.g., no error messages)
+- id: verify_no_errors
+  type: browser.verify
+  parameters:
+    selector: ".error-message"
+    exists: false  # Verifies element DOES NOT exist
+    timeout: 5000
 ```
+
+### Playbook Steps (Composable Playbooks)
+
+**New in v2.2.0**: Use verified playbooks as steps in other playbooks.
+
+```yaml
+# Execute a verified playbook as a single step
+- id: login
+  name: "Login to Gateway"
+  type: playbook.run
+  parameters:
+    playbook: "examples/gateway_login.yaml"  # Relative to playbooks/
+    # Map parent parameters to child playbook
+    gateway_url: "{{ parameter.gateway_url }}"
+    username: "{{ parameter.username }}"
+    password: "{{ parameter.password }}"
+  timeout: 120
+
+# Another example - module upload
+- id: upload_module
+  name: "Upload Perspective Module"
+  type: playbook.run
+  parameters:
+    playbook: "examples/module_upload.yaml"
+    module_file: "{{ parameter.module_path }}"
+  timeout: 300
+```
+
+**Requirements:**
+- Target playbook **MUST** be marked as "Verified" (via 3-dot menu on playbook card)
+- Prevents circular dependencies (playbook cannot call itself)
+- Maximum nesting depth: 3 levels
+- Parameters are mapped from parent to child
+
+**Benefits:**
+- Build complex workflows from tested building blocks
+- Reuse common sequences (login, module upload, etc.) across playbooks
+- Maintain and update logic in one place
+- Playbook shows as single step in execution view
 
 ### Utility Steps
 

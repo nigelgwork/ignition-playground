@@ -2,7 +2,7 @@
  * Main App component with routing and providers
  */
 
-import { useMemo } from 'react';
+import { useMemo, useEffect } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { CssBaseline, ThemeProvider, createTheme } from '@mui/material';
@@ -58,6 +58,7 @@ const warpColors = {
 
 function AppContent() {
   const setWSConnected = useStore((state) => state.setWSConnected);
+  const setWSConnectionStatus = useStore((state) => state.setWSConnectionStatus);
   const setExecutionUpdate = useStore((state) => state.setExecutionUpdate);
   const setScreenshotFrame = useStore((state) => state.setScreenshotFrame);
   const themeMode = useStore((state) => state.theme);
@@ -126,12 +127,24 @@ function AppContent() {
   }, [themeMode]);
 
   // Connect to WebSocket for real-time updates
-  useWebSocket({
-    onOpen: () => setWSConnected(true),
-    onClose: () => setWSConnected(false),
+  const { connectionStatus } = useWebSocket({
+    onOpen: () => {
+      setWSConnected(true);
+      setWSConnectionStatus('connected');
+    },
+    onClose: () => {
+      setWSConnected(false);
+      setWSConnectionStatus('disconnected');
+    },
     onExecutionUpdate: (update) => setExecutionUpdate(update.execution_id, update),
     onScreenshotFrame: (frame) => setScreenshotFrame(frame.executionId, frame),
   });
+
+  // Sync WebSocket connection status to store
+  // This ensures status updates even when onOpen/onClose aren't called (during reconnects)
+  useEffect(() => {
+    setWSConnectionStatus(connectionStatus);
+  }, [connectionStatus, setWSConnectionStatus]);
 
   return (
     <ThemeProvider theme={theme}>

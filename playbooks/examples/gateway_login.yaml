@@ -50,39 +50,72 @@ steps:
     timeout: 10
 
   - id: step5
-    name: "Step 5: Click Continue Button"
-    type: browser.click
+    name: "Step 5: Capture page after username entry"
+    type: browser.screenshot
     parameters:
-      selector: "button:has-text('Continue'), button[type='button']:has-text('Continue'), input[value='Continue'], button.continue-button, #continue-button, button:has-text('Next'), button.next-button"
-      timeout: 30000
-    timeout: 30
-    retry_count: 2
+      path: "after_username_entry.png"
+    timeout: 10
 
   - id: step6
-    name: "Step 6: Enter Password"
+    name: "Step 6: Click Continue Button"
+    type: browser.click
+    parameters:
+      selector: "text='CONTINUE'"
+    timeout: 10
+    retry_count: 3
+
+  - id: step7
+    name: "Step 7: Enter Password"
     type: browser.fill
     parameters:
       selector: "input[name='j_password'], input[name='password'], input[type='password']"
       value: "{{ password }}"
     timeout: 10
 
-  - id: step7
-    name: "Step 7: Submit Login"
+  - id: step8
+    name: "Step 8: Click Continue Button (After Password)"
     type: browser.click
     parameters:
-      selector: "button[type='submit'], button:has-text('Sign In'), button:has-text('Login'), input[type='submit']"
+      selector: "text='CONTINUE'"
     timeout: 10
+    retry_count: 3
 
-  - id: step8
-    name: "Step 8: Wait for Dashboard"
+  - id: step9
+    name: "Step 9: Wait for Dashboard"
     type: browser.wait
     parameters:
       selector: ".home-page, .ia_homePage, [data-page='home'], nav"
     timeout: 15
 
-  - id: step9
-    name: "Step 9: Capture Success Screenshot"
+  - id: step10
+    name: "Step 10: Check License Status (Optional)"
+    type: browser.click
+    parameters:
+      selector: "a[href*='license'], a:has-text('Licensing'), nav a:has-text('Config'), .ia-navList a[href='/web/config/system.license']"
+    timeout: 10
+    on_failure: continue
+
+  - id: step11
+    name: "Step 11: Wait for License Page (Optional)"
+    type: browser.wait
+    parameters:
+      selector: ".license-info, [data-page='license'], .ia-licenseStatus, h2:has-text('License')"
+    timeout: 10
+    on_failure: continue
+
+  - id: step12
+    name: "Step 12: Check for Trial Reset Warning (Optional)"
+    type: browser.verify
+    parameters:
+      selector: "text=/trial.*reset/i, .warning:has-text('trial'), .alert:has-text('trial'), [class*='trial']"
+      exists: false
+    timeout: 5
+    on_failure: continue
+
+  - id: step13
+    name: "Step 13: Capture License Screenshot (Optional)"
     type: browser.screenshot
     parameters:
-      path: "gateway_logged_in.png"
+      path: "gateway_license_status.png"
     timeout: 10
+    on_failure: continue

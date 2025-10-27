@@ -46,6 +46,10 @@ class StepType(str, Enum):
     BROWSER_FILL = "browser.fill"
     BROWSER_SCREENSHOT = "browser.screenshot"
     BROWSER_WAIT = "browser.wait"
+    BROWSER_VERIFY = "browser.verify"
+
+    # Playbook operations (composable playbooks)
+    PLAYBOOK_RUN = "playbook.run"
 
     # Utility operations
     SLEEP = "utility.sleep"

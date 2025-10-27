@@ -45,6 +45,7 @@ import {
   Edit as EditIcon,
   Check as SaveIcon,
   Cancel as CancelIcon,
+  Delete as DeleteIcon,
 } from '@mui/icons-material';
 import type { PlaybookInfo } from '../types/api';
 import { useStore } from '../store';
@@ -178,6 +179,21 @@ export function PlaybookCard({ playbook, onConfigure, onExecute, onExport, onVie
     },
     onError: (error) => {
       setSnackbarMessage(`Failed to update: ${(error as Error).message}`);
+      setSnackbarOpen(true);
+    },
+  });
+
+  // Mutation for deleting playbook
+  const deleteMutation = useMutation({
+    mutationFn: () => api.playbooks.delete(playbook.path),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['playbooks'] });
+      setSnackbarMessage('Playbook deleted successfully');
+      setSnackbarOpen(true);
+      setMenuAnchor(null);
+    },
+    onError: (error) => {
+      setSnackbarMessage(`Failed to delete: ${(error as Error).message}`);
       setSnackbarOpen(true);
     },
   });
@@ -502,6 +518,22 @@ export function PlaybookCard({ playbook, onConfigure, onExecute, onExport, onVie
         >
           <DownloadIcon fontSize="small" sx={{ mr: 1 }} />
           Export Playbook
+        </MenuItem>
+
+        <Divider />
+
+        {/* Delete Playbook */}
+        <MenuItem
+          onClick={() => {
+            if (window.confirm(`Are you sure you want to delete "${playbook.name}"? This cannot be undone.`)) {
+              deleteMutation.mutate();
+            }
+          }}
+          disabled={deleteMutation.isPending}
+          sx={{ color: 'error.main' }}
+        >
+          <DeleteIcon fontSize="small" sx={{ mr: 1 }} />
+          Delete Playbook
         </MenuItem>
       </Menu>
 

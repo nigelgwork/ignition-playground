@@ -6,6 +6,11 @@ Provides REST endpoints for playbook management and execution control.
 
 import asyncio
 import logging
+import os
+import pty
+import subprocess
+import select
+import signal
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 from datetime import datetime
@@ -60,6 +65,7 @@ app.add_middleware(
 active_engines: Dict[str, PlaybookEngine] = {}
 engine_completion_times: Dict[str, datetime] = {}  # Track when engines completed for TTL cleanup
 websocket_connections: List[WebSocket] = []
+claude_code_processes: Dict[str, subprocess.Popen] = {}  # Track Claude Code PTY processes by execution_id
 
 # AI Assistant (will use ANTHROPIC_API_KEY from environment)
 ai_assistant = AIAssistant()
@@ -1191,10 +1197,65 @@ async def disable_playbook(playbook_path: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.delete("/api/playbooks/{playbook_path:path}")
+async def delete_playbook(playbook_path: str):
+    """Delete a playbook file and its metadata"""
+    try:
+        import os
+        from pathlib import Path
+
+        # Get absolute path to playbook
+        full_path = Path(playbook_path)
+        if not full_path.is_absolute():
+            # Assume relative to project root
+            full_path = Path.cwd() / playbook_path
+
+        # Safety check - only allow deleting files in playbooks/ directory
+        if "playbooks/" not in str(full_path):
+            raise HTTPException(
+                status_code=400,
+                detail="Can only delete playbooks from the playbooks/ directory"
+            )
+
+        if not full_path.exists():
+            raise HTTPException(status_code=404, detail=f"Playbook not found: {playbook_path}")
+
+        if not full_path.is_file():
+            raise HTTPException(status_code=400, detail=f"Path is not a file: {playbook_path}")
+
+        # Delete the file
+        os.remove(full_path)
+        logger.info(f"Deleted playbook file: {full_path}")
+
+        # Delete metadata if exists
+        relative_path = get_relative_playbook_path(playbook_path)
+        try:
+            metadata = metadata_store.get_metadata(relative_path)
+            if metadata:
+                # Remove from metadata store
+                if relative_path in metadata_store._metadata:
+                    del metadata_store._metadata[relative_path]
+                    metadata_store._save()
+                    logger.info(f"Deleted metadata for: {relative_path}")
+        except Exception as meta_error:
+            logger.warning(f"Could not delete metadata: {meta_error}")
+
+        return {
+            "status": "success",
+            "playbook_path": playbook_path,
+            "message": f"Playbook deleted: {full_path.name}"
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting playbook: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # WebSocket endpoint for real-time updates
 @app.websocket("/ws/executions")
 async def websocket_endpoint(websocket: WebSocket):
-    """WebSocket for real-time execution updates"""
+    """WebSocket for real-time execution updates with heartbeat support"""
     # Simple authentication: check for API key in query params
     # In production, use proper token-based auth
     api_key = websocket.query_params.get("api_key")
@@ -1211,14 +1272,32 @@ async def websocket_endpoint(websocket: WebSocket):
 
     try:
         while True:
-            # Keep connection alive
+            # Keep connection alive and handle heartbeat
             data = await websocket.receive_text()
-            # Echo back for ping/pong
-            await websocket.send_json({"type": "pong", "data": data})
+
+            # Parse message to check for ping
+            try:
+                import json
+                message = json.loads(data)
+                if message.get('type') == 'ping':
+                    # Respond to heartbeat ping
+                    await websocket.send_json({"type": "pong", "timestamp": message.get('timestamp')})
+                    logger.debug("Heartbeat ping received and acknowledged")
+                else:
+                    # Echo back other messages for compatibility
+                    await websocket.send_json({"type": "pong", "data": data})
+            except json.JSONDecodeError:
+                # Not JSON, echo back as before
+                await websocket.send_json({"type": "pong", "data": data})
 
     except WebSocketDisconnect:
-        websocket_connections.remove(websocket)
+        if websocket in websocket_connections:
+            websocket_connections.remove(websocket)
         logger.info("WebSocket client disconnected")
+    except Exception as e:
+        logger.error(f"WebSocket error: {e}")
+        if websocket in websocket_connections:
+            websocket_connections.remove(websocket)
 
 
 async def broadcast_execution_state(state: ExecutionState):
@@ -1300,6 +1379,225 @@ async def broadcast_screenshot_frame(execution_id: str, screenshot_b64: str):
             websocket_connections.remove(ws)
 
 
+@app.websocket("/ws/claude-code/{execution_id}")
+async def claude_code_terminal(websocket: WebSocket, execution_id: str):
+    """
+    WebSocket endpoint for embedded Claude Code terminal.
+    Spawns a Claude Code process with PTY and proxies stdin/stdout.
+    """
+    await websocket.accept()
+    logger.info(f"Claude Code WebSocket connected for execution: {execution_id}")
+
+    master_fd = None
+    process = None
+
+    try:
+        # Get execution context
+        engine = active_engines.get(execution_id)
+        if not engine:
+            await websocket.send_json({
+                "type": "error",
+                "message": "Execution not found or not active"
+            })
+            await websocket.close(code=1008, reason="Execution not found")
+            return
+
+        execution_state = engine.get_current_execution()
+        if not execution_state:
+            await websocket.send_json({
+                "type": "error",
+                "message": "Execution state not available"
+            })
+            await websocket.close(code=1008, reason="No execution state")
+            return
+
+        # Find playbook path
+        playbook_name = execution_state.playbook_name
+        playbooks_dir = Path("./playbooks")
+        playbook_path = None
+
+        import yaml
+        for yaml_file in playbooks_dir.rglob("*.yaml"):
+            try:
+                with open(yaml_file, 'r') as f:
+                    playbook_data = yaml.safe_load(f)
+                    if playbook_data and playbook_data.get('name') == playbook_name:
+                        playbook_path = str(yaml_file.absolute())
+                        break
+            except Exception:
+                continue
+
+        if not playbook_path:
+            await websocket.send_json({
+                "type": "error",
+                "message": f"Playbook file not found for '{playbook_name}'"
+            })
+            await websocket.close(code=1008, reason="Playbook not found")
+            return
+
+        # Build context message
+        context_parts = [
+            f"# Playbook Execution Debug Session",
+            f"",
+            f"**Execution ID:** {execution_id}",
+            f"**Playbook:** {playbook_name}",
+            f"**Status:** {execution_state.status.value}",
+            f"**Current Step:** {execution_state.current_step_index + 1 if execution_state.current_step_index is not None else 'N/A'}",
+            f"",
+        ]
+
+        # Add step results
+        if execution_state.step_results:
+            context_parts.append("## Step Results:")
+            for idx, result in enumerate(execution_state.step_results, 1):
+                status_str = result.status.value if hasattr(result, 'status') else str(result.get('status', 'unknown'))
+                status_emoji = "✅" if status_str == "success" else "❌"
+                step_name = result.step_name if hasattr(result, 'step_name') else result.get('step_name', 'Unknown')
+                context_parts.append(f"{status_emoji} **Step {idx}:** {step_name}")
+                error = result.error if hasattr(result, 'error') else result.get('error')
+                if error:
+                    context_parts.append(f"   Error: {error}")
+            context_parts.append("")
+
+        context_message = "\n".join(context_parts)
+
+        # Spawn Claude Code with PTY
+        master_fd, slave_fd = pty.openpty()
+
+        # Build command
+        cmd_args = [
+            "claude-code",
+            "-p", playbook_path,
+            "-m", f"{context_message}\n\nYou are debugging a paused Ignition Automation Toolkit playbook execution. The playbook YAML file is open for editing."
+        ]
+
+        process = subprocess.Popen(
+            cmd_args,
+            stdin=slave_fd,
+            stdout=slave_fd,
+            stderr=slave_fd,
+            preexec_fn=os.setsid,  # Create new process group
+            close_fds=True
+        )
+
+        os.close(slave_fd)  # Parent doesn't need slave_fd
+        claude_code_processes[execution_id] = process
+
+        logger.info(f"Claude Code process started: PID={process.pid}, playbook={playbook_path}")
+
+        # Send initial welcome message
+        await websocket.send_json({
+            "type": "connected",
+            "message": f"Claude Code session started for {playbook_name}",
+            "pid": process.pid
+        })
+
+        # Create tasks for bidirectional I/O
+        async def read_from_pty():
+            """Read output from PTY and send to WebSocket"""
+            while True:
+                try:
+                    # Check if process is still alive
+                    if process.poll() is not None:
+                        logger.info(f"Claude Code process exited: {process.pid}")
+                        await websocket.send_json({
+                            "type": "exit",
+                            "code": process.returncode
+                        })
+                        break
+
+                    # Use select to check if data is available (non-blocking)
+                    readable, _, _ = select.select([master_fd], [], [], 0.1)
+                    if readable:
+                        data = os.read(master_fd, 1024)
+                        if not data:
+                            break
+                        # Send binary data as bytes WebSocket frame
+                        await websocket.send_bytes(data)
+                    else:
+                        # Small sleep to prevent busy loop
+                        await asyncio.sleep(0.01)
+
+                except OSError:
+                    break
+                except Exception as e:
+                    logger.error(f"Error reading from PTY: {e}")
+                    break
+
+        async def write_to_pty():
+            """Receive data from WebSocket and write to PTY"""
+            while True:
+                try:
+                    message = await websocket.receive()
+
+                    if "bytes" in message:
+                        # Binary data from terminal
+                        data = message["bytes"]
+                        os.write(master_fd, data)
+                    elif "text" in message:
+                        # Text message (e.g., resize events)
+                        import json
+                        try:
+                            msg = json.loads(message["text"])
+                            if msg.get("type") == "resize":
+                                # Handle terminal resize (optional)
+                                pass
+                        except json.JSONDecodeError:
+                            pass
+
+                except WebSocketDisconnect:
+                    break
+                except Exception as e:
+                    logger.error(f"Error writing to PTY: {e}")
+                    break
+
+        # Run both tasks concurrently
+        await asyncio.gather(
+            read_from_pty(),
+            write_to_pty(),
+            return_exceptions=True
+        )
+
+    except Exception as e:
+        logger.exception(f"Claude Code WebSocket error: {e}")
+        try:
+            await websocket.send_json({"type": "error", "message": str(e)})
+        except:
+            pass
+
+    finally:
+        # Cleanup
+        logger.info(f"Cleaning up Claude Code session: {execution_id}")
+
+        if process:
+            try:
+                # Try graceful termination first
+                if process.poll() is None:
+                    os.killpg(os.getpgid(process.pid), signal.SIGTERM)
+                    try:
+                        process.wait(timeout=5)
+                    except subprocess.TimeoutExpired:
+                        # Force kill if still running
+                        os.killpg(os.getpgid(process.pid), signal.SIGKILL)
+                        process.wait()
+            except Exception as e:
+                logger.error(f"Error terminating Claude Code process: {e}")
+
+        if master_fd is not None:
+            try:
+                os.close(master_fd)
+            except Exception:
+                pass
+
+        if execution_id in claude_code_processes:
+            del claude_code_processes[execution_id]
+
+        try:
+            await websocket.close()
+        except Exception:
+            pass
+
+
 # Note: Startup logic moved to startup/lifecycle.py lifespan manager
 # Security warning for WebSocket API key is now in environment validation
 
@@ -1358,6 +1656,17 @@ class AIAssistResponse(BaseModel):
     message: str
     suggested_fix: Optional[Dict[str, Any]] = None
     can_auto_apply: bool = False
+
+class ClaudeCodeSessionRequest(BaseModel):
+    """Request to create a Claude Code debugging session"""
+    execution_id: str
+
+class ClaudeCodeSessionResponse(BaseModel):
+    """Response with Claude Code session details"""
+    command: str
+    playbook_path: str
+    execution_id: str
+    context_message: str
 
 @app.get("/api/ai-credentials", response_model=List[AICredentialInfo])
 async def list_ai_credentials():
@@ -1725,6 +2034,104 @@ async def ai_assist(request: AIAssistRequest):
             can_auto_apply=False
         )
 
+@app.post("/api/ai/claude-code-session", response_model=ClaudeCodeSessionResponse)
+async def create_claude_code_session(request: ClaudeCodeSessionRequest):
+    """
+    Generate a Claude Code startup command with full execution context.
+    Returns a shell command that opens Claude Code with the playbook file
+    and debugging context pre-loaded.
+    """
+    execution_id = request.execution_id
+
+    # Get execution context
+    engine = active_engines.get(execution_id)
+    if not engine:
+        raise HTTPException(status_code=404, detail="Execution not found or not active")
+
+    execution_state = engine.get_current_execution()
+    if not execution_state:
+        raise HTTPException(status_code=404, detail="Execution state not available")
+
+    # Find playbook path
+    playbook_name = execution_state.playbook_name
+    playbooks_dir = Path("./playbooks")
+    playbook_path = None
+
+    for yaml_file in playbooks_dir.rglob("*.yaml"):
+        try:
+            with open(yaml_file, 'r') as f:
+                playbook_data = yaml.safe_load(f)
+                if playbook_data and playbook_data.get('name') == playbook_name:
+                    playbook_path = str(yaml_file.absolute())
+                    break
+        except Exception:
+            continue
+
+    if not playbook_path:
+        raise HTTPException(status_code=404, detail=f"Playbook file not found for '{playbook_name}'")
+
+    # Build context message with current step, error, status
+    context_parts = [
+        f"# Playbook Execution Debug Session",
+        f"",
+        f"**Execution ID:** {execution_id}",
+        f"**Playbook:** {playbook_name}",
+        f"**Status:** {execution_state.status.value}",
+        f"**Current Step:** {execution_state.current_step_index + 1 if execution_state.current_step_index is not None else 'N/A'}",
+        f"",
+    ]
+
+    # Add step results
+    if execution_state.step_results:
+        context_parts.append("## Step Results:")
+        for idx, result in enumerate(execution_state.step_results, 1):
+            status_emoji = "✅" if result.get("status") == "success" else "❌"
+            context_parts.append(f"{status_emoji} **Step {idx}:** {result.get('step_name', 'Unknown')}")
+            if result.get("error"):
+                context_parts.append(f"   Error: {result['error']}")
+            if result.get("output"):
+                context_parts.append(f"   Output: {result['output']}")
+        context_parts.append("")
+
+    # Add parameters
+    if execution_state.parameters:
+        context_parts.append("## Parameters:")
+        for key, value in execution_state.parameters.items():
+            # Mask sensitive values
+            display_value = "***" if any(sensitive in key.lower() for sensitive in ["password", "token", "key", "secret"]) else value
+            context_parts.append(f"- {key}: {display_value}")
+        context_parts.append("")
+
+    context_message = "\n".join(context_parts)
+
+    # Generate Claude Code command
+    # Escape quotes in context message for shell
+    escaped_context = context_message.replace('"', '\\"').replace('$', '\\$')
+
+    command = f'''claude-code -p "{playbook_path}" -m "{escaped_context}
+
+You are debugging a paused Ignition Automation Toolkit playbook execution. The playbook YAML file is open for editing.
+
+**Your Task:**
+1. Review the execution context above
+2. Identify why the playbook failed or is paused
+3. Suggest fixes to the playbook YAML
+4. With user approval, edit the playbook to resolve issues
+
+**Guidelines:**
+- The playbook uses YAML syntax (see docs/playbook_syntax.md)
+- Credentials use {{ credential.name }} references
+- Parameters use {{ parameter.name }} references
+- Browser steps use CSS selectors
+- All changes require user approval before applying"'''
+
+    return ClaudeCodeSessionResponse(
+        command=command,
+        playbook_path=playbook_path,
+        execution_id=execution_id,
+        context_message=context_message
+    )
+
 
 class StepEditRequest(BaseModel):
     """Request to edit a step in a playbook"""
@@ -1767,18 +2174,9 @@ async def edit_step(request: StepEditRequest):
 
 
 # ============================================================================
-# AI Credentials Management (Stub - returns empty list for now)
+# NOTE: AI Credentials endpoints are defined earlier in this file (line ~1362-1440)
+# This section intentionally left empty to avoid duplicate endpoint definitions
 # ============================================================================
-
-@app.get("/api/ai-credentials")
-async def list_ai_credentials():
-    """List all AI credentials (stub - returns empty for now)"""
-    return []
-
-@app.delete("/api/ai-credentials/{credential_id}")
-async def delete_ai_credential(credential_id: int):
-    """Delete AI credential (stub)"""
-    return {"message": "Deleted (stub)"}
 
 
 # ============================================================================

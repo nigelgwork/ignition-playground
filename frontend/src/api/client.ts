@@ -101,6 +101,11 @@ export const api = {
           body: JSON.stringify({ playbook_path: path, name, description }),
         }
       ),
+    delete: (path: string) =>
+      fetchJSON<{ status: string; playbook_path: string; message: string }>(
+        `/api/playbooks/${encodeURIComponent(path)}`,
+        { method: 'DELETE' }
+      ),
   },
 
   /**
@@ -186,6 +191,18 @@ export const api = {
           body: JSON.stringify({ x, y }),
         }
       ),
+
+    // Claude Code integration
+    getClaudeCodeSession: (executionId: string) =>
+      fetchJSON<{
+        command: string;
+        playbook_path: string;
+        execution_id: string;
+        context_message: string;
+      }>('/api/ai/claude-code-session', {
+        method: 'POST',
+        body: JSON.stringify({ execution_id: executionId }),
+      }),
   },
 
   /**
