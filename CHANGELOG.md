@@ -5,6 +5,37 @@ All notable changes to the Ignition Automation Toolkit will be documented in thi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.0.0] - 2025-10-27
+
+### Major Release - Claude Code Phase 2 Complete
+
+**Breaking Change:** Version numbering reset to v3.0.0+ for major architecture improvements.
+
+### Added
+- **Claude Code Phase 2 - npm-based Embedded Terminal**: Production-ready terminal integration
+  - Migrated from CDN to npm package imports (xterm@5.3.0, xterm-addon-fit@0.8.0, xterm-addon-web-links@0.9.0)
+  - Fixed TypeScript compatibility issues with xterm 5.3.0 API
+  - Updated EmbeddedTerminal component with proper npm imports
+  - Null-safety fixes throughout terminal component
+  - Backend WebSocket endpoint `/ws/claude-code/{execution_id}` fully functional
+  - ClaudeCodeDialog with embedded/manual mode toggle already integrated
+
+### Fixed
+- **npm Dependency Version Issues**: Resolved future/non-existent version conflicts
+  - Fixed package.json versions (eslint, react-router-dom, xterm, react, vite)
+  - Documented fix procedure in `.claude/NPM_DEPENDENCY_FIX.md`
+  - Restored working versions from commit d676a2a (v1.0.34 baseline)
+  - Successfully installed 262 packages with 0 vulnerabilities
+
+### Technical Details
+- TypeScript API updates: `selection` → `selectionBackground` for xterm 5.3.0
+- Removed CDN globals (`window.Terminal`, `window.FitAddon`, `window.WebLinksAddon`)
+- Added proper TypeScript typing for Terminal and addons
+- Frontend version: 3.0.0
+- Backend version: 3.0.0
+- Files modified: `frontend/src/components/EmbeddedTerminal.tsx`, `frontend/package.json`
+- Documentation: `.claude/NPM_DEPENDENCY_FIX.md`
+
 ## [2.4.0] - 2025-10-27
 
 ### Added

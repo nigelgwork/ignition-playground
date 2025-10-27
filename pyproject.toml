@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ignition-toolkit"
-version = "2.4.0"  # Updated: 2025-10-27 - Playbook Code Viewer/Editor in Debug Mode
+version = "3.0.0"  # Updated: 2025-10-27 - Major Release: Claude Code Phase 2 + npm xterm integration
 description = "Lightweight automation toolkit for Ignition SCADA Gateway operations"
 readme = "README.md"
 requires-python = ">=3.10"

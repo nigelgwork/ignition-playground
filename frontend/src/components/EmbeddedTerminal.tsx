@@ -1,5 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { Box, Alert } from '@mui/material';
+import { Terminal } from 'xterm';
+import { FitAddon } from 'xterm-addon-fit';
+import { WebLinksAddon } from 'xterm-addon-web-links';
+import 'xterm/css/xterm.css';
 
 interface EmbeddedTerminalProps {
   executionId: string;
@@ -7,39 +11,23 @@ interface EmbeddedTerminalProps {
   onError: (error: string) => void;
 }
 
-// Declare xterm types for CDN usage
-declare global {
-  interface Window {
-    Terminal: any;
-    FitAddon: any;
-    WebLinksAddon: any;
-  }
-}
-
 export function EmbeddedTerminal({
   executionId,
   onError,
 }: EmbeddedTerminalProps) {
   const terminalRef = useRef<HTMLDivElement>(null);
-  const terminal = useRef<any>(null);
-  const fitAddon = useRef<any>(null);
+  const terminal = useRef<Terminal | null>(null);
+  const fitAddon = useRef<FitAddon | null>(null);
   const ws = useRef<WebSocket | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const initializeTerminal = () => {
-      // Check if xterm.js is loaded from CDN
-      if (!window.Terminal || !window.FitAddon) {
-        setError('Terminal library not loaded. Please refresh the page.');
-        onError('xterm.js not loaded');
-        return;
-      }
-
       if (!terminalRef.current) return;
 
       try {
         // Initialize terminal with custom theme (Warp Terminal inspired)
-        terminal.current = new window.Terminal({
+        terminal.current = new Terminal({
           cursorBlink: true,
           cursorStyle: 'block',
           fontFamily: '"Fira Code", "Cascadia Code", "Monaco", "Courier New", monospace',
@@ -50,7 +38,9 @@ export function EmbeddedTerminal({
             foreground: '#FFFFFF',
             cursor: '#7AA2F7',
             cursorAccent: '#0D0D0D',
-            selection: 'rgba(122, 162, 247, 0.3)',
+            // Note: 'selection' is not in ITheme for xterm 5.3.0
+            // selectionBackground is used instead
+            selectionBackground: 'rgba(122, 162, 247, 0.3)',
             black: '#1A1B26',
             red: '#F7768E',
             green: '#9ECE6A',
@@ -68,18 +58,15 @@ export function EmbeddedTerminal({
             brightCyan: '#7DCFFF',
             brightWhite: '#C0CAF5',
           },
-          allowProposedApi: true,
         });
 
         // Add fit addon
-        fitAddon.current = new window.FitAddon.FitAddon();
+        fitAddon.current = new FitAddon();
         terminal.current.loadAddon(fitAddon.current);
 
-        // Add web links addon if available
-        if (window.WebLinksAddon) {
-          const webLinksAddon = new window.WebLinksAddon.WebLinksAddon();
-          terminal.current.loadAddon(webLinksAddon);
-        }
+        // Add web links addon
+        const webLinksAddon = new WebLinksAddon();
+        terminal.current.loadAddon(webLinksAddon);
 
         // Open terminal in DOM
         terminal.current.open(terminalRef.current);
@@ -105,31 +92,31 @@ export function EmbeddedTerminal({
         ws.current.binaryType = 'arraybuffer';
 
         ws.current.onopen = () => {
-          terminal.current.writeln('\x1b[1;32m✓ Connected to Claude Code session\x1b[0m');
-          terminal.current.writeln('');
+          terminal.current?.writeln('\x1b[1;32m✓ Connected to Claude Code session\x1b[0m');
+          terminal.current?.writeln('');
         };
 
         ws.current.onmessage = (event) => {
           if (event.data instanceof ArrayBuffer) {
             // Binary data from PTY - write directly to terminal
             const uint8Array = new Uint8Array(event.data);
-            terminal.current.write(uint8Array);
+            terminal.current?.write(uint8Array);
           } else if (typeof event.data === 'string') {
             // JSON message from server
             try {
               const message = JSON.parse(event.data);
 
               if (message.type === 'connected') {
-                terminal.current.writeln(`\x1b[1;32m${message.message}\x1b[0m`);
-                terminal.current.writeln(`\x1b[90mPID: ${message.pid}\x1b[0m`);
-                terminal.current.writeln('');
+                terminal.current?.writeln(`\x1b[1;32m${message.message}\x1b[0m`);
+                terminal.current?.writeln(`\x1b[90mPID: ${message.pid}\x1b[0m`);
+                terminal.current?.writeln('');
               } else if (message.type === 'error') {
-                terminal.current.writeln(`\x1b[1;31m✗ Error: ${message.message}\x1b[0m`);
+                terminal.current?.writeln(`\x1b[1;31m✗ Error: ${message.message}\x1b[0m`);
                 setError(message.message);
                 onError(message.message);
               } else if (message.type === 'exit') {
-                terminal.current.writeln('');
-                terminal.current.writeln(`\x1b[1;33m⚠ Claude Code process exited (code: ${message.code})\x1b[0m`);
+                terminal.current?.writeln('');
+                terminal.current?.writeln(`\x1b[1;33m⚠ Claude Code process exited (code: ${message.code})\x1b[0m`);
                 setTimeout(() => {
                   if (ws.current) {
                     ws.current.close();
@@ -144,14 +131,14 @@ export function EmbeddedTerminal({
 
         ws.current.onerror = (error) => {
           console.error('WebSocket error:', error);
-          terminal.current.writeln('\x1b[1;31m✗ WebSocket connection error\x1b[0m');
+          terminal.current?.writeln('\x1b[1;31m✗ WebSocket connection error\x1b[0m');
           setError('WebSocket connection failed');
           onError('WebSocket error');
         };
 
         ws.current.onclose = () => {
-          terminal.current.writeln('');
-          terminal.current.writeln('\x1b[1;33m⚠ Connection closed\x1b[0m');
+          terminal.current?.writeln('');
+          terminal.current?.writeln('\x1b[1;33m⚠ Connection closed\x1b[0m');
         };
 
         // Forward keyboard input to WebSocket
