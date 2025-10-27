@@ -1510,11 +1510,37 @@ async def claude_code_terminal(websocket: WebSocket, execution_id: str):
 
         logger.info(f"Using Claude CLI: {claude_cmd}")
 
-        cmd_args = [
-            claude_cmd,
-            "-p", playbook_path,
-            "-m", f"{context_message}\n\nYou are debugging a paused Ignition Automation Toolkit playbook execution. The playbook YAML file is open for editing."
-        ]
+        # Build arguments - check if it's a script that needs bash
+        cmd_file_info = os.path.isfile(claude_cmd)
+        context_msg = f"{context_message}\n\nYou are debugging a paused Ignition Automation Toolkit playbook execution. The playbook YAML file is open for editing."
+
+        # Check if the command is a shell script (not a binary)
+        is_shell_script = False
+        if cmd_file_info:
+            try:
+                with open(claude_cmd, 'rb') as f:
+                    first_bytes = f.read(20)
+                    if first_bytes.startswith(b'#!/'):
+                        is_shell_script = True
+            except Exception:
+                pass
+
+        if is_shell_script:
+            # It's a shell script - need to invoke through bash
+            cmd_args = [
+                "/bin/bash",
+                claude_cmd,
+                "-p", playbook_path,
+                "-m", context_msg
+            ]
+            logger.info(f"Detected shell script, using: /bin/bash {claude_cmd}")
+        else:
+            # It's a binary - call directly
+            cmd_args = [
+                claude_cmd,
+                "-p", playbook_path,
+                "-m", context_msg
+            ]
 
         process = subprocess.Popen(
             cmd_args,
