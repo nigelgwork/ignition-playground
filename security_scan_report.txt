@@ -1,0 +1,174 @@
+Run started:2025-10-27 11:59:55.120736
+
+Test results:
+>> Issue: [B404:blacklist] Consider possible security implications associated with the subprocess module.
+   Severity: Low   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.7.6/blacklists/blacklist_imports.html#b404-import-subprocess
+   Location: ignition_toolkit/api/app.py:11:0
+10	import pty
+11	import subprocess
+12	import select
+
+--------------------------------------------------
+>> Issue: [B112:try_except_continue] Try, Except, Continue detected.
+   Severity: Low   Confidence: High
+   CWE: CWE-703 (https://cwe.mitre.org/data/definitions/703.html)
+   More Info: https://bandit.readthedocs.io/en/1.7.6/plugins/b112_try_except_continue.html
+   Location: ignition_toolkit/api/routers/ai.py:317:16
+316	                        break
+317	                except:
+318	                    continue
+319	
+
+--------------------------------------------------
+>> Issue: [B112:try_except_continue] Try, Except, Continue detected.
+   Severity: Low   Confidence: High
+   CWE: CWE-703 (https://cwe.mitre.org/data/definitions/703.html)
+   More Info: https://bandit.readthedocs.io/en/1.7.6/plugins/b112_try_except_continue.html
+   Location: ignition_toolkit/api/routers/ai.py:493:8
+492	                    break
+493	        except Exception:
+494	            continue
+495	
+
+--------------------------------------------------
+>> Issue: [B404:blacklist] Consider possible security implications associated with the subprocess module.
+   Severity: Low   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.7.6/blacklists/blacklist_imports.html#b404-import-subprocess
+   Location: ignition_toolkit/api/routers/websockets.py:11:0
+10	import pty
+11	import subprocess
+12	import select
+
+--------------------------------------------------
+>> Issue: [B110:try_except_pass] Try, Except, Pass detected.
+   Severity: Low   Confidence: High
+   CWE: CWE-703 (https://cwe.mitre.org/data/definitions/703.html)
+   More Info: https://bandit.readthedocs.io/en/1.7.6/plugins/b110_try_except_pass.html
+   Location: ignition_toolkit/api/routers/websockets.py:245:12
+244	                        is_shell_script = True
+245	            except Exception:
+246	                pass
+247	
+
+--------------------------------------------------
+>> Issue: [B603:subprocess_without_shell_equals_true] subprocess call - check for execution of untrusted input.
+   Severity: Low   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.7.6/plugins/b603_subprocess_without_shell_equals_true.html
+   Location: ignition_toolkit/api/routers/websockets.py:265:18
+264	
+265	        process = subprocess.Popen(
+266	            cmd_args,
+267	            stdin=slave_fd,
+268	            stdout=slave_fd,
+269	            stderr=slave_fd,
+270	            preexec_fn=os.setsid,  # Create new process group
+271	            close_fds=True
+272	        )
+273	
+
+--------------------------------------------------
+>> Issue: [B110:try_except_pass] Try, Except, Pass detected.
+   Severity: Low   Confidence: High
+   CWE: CWE-703 (https://cwe.mitre.org/data/definitions/703.html)
+   More Info: https://bandit.readthedocs.io/en/1.7.6/plugins/b110_try_except_pass.html
+   Location: ignition_toolkit/api/routers/websockets.py:358:8
+357	            await websocket.send_json({"type": "error", "message": str(e)})
+358	        except:
+359	            pass
+360	
+
+--------------------------------------------------
+>> Issue: [B110:try_except_pass] Try, Except, Pass detected.
+   Severity: Low   Confidence: High
+   CWE: CWE-703 (https://cwe.mitre.org/data/definitions/703.html)
+   More Info: https://bandit.readthedocs.io/en/1.7.6/plugins/b110_try_except_pass.html
+   Location: ignition_toolkit/api/routers/websockets.py:382:12
+381	                os.close(master_fd)
+382	            except Exception:
+383	                pass
+384	
+
+--------------------------------------------------
+>> Issue: [B110:try_except_pass] Try, Except, Pass detected.
+   Severity: Low   Confidence: High
+   CWE: CWE-703 (https://cwe.mitre.org/data/definitions/703.html)
+   More Info: https://bandit.readthedocs.io/en/1.7.6/plugins/b110_try_except_pass.html
+   Location: ignition_toolkit/api/routers/websockets.py:391:8
+390	            await websocket.close()
+391	        except Exception:
+392	            pass
+393	
+
+--------------------------------------------------
+>> Issue: [B104:hardcoded_bind_all_interfaces] Possible binding to all interfaces.
+   Severity: Medium   Confidence: Medium
+   CWE: CWE-605 (https://cwe.mitre.org/data/definitions/605.html)
+   More Info: https://bandit.readthedocs.io/en/1.7.6/plugins/b104_hardcoded_bind_all_interfaces.html
+   Location: ignition_toolkit/cli.py:22:32
+21	@main.command()
+22	@click.option("--host", default="0.0.0.0", help="API server host")
+23	@click.option("--port", default=5000, help="API server port")
+
+--------------------------------------------------
+>> Issue: [B104:hardcoded_bind_all_interfaces] Possible binding to all interfaces.
+   Severity: Medium   Confidence: Medium
+   CWE: CWE-605 (https://cwe.mitre.org/data/definitions/605.html)
+   More Info: https://bandit.readthedocs.io/en/1.7.6/plugins/b104_hardcoded_bind_all_interfaces.html
+   Location: ignition_toolkit/core/config.py:41:20
+40	    # API
+41	    api_host: str = "0.0.0.0"
+42	    api_port: int = 5000
+
+--------------------------------------------------
+>> Issue: [B106:hardcoded_password_funcarg] Possible hardcoded password: '<encrypted>'
+   Severity: Low   Confidence: Medium
+   CWE: CWE-259 (https://cwe.mitre.org/data/definitions/259.html)
+   More Info: https://bandit.readthedocs.io/en/1.7.6/plugins/b106_hardcoded_password_funcarg.html
+   Location: ignition_toolkit/credentials/vault.py:150:31
+149	        for name, cred_data in credentials_data.items():
+150	            credentials.append(Credential(
+151	                name=cred_data["name"],
+152	                username=cred_data["username"],
+153	                password="<encrypted>",  # Don't return actual password
+154	                gateway_url=cred_data.get("gateway_url"),
+155	                description=cred_data.get("description"),
+156	                created_at=datetime.fromisoformat(cred_data["created_at"]) if cred_data.get("created_at") else None,
+157	                updated_at=datetime.fromisoformat(cred_data["updated_at"]) if cred_data.get("updated_at") else None,
+158	            ))
+159	
+
+--------------------------------------------------
+>> Issue: [B110:try_except_pass] Try, Except, Pass detected.
+   Severity: Low   Confidence: High
+   CWE: CWE-703 (https://cwe.mitre.org/data/definitions/703.html)
+   More Info: https://bandit.readthedocs.io/en/1.7.6/plugins/b110_try_except_pass.html
+   Location: ignition_toolkit/gateway/client.py:437:20
+436	                        return True
+437	                    except Exception:
+438	                        # May still be initializing
+439	                        pass
+440	
+
+--------------------------------------------------
+
+Code scanned:
+	Total lines of code: 7084
+	Total lines skipped (#nosec): 0
+	Total potential issues skipped due to specifically being disabled (e.g., #nosec BXXX): 0
+
+Run metrics:
+	Total issues (by severity):
+		Undefined: 0
+		Low: 11
+		Medium: 2
+		High: 0
+	Total issues (by confidence):
+		Undefined: 0
+		Low: 0
+		Medium: 3
+		High: 10
+Files skipped (0):
