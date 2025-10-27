@@ -16,6 +16,7 @@ import logging
 from sqlalchemy import text
 
 from ignition_toolkit.core.config import get_settings
+from ignition_toolkit.core.paths import get_playbooks_dir, get_frontend_dist_dir
 from ignition_toolkit.storage.database import get_database
 from ignition_toolkit.credentials.vault import get_credential_vault
 from ignition_toolkit.startup.exceptions import (
@@ -164,9 +165,9 @@ async def validate_playbooks() -> dict:
     Raises:
         Exception: If validation fails (caught by lifecycle manager as warning)
     """
-    playbooks_dir = Path("playbooks")
+    playbooks_dir = get_playbooks_dir()
     if not playbooks_dir.exists():
-        raise Exception(f"Playbooks directory not found: {playbooks_dir.absolute()}")
+        raise Exception(f"Playbooks directory not found: {playbooks_dir}")
 
     # Count playbooks by domain
     gateway_playbooks = list((playbooks_dir / "gateway").glob("*.yaml")) if (playbooks_dir / "gateway").exists() else []

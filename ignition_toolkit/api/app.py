@@ -33,6 +33,7 @@ from ignition_toolkit.ai import AIAssistant
 from ignition_toolkit import __version__
 from ignition_toolkit.startup.lifecycle import lifespan
 from ignition_toolkit.api.routers import health_router
+from ignition_toolkit.core.paths import get_playbooks_dir, get_playbook_path
 
 logger = logging.getLogger(__name__)
 
@@ -237,7 +238,7 @@ async def cleanup_old_executions():
 @app.get("/api/playbooks", response_model=List[PlaybookInfo])
 async def list_playbooks():
     """List all available playbooks"""
-    playbooks_dir = Path("./playbooks")
+    playbooks_dir = get_playbooks_dir()
     if not playbooks_dir.exists():
         return []
 
@@ -366,7 +367,7 @@ def validate_playbook_path(path_str: str) -> Path:
     Raises:
         HTTPException: If path is invalid or outside playbooks directory
     """
-    playbooks_dir = Path("./playbooks").resolve()
+    playbooks_dir = get_playbooks_dir().resolve()
 
     # Resolve the provided path
     try:
@@ -402,7 +403,7 @@ def get_relative_playbook_path(path_str: str) -> str:
     Returns:
         Relative path string from playbooks directory (e.g., "gateway/reset_gateway_trial.yaml")
     """
-    playbooks_dir = Path("./playbooks").resolve()
+    playbooks_dir = get_playbooks_dir().resolve()
     playbook_path = Path(path_str).resolve()
 
     # Convert to relative path from playbooks directory
@@ -878,7 +879,7 @@ async def get_playbook_code(execution_id: str):
         raise HTTPException(status_code=404, detail="Execution state not available")
 
     playbook_name = execution_state.playbook_name
-    playbooks_dir = Path("./playbooks").resolve()
+    playbooks_dir = get_playbooks_dir().resolve()
 
     import yaml
     # Find the playbook file
@@ -921,7 +922,7 @@ async def update_playbook_code(execution_id: str, request: PlaybookCodeUpdateReq
         raise HTTPException(status_code=404, detail="Execution state not available")
 
     playbook_name = execution_state.playbook_name
-    playbooks_dir = Path("./playbooks").resolve()
+    playbooks_dir = get_playbooks_dir().resolve()
 
     import yaml
     from datetime import datetime
@@ -1510,7 +1511,7 @@ async def claude_code_terminal(websocket: WebSocket, execution_id: str):
 
         # Find playbook path
         playbook_name = execution_state.playbook_name
-        playbooks_dir = Path("./playbooks").resolve()
+        playbooks_dir = get_playbooks_dir().resolve()
         playbook_path = None
 
         import yaml
@@ -2047,7 +2048,7 @@ async def ai_assist(request: AIAssistRequest):
                     context_parts.append(f"Error: {last_result.error}")
 
             # Try to load the playbook to get additional step details
-            playbooks_dir = Path("./playbooks")
+            playbooks_dir = get_playbooks_dir()
             playbook = None
             for yaml_file in playbooks_dir.rglob("*.yaml"):
                 try:
@@ -2221,7 +2222,7 @@ async def create_claude_code_session(request: ClaudeCodeSessionRequest):
 
     # Find playbook path
     playbook_name = execution_state.playbook_name
-    playbooks_dir = Path("./playbooks")
+    playbooks_dir = get_playbooks_dir()
     playbook_path = None
 
     for yaml_file in playbooks_dir.rglob("*.yaml"):

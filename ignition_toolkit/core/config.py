@@ -3,6 +3,8 @@ Configuration management
 
 Centralized settings using Pydantic BaseSettings for type-safe configuration
 with environment variable support.
+
+IMPORTANT: Uses dynamic path resolution from paths.py to work from any directory.
 """
 
 import os
@@ -10,6 +12,13 @@ from pathlib import Path
 from typing import List
 
 from pydantic_settings import BaseSettings
+
+from .paths import (
+    get_database_file,
+    get_credentials_file,
+    get_frontend_dist_dir,
+    get_playwright_browsers_dir,
+)
 
 
 class Settings(BaseSettings):
@@ -22,11 +31,11 @@ class Settings(BaseSettings):
     - ENVIRONMENT=development
     """
 
-    # Database
-    database_path: Path = Path("./data/toolkit.db")
+    # Database (defaults to dynamic path from paths.py)
+    database_path: Path = get_database_file()
 
-    # Credentials
-    vault_path: Path = Path.home() / ".ignition-toolkit" / "credentials.vault"
+    # Credentials (defaults to dynamic path from paths.py)
+    vault_path: Path = get_credentials_file()
 
     # API
     api_host: str = "0.0.0.0"
@@ -40,10 +49,11 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     log_format: str = "json"
 
-    # Playwright browser automation
+    # Playwright browser automation (defaults to dynamic path from paths.py)
     playwright_headless: bool = True
     playwright_browser: str = "chromium"
     playwright_timeout: int = 30000
+    playwright_browsers_path: Path = get_playwright_browsers_dir()
 
     # Feature flags
     enable_ai: bool = False
@@ -54,8 +64,8 @@ class Settings(BaseSettings):
     max_concurrent_executions: int = 10
     execution_timeout_seconds: int = 3600  # 1 hour
 
-    # Frontend
-    frontend_dir: Path = Path("frontend/dist")
+    # Frontend (defaults to dynamic path from paths.py)
+    frontend_dir: Path = get_frontend_dist_dir()
 
     class Config:
         env_file = ".env"
