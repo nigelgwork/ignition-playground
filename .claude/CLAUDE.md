@@ -8,7 +8,7 @@ This file provides guidance to Claude Code when working with the Ignition Automa
 
 **Ignition Automation Toolkit** is a visual acceptance testing platform for Ignition SCADA (Gateway, Perspective, Designer) with domain-separated playbook libraries, real-time visual feedback, and optional AI-assisted test creation.
 
-**Current Version:** 2.3.0 (Production Ready)
+**Current Version:** 2.4.0 (Production Ready)
 **Phase:** 8/8 Complete - All Core Features Implemented ✅
 **Target Platform:** Ignition SCADA 8.3+
 **Primary Language:** Python 3.10+

@@ -5,6 +5,29 @@ All notable changes to the Ignition Automation Toolkit will be documented in thi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.4.0] - 2025-10-27
+
+### Added
+- **Playbook Code Viewer/Editor in Debug Mode**: View and edit playbook YAML source during execution
+  - "View Code" button appears when execution is paused or debug mode is enabled
+  - Live code editor with syntax validation
+  - Automatic backup creation before any changes (timestamped `.backup.YYYYMMDD_HHMMSS.yaml`)
+  - Read-only mode when not in debug/paused state
+  - Three-column layout: Step progress | Live browser view | Code editor
+  - Unsaved changes warning before closing
+  - Backend endpoints: `GET /api/executions/{execution_id}/playbook/code`, `PUT /api/executions/{execution_id}/playbook/code`
+  - Frontend component: `PlaybookCodeViewer.tsx`
+  - Integration in `ExecutionDetail.tsx` with dynamic grid layout
+  - Files: `ignition_toolkit/api/app.py`, `frontend/src/components/PlaybookCodeViewer.tsx`, `frontend/src/pages/ExecutionDetail.tsx`, `frontend/src/api/client.ts`
+
+### Technical Details
+- Backup format: `{playbook_name}.backup.{timestamp}.yaml`
+- Grid layout adjusts: 2 columns (default) → 3 columns (when code viewer open)
+- Visibility logic: Only shows button when `debugMode || status === 'paused'`
+- Edit protection: Textarea disabled unless `isDebugMode || isPaused`
+- Frontend version: 2.4.0
+- Backend version: 2.4.0
+
 ## [2.3.0] - 2025-10-27
 
 ### Added

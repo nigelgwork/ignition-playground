@@ -865,6 +865,102 @@ async def browser_click_at_coordinates(execution_id: str, request: BrowserClickR
         raise HTTPException(status_code=400, detail="No browser available for this execution")
 
 
+@app.get("/api/executions/{execution_id}/playbook/code")
+async def get_playbook_code(execution_id: str):
+    """Get the YAML source code for the playbook being executed"""
+    if execution_id not in active_engines:
+        raise HTTPException(status_code=404, detail="Execution not found")
+
+    engine = active_engines[execution_id]
+    execution_state = engine.get_current_execution()
+
+    if not execution_state:
+        raise HTTPException(status_code=404, detail="Execution state not available")
+
+    playbook_name = execution_state.playbook_name
+    playbooks_dir = Path("./playbooks").resolve()
+
+    import yaml
+    # Find the playbook file
+    for yaml_file in playbooks_dir.rglob("*.yaml"):
+        if '.backup.' in yaml_file.name:
+            continue
+        try:
+            with open(yaml_file, 'r') as f:
+                playbook_data = yaml.safe_load(f)
+                if playbook_data and playbook_data.get('name') == playbook_name:
+                    # Found it - return the code
+                    with open(yaml_file, 'r') as f:
+                        code = f.read()
+                    return {
+                        "code": code,
+                        "playbook_path": str(yaml_file.relative_to(playbooks_dir)),
+                        "playbook_name": playbook_name,
+                    }
+        except Exception:
+            continue
+
+    raise HTTPException(status_code=404, detail=f"Playbook file not found for '{playbook_name}'")
+
+
+class PlaybookCodeUpdateRequest(BaseModel):
+    """Request to update playbook code during execution"""
+    code: str
+
+
+@app.put("/api/executions/{execution_id}/playbook/code")
+async def update_playbook_code(execution_id: str, request: PlaybookCodeUpdateRequest):
+    """Update the playbook code for an execution (creates backup first)"""
+    if execution_id not in active_engines:
+        raise HTTPException(status_code=404, detail="Execution not found")
+
+    engine = active_engines[execution_id]
+    execution_state = engine.get_current_execution()
+
+    if not execution_state:
+        raise HTTPException(status_code=404, detail="Execution state not available")
+
+    playbook_name = execution_state.playbook_name
+    playbooks_dir = Path("./playbooks").resolve()
+
+    import yaml
+    from datetime import datetime
+
+    # Find the playbook file
+    for yaml_file in playbooks_dir.rglob("*.yaml"):
+        if '.backup.' in yaml_file.name:
+            continue
+        try:
+            with open(yaml_file, 'r') as f:
+                playbook_data = yaml.safe_load(f)
+                if playbook_data and playbook_data.get('name') == playbook_name:
+                    # Found it - create backup and update
+                    backup_path = yaml_file.with_suffix(f'.backup.{datetime.now().strftime("%Y%m%d_%H%M%S")}.yaml')
+
+                    # Create backup
+                    with open(yaml_file, 'r') as f:
+                        backup_content = f.read()
+                    with open(backup_path, 'w') as f:
+                        f.write(backup_content)
+
+                    # Write new content
+                    with open(yaml_file, 'w') as f:
+                        f.write(request.code)
+
+                    logger.info(f"Updated playbook {yaml_file}, backup at {backup_path}")
+
+                    return {
+                        "status": "success",
+                        "message": f"Playbook updated successfully",
+                        "backup_path": str(backup_path.relative_to(playbooks_dir)),
+                    }
+        except Exception as e:
+            logger.error(f"Error updating playbook: {e}")
+            raise HTTPException(status_code=500, detail=f"Failed to update playbook: {str(e)}")
+
+    raise HTTPException(status_code=404, detail=f"Playbook file not found for '{playbook_name}'")
+
+
 # Playbook Update Endpoint
 
 class PlaybookUpdateRequest(BaseModel):

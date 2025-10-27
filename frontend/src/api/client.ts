@@ -203,6 +203,24 @@ export const api = {
         method: 'POST',
         body: JSON.stringify({ execution_id: executionId }),
       }),
+
+    // Playbook code viewer/editor
+    getPlaybookCode: (executionId: string) =>
+      fetchJSON<{
+        code: string;
+        playbook_path: string;
+        playbook_name: string;
+      }>(`/api/executions/${executionId}/playbook/code`),
+
+    updatePlaybookCode: (executionId: string, code: string) =>
+      fetchJSON<{
+        status: string;
+        message: string;
+        backup_path: string;
+      }>(`/api/executions/${executionId}/playbook/code`, {
+        method: 'PUT',
+        body: JSON.stringify({ code }),
+      }),
   },
 
   /**

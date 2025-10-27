@@ -34,6 +34,7 @@ import {
   Pending as PendingIcon,
   Cancel as SkippedIcon,
   BugReport as DebugIcon,
+  Code as CodeIcon,
 } from '@mui/icons-material';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../api/client';
@@ -42,6 +43,7 @@ import { ExecutionControls } from '../components/ExecutionControls';
 import { DebugPanel } from '../components/DebugPanel';
 import { AIAssistDialog } from '../components/AIAssistDialog';
 import { ClaudeCodeDialog } from '../components/ClaudeCodeDialog';
+import { PlaybookCodeViewer } from '../components/PlaybookCodeViewer';
 import { useStore } from '../store';
 import type { ExecutionStatusResponse } from '../types/api';
 
@@ -53,6 +55,7 @@ export function ExecutionDetail() {
   const [aiDialogOpen, setAiDialogOpen] = useState(false);
   const [claudeCodeDialogOpen, setClaudeCodeDialogOpen] = useState(false);
   const [showDebugPanel, setShowDebugPanel] = useState(false);
+  const [showCodeViewer, setShowCodeViewer] = useState(false);
   const [runtime, setRuntime] = useState<string>('0s');
 
   // Fetch execution from API
@@ -282,6 +285,21 @@ export function ExecutionDetail() {
           />
         </Tooltip>
 
+        {/* View Code Button - Only show when debug mode or paused */}
+        {(debugMode || execution.status === 'paused') && (
+          <Tooltip title="View and edit playbook code">
+            <Button
+              variant="outlined"
+              size="small"
+              startIcon={<CodeIcon />}
+              onClick={() => setShowCodeViewer(!showCodeViewer)}
+              sx={{ ml: 1 }}
+            >
+              {showCodeViewer ? 'Hide Code' : 'View Code'}
+            </Button>
+          </Tooltip>
+        )}
+
         <ExecutionControls
           executionId={executionId}
           status={execution.status}
@@ -306,7 +324,7 @@ export function ExecutionDetail() {
         sx={{
           flexGrow: 1,
           display: 'grid',
-          gridTemplateColumns: '1fr 2fr',
+          gridTemplateColumns: showCodeViewer ? '1fr 2fr 1.5fr' : '1fr 2fr',
           gap: 2,
           p: 2,
           overflow: 'hidden',
@@ -394,11 +412,24 @@ export function ExecutionDetail() {
           </List>
         </Paper>
 
-        {/* Right: Live Browser View OR Debug Panel */}
+        {/* Middle: Live Browser View OR Debug Panel */}
         {showDebugPanel ? (
           <DebugPanel executionId={executionId} />
         ) : (
           <LiveBrowserView executionId={executionId} />
+        )}
+
+        {/* Right: Playbook Code Viewer (when enabled) */}
+        {showCodeViewer && (
+          <Box sx={{ height: '100%', overflow: 'hidden' }}>
+            <PlaybookCodeViewer
+              executionId={executionId}
+              playbookName={execution.playbook_name}
+              isDebugMode={debugMode}
+              isPaused={execution.status === 'paused'}
+              onClose={() => setShowCodeViewer(false)}
+            />
+          </Box>
         )}
       </Box>
 
