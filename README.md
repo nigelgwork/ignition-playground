@@ -29,6 +29,29 @@ A modern, Docker-free automation toolkit for Ignition SCADA with complete playbo
 
 ### Installation
 
+#### Option 1: Using Makefile (Recommended)
+
+```bash
+# Clone repository
+git clone git@github.com:nigelgwork/ignition-playground.git
+cd ignition-playground
+
+# Install and initialize
+make install          # Install in development mode
+make install-dev      # Install with dev dependencies
+make install-playwright  # Install Playwright browsers
+make init             # Initialize credential vault and .env
+
+# Start development server
+make dev              # Start backend + frontend with hot reload
+
+# Or use Docker
+make docker-build     # Build Docker image
+make docker-up        # Start services with docker-compose
+```
+
+#### Option 2: Manual Setup
+
 ```bash
 # Clone repository
 git clone git@github.com:nigelgwork/ignition-playground.git
@@ -48,6 +71,25 @@ ignition-toolkit serve --port 8080
 ```
 
 Access the web UI at http://localhost:8080
+
+#### Option 3: Docker Deployment
+
+```bash
+# Clone and build
+git clone git@github.com:nigelgwork/ignition-playground.git
+cd ignition-playground
+
+# Production mode (SQLite)
+docker-compose up -d
+
+# Development mode (hot reload)
+docker-compose --profile dev up -d
+
+# Production with PostgreSQL
+docker-compose --profile postgres up -d
+```
+
+Access the web UI at http://localhost:5000
 
 ### Your First Playbook
 
@@ -248,6 +290,106 @@ pytest tests/test_gateway_client.py -v
 
 # Test playbook execution
 pytest tests/test_playbook_engine.py -v
+
+# Or use Makefile
+make test             # Run all tests
+make test-cov         # Run with coverage report
+make test-fast        # Skip slow integration tests
+```
+
+## 🛠️ Makefile Commands
+
+The project includes a comprehensive Makefile with 52 commands. Run `make help` to see all available commands.
+
+### Development Commands
+```bash
+make install          # Install project in development mode
+make install-dev      # Install with development dependencies
+make dev              # Start development server (hot reload)
+make dev-backend      # Start backend only
+make dev-frontend     # Start frontend dev server only
+make stop             # Stop all running servers
+make restart          # Restart development server
+make status           # Check server status
+```
+
+### Testing & Quality
+```bash
+make test             # Run all tests
+make test-unit        # Run unit tests only
+make test-integration # Run integration tests only
+make test-cov         # Run tests with coverage report
+make test-fast        # Run fast tests (skip slow ones)
+make lint             # Run all linters (ruff, mypy)
+make format           # Format code with ruff
+make complexity       # Check code complexity
+make security         # Run security checks with bandit
+```
+
+### Docker Commands
+```bash
+make docker-build     # Build Docker image
+make docker-up        # Start services (production)
+make docker-up-dev    # Start services (dev profile)
+make docker-up-postgres # Start with PostgreSQL
+make docker-down      # Stop Docker services
+make docker-logs      # Show Docker logs
+make docker-shell     # Open shell in backend container
+make docker-rebuild   # Rebuild and restart
+```
+
+### Database & Credentials
+```bash
+make db-reset         # Reset database
+make db-backup        # Backup database
+make db-shell         # Open SQLite shell
+make cred-list        # List all credentials
+make cred-add         # Add new credential (interactive)
+make cred-backup      # Backup credential vault
+```
+
+### Playbook Management
+```bash
+make playbook-list    # List all playbooks
+make playbook-validate # Validate all YAML playbooks
+```
+
+### Build & Release
+```bash
+make build            # Build frontend for production
+make build-all        # Build frontend and Docker image
+make version          # Show current version
+make bump-patch       # Bump patch version (x.x.X)
+make bump-minor       # Bump minor version (x.X.0)
+make bump-major       # Bump major version (X.0.0)
+```
+
+### Utilities
+```bash
+make clean            # Clean build artifacts
+make clean-all        # Deep clean (including Docker volumes)
+make info             # Show environment information
+make deps-check       # Check for outdated dependencies
+make deps-upgrade     # Upgrade all dependencies
+make logs             # Show application logs
+make verify-ux        # Verify UX functionality
+```
+
+### Common Workflows
+```bash
+# Fresh install
+make install && make install-dev && make init
+
+# Development cycle
+make dev              # Start server
+make test-fast        # Run tests while developing
+make lint && make format  # Before committing
+
+# Production deployment
+make docker-build && make docker-up
+
+# Upgrade dependencies
+make deps-check && make deps-upgrade
 ```
 
 ## 🔒 Security
