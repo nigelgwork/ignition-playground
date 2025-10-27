@@ -14,6 +14,12 @@ from pydantic import BaseModel
 from ignition_toolkit.playbook.engine import PlaybookEngine
 from ignition_toolkit.playbook.models import ExecutionState, ExecutionStatus
 from ignition_toolkit.storage import get_database
+from ignition_toolkit.api.routers.models import (
+    ExecutionRequest,
+    ExecutionResponse,
+    StepResultResponse,
+    ExecutionStatusResponse
+)
 
 logger = logging.getLogger(__name__)
 
@@ -40,42 +46,8 @@ def get_execution_ttl_minutes():
 
 
 # ============================================================================
-# Pydantic Models
+# Pydantic Models (shared models imported from models.py)
 # ============================================================================
-
-class ExecutionRequest(BaseModel):
-    """Request to execute a playbook"""
-    playbook_path: str
-    parameters: Dict[str, str]
-    gateway_url: Optional[str] = None
-    credential_name: Optional[str] = None
-    debug_mode: Optional[bool] = False
-
-
-class ExecutionResponse(BaseModel):
-    """Response for execution start"""
-    execution_id: str
-    playbook_name: str
-    status: str
-    message: str
-
-
-class StepResultResponse(BaseModel):
-    """Step result information"""
-    step_id: str
-    status: str
-    output: Optional[str] = None
-    error: Optional[str] = None
-
-
-class ExecutionStatusResponse(BaseModel):
-    """Execution status information"""
-    execution_id: str
-    playbook_name: str
-    status: str
-    current_step: Optional[int] = None
-    total_steps: int
-    step_results: List[StepResultResponse] = []
 
 
 class PlaybookCodeUpdateRequest(BaseModel):

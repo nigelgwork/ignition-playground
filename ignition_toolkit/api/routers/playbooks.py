@@ -18,6 +18,7 @@ from pydantic import BaseModel
 from ignition_toolkit.playbook.loader import PlaybookLoader
 from ignition_toolkit.playbook.metadata import PlaybookMetadataStore
 from ignition_toolkit.core.paths import get_playbooks_dir, get_playbook_path
+from ignition_toolkit.api.routers.models import ParameterInfo, StepInfo, PlaybookInfo
 
 logger = logging.getLogger(__name__)
 
@@ -32,43 +33,8 @@ def get_metadata_store():
 
 
 # ============================================================================
-# Pydantic Models
+# Pydantic Models (shared models imported from models.py)
 # ============================================================================
-
-class ParameterInfo(BaseModel):
-    """Parameter definition for frontend"""
-    name: str
-    type: str
-    required: bool
-    default: Optional[str] = None
-    description: str = ""
-
-
-class StepInfo(BaseModel):
-    """Step definition for frontend"""
-    id: str
-    name: str
-    type: str
-    timeout: int
-    retry_count: int
-
-
-class PlaybookInfo(BaseModel):
-    """Playbook metadata"""
-    name: str
-    path: str
-    version: str
-    description: str
-    parameter_count: int
-    step_count: int
-    parameters: List[ParameterInfo] = []
-    steps: List[StepInfo] = []
-    # Metadata fields
-    revision: int = 0
-    verified: bool = False
-    enabled: bool = True
-    last_modified: Optional[str] = None
-    verified_at: Optional[str] = None
 
 
 class PlaybookUpdateRequest(BaseModel):
