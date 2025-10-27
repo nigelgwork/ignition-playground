@@ -11,6 +11,7 @@ import pty
 import subprocess
 import select
 import signal
+import shutil
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 from datetime import datetime
@@ -1413,24 +1414,32 @@ async def claude_code_terminal(websocket: WebSocket, execution_id: str):
 
         # Find playbook path
         playbook_name = execution_state.playbook_name
-        playbooks_dir = Path("./playbooks")
+        playbooks_dir = Path("./playbooks").resolve()
         playbook_path = None
 
         import yaml
+        # Search for playbook by name
         for yaml_file in playbooks_dir.rglob("*.yaml"):
+            # Skip backup files
+            if '.backup.' in yaml_file.name:
+                continue
             try:
                 with open(yaml_file, 'r') as f:
                     playbook_data = yaml.safe_load(f)
                     if playbook_data and playbook_data.get('name') == playbook_name:
                         playbook_path = str(yaml_file.absolute())
+                        logger.info(f"Found playbook: {playbook_path}")
                         break
-            except Exception:
+            except Exception as e:
+                logger.warning(f"Error reading {yaml_file}: {e}")
                 continue
 
         if not playbook_path:
+            error_msg = f"Playbook file not found for '{playbook_name}' in {playbooks_dir}"
+            logger.error(error_msg)
             await websocket.send_json({
                 "type": "error",
-                "message": f"Playbook file not found for '{playbook_name}'"
+                "message": error_msg
             })
             await websocket.close(code=1008, reason="Playbook not found")
             return
@@ -1464,9 +1473,45 @@ async def claude_code_terminal(websocket: WebSocket, execution_id: str):
         # Spawn Claude Code with PTY
         master_fd, slave_fd = pty.openpty()
 
-        # Build command
+        # Build command - check environment variable first, then try common names
+        claude_cmd = os.getenv("CLAUDE_CLI_COMMAND")  # User can override with env var
+
+        if claude_cmd:
+            # User-specified command - verify it exists
+            if not shutil.which(claude_cmd):
+                error_msg = f"Configured Claude CLI command '{claude_cmd}' not found. Set CLAUDE_CLI_COMMAND environment variable to the correct command."
+                logger.error(error_msg)
+                await websocket.send_json({
+                    "type": "error",
+                    "message": error_msg
+                })
+                await websocket.close(code=1008, reason="Claude CLI not found")
+                return
+        else:
+            # Auto-detect: try common Claude CLI names
+            for cmd_name in ["claude-code", "claude-work", "claude", "claude-personal"]:
+                found_cmd = shutil.which(cmd_name)
+                if found_cmd:
+                    claude_cmd = found_cmd
+                    break
+
+            if not claude_cmd:
+                error_msg = (
+                    "Claude CLI not found. Please install one of: claude-code, claude-work, claude, claude-personal\n"
+                    "Or set CLAUDE_CLI_COMMAND environment variable to your Claude CLI command name."
+                )
+                logger.error(error_msg)
+                await websocket.send_json({
+                    "type": "error",
+                    "message": error_msg
+                })
+                await websocket.close(code=1008, reason="Claude CLI not found")
+                return
+
+        logger.info(f"Using Claude CLI: {claude_cmd}")
+
         cmd_args = [
-            "claude-code",
+            claude_cmd,
             "-p", playbook_path,
             "-m", f"{context_message}\n\nYou are debugging a paused Ignition Automation Toolkit playbook execution. The playbook YAML file is open for editing."
         ]
