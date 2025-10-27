@@ -190,7 +190,16 @@ ignition-playground/
 │   ├── playbook/              # Playbook engine & step executor
 │   ├── browser/               # Playwright browser automation
 │   ├── credentials/           # Fernet encrypted credential vault
-│   ├── api/                   # FastAPI server + WebSocket
+│   ├── api/                   # FastAPI server (modular architecture)
+│   │   ├── app.py             # Main FastAPI app (190 lines, 92% reduced!)
+│   │   └── routers/           # Modular API routers
+│   │       ├── health.py      # Health check endpoints
+│   │       ├── playbooks.py   # Playbook management (6 routes)
+│   │       ├── executions.py  # Execution control (11 routes)
+│   │       ├── credentials.py # Credential CRUD (4 routes)
+│   │       ├── ai.py          # AI integration (8 routes)
+│   │       ├── websockets.py  # WebSocket endpoints (2 WS + broadcast)
+│   │       └── models.py      # Shared Pydantic models (7 models)
 │   ├── storage/               # SQLite database models
 │   ├── ai/                    # AI integration scaffolding
 │   └── cli.py                 # Command-line interface
@@ -199,12 +208,20 @@ ignition-playground/
 │   ├── browser/               # Browser automation workflows
 │   ├── ai/                    # AI-assisted workflows
 │   └── examples/              # Example playbooks
-├── frontend/                  # Web UI (HTML/CSS/JS)
+├── frontend/                  # React 19 + TypeScript Web UI
+│   ├── src/                   # React source code
+│   │   ├── pages/             # Page components
+│   │   ├── components/        # Reusable components
+│   │   ├── hooks/             # Custom React hooks
+│   │   ├── store/             # Zustand state management
+│   │   └── api/               # API client
+│   └── dist/                  # Built frontend (served by FastAPI)
 ├── tests/                     # Test suite (46 tests)
 ├── docs/                      # Documentation
 ├── .claude/                   # Claude Code instructions
+├── .refactor/                 # Refactoring documentation
 ├── CHANGELOG.md               # Version history
-├── VERSION                    # Current version (1.0.27)
+├── VERSION                    # Current version (2.4.0)
 └── pyproject.toml             # Package configuration
 ```
 

@@ -644,6 +644,138 @@ The application needs a robust startup system that validates all components befo
 
 ---
 
+## ADR-012: Modular API Router Architecture
+
+**Date:** 2025-10-27
+**Status:** Accepted ✅
+
+### Context
+
+The FastAPI application grew to 2,377 lines in a single `app.py` file, making it difficult to maintain, test, and navigate. The monolithic structure included:
+- Route handlers for 6 different domains (health, playbooks, executions, credentials, AI, WebSocket)
+- Duplicate Pydantic models across the file
+- Mixed concerns (routing, business logic, models)
+- High cyclomatic complexity
+
+**Options:**
+1. **Keep monolithic**: Simple, but unmaintainable
+2. **Split by feature**: Vertical slicing by domain
+3. **Split by layer**: Horizontal slicing (routes, services, models)
+4. **Hybrid approach**: Domain routers + shared models
+
+### Decision
+
+**We chose a hybrid modular architecture** with domain-specific routers and a shared models module.
+
+### Rationale
+
+1. **Domain-Separated Routers**: Each domain gets its own router module:
+   ```python
+   # ignition_toolkit/api/routers/playbooks.py
+   router = APIRouter(prefix="/api/playbooks", tags=["playbooks"])
+
+   @router.get("")
+   async def list_playbooks():
+       # ...
+   ```
+
+2. **Shared Models Module**: Eliminate duplication with centralized Pydantic models:
+   ```python
+   # ignition_toolkit/api/routers/models.py
+   class ExecutionRequest(BaseModel):
+       playbook_path: str
+       parameters: Dict[str, str]
+       # Shared by multiple routers
+   ```
+
+3. **Dependency Injection**: Access global state without circular imports:
+   ```python
+   def get_active_engines():
+       from ignition_toolkit.api.app import active_engines
+       return active_engines
+   ```
+
+4. **Clean app.py**: Core file reduced to initialization and router registration:
+   ```python
+   app = FastAPI(lifespan=lifespan)
+   app.include_router(health_router)
+   app.include_router(playbooks_router)
+   app.include_router(executions_router)
+   # ... etc
+   ```
+
+### Architecture
+
+**Final Structure (190 lines total in app.py):**
+
+```
+ignition_toolkit/api/
+├── app.py                   # 190 lines (92% reduction from 2,377)
+│   ├── FastAPI initialization
+│   ├── Router registration (6 routers)
+│   └── Frontend serving
+└── routers/
+    ├── health.py            # Health check endpoints
+    ├── playbooks.py         # 6 routes (list, get, update, verify, delete)
+    ├── executions.py        # 11 routes (start, pause, resume, skip, cancel, etc.)
+    ├── credentials.py       # 4 routes (CRUD operations)
+    ├── ai.py                # 8 routes (AI credentials, settings, assist)
+    ├── websockets.py        # 2 WebSocket endpoints + broadcast helpers
+    └── models.py            # 7 shared Pydantic models
+```
+
+**Refactoring Journey:**
+- **Original**: 2,377 lines (monolithic)
+- **Phase 2**: 704 lines (-70%, 4 routers extracted)
+- **Phase 3.1**: 294 lines (-58%, WebSocket extraction)
+- **Phase 3.2**: 190 lines (-35%, model consolidation)
+- **Final**: 190 lines (**92% total reduction**)
+
+### Consequences
+
+**Positive:**
+- **Maintainability**: Each router handles one domain (~100-500 lines)
+- **Testability**: Routers can be unit tested independently
+- **Clarity**: Clear separation of concerns
+- **Scalability**: Easy to add new routers without touching core
+- **Type Safety**: Consistent model definitions across all routers
+- **Developer Experience**: Easy to navigate and find relevant code
+- **Performance**: Cleaner imports, faster module loading
+- **No Duplication**: Shared models eliminate 92 lines of duplicate code
+
+**Negative:**
+- More files to navigate (7 router files vs 1 monolithic file)
+- Dependency injection adds slight complexity
+- Need to import from multiple modules
+
+**Accepted Trade-off:** Maintainability and clarity worth the additional file count.
+
+### Metrics
+
+| Metric | Before | After | Change |
+|--------|--------|-------|--------|
+| app.py lines | 2,377 | 190 | -92% |
+| Routers | 0 | 6 | +6 |
+| Model files | 0 | 1 | +1 |
+| Duplicate models | ~226 lines | 0 | -100% |
+| Test coverage | Same | Same | Maintained |
+
+### Implementation Details
+
+**Phase 2 (4 sub-phases):**
+1. Playbooks router extraction (461 lines)
+2. Executions router extraction (566 lines)
+3. Credentials router extraction (124 lines)
+4. AI router extraction (533 lines)
+
+**Phase 3 (2 sub-phases):**
+1. WebSocket router extraction (479 lines)
+2. Model consolidation (104 lines removed from app.py)
+
+**Documentation:** See `.refactor/PHASE3_COMPLETE_SUMMARY.md` for detailed refactoring history.
+
+---
+
 ## Summary of Key Decisions
 
 | ADR | Decision | Rationale |
@@ -659,6 +791,7 @@ The application needs a robust startup system that validates all components befo
 | ADR-009 | Domain-prefixed step types | Clear namespace, no conflicts, self-documenting |
 | ADR-010 | localStorage for UI config | Simple, fast, sufficient for single-user use |
 | ADR-011 | FastAPI lifespan startup | Fail-fast validation, health monitoring, modern pattern |
+| ADR-012 | Modular API router architecture | Maintainability, testability, 92% size reduction |
 
 ---
 
