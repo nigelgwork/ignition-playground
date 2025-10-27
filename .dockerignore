@@ -1,0 +1,112 @@
+# ========================================
+# Docker Ignore File
+# ========================================
+# Excludes files/directories from Docker build context
+# Reduces build time and image size
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+venv/
+env/
+ENV/
+.venv
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+.travis.yml
+
+# Documentation
+docs/
+*.md
+!README.md  # Keep README
+
+# Testing
+tests/
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.hypothesis/
+
+# Data and artifacts (excluded from build, mounted as volumes)
+data/
+*.db
+*.sqlite
+*.sqlite3
+
+# Credentials
+.env
+.env.*
+!.env.example
+credentials.enc
+*.key
+*.pem
+
+# Logs
+*.log
+logs/
+
+# Frontend (excluded, built separately or mounted)
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+frontend/package-lock.json
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# OS files
+Thumbs.db
+.DS_Store
+
+# Refactor tracking (not needed in container)
+.refactor/
+
+# Old/backup files
+*.bak
+*.backup
+*.old
+*~
+
+# Claude Code files
+.claude/
+PLAYBOOK_CODE_VIEWER_TODO.md
+WEBSOCKET_*.md

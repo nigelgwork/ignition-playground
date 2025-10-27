@@ -1,0 +1,135 @@
+# ========================================
+# Ignition Automation Toolkit - Docker Compose
+# ========================================
+#
+# Usage:
+#   docker-compose up                     # Production: Backend only (SQLite)
+#   docker-compose --profile dev up       # Development: Backend + Frontend dev server
+#   docker-compose --profile postgres up  # Production: Backend + PostgreSQL
+#
+# Commands:
+#   docker-compose down                   # Stop all services
+#   docker-compose down -v                # Stop and remove volumes
+#   docker-compose logs -f backend        # View backend logs
+#   docker-compose exec backend bash      # Shell into backend container
+
+version: '3.8'
+
+services:
+  # ========================================
+  # Backend Service (Always runs)
+  # ========================================
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: ignition-toolkit:latest
+    container_name: ignition-toolkit-backend
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    environment:
+      # API Configuration
+      - API_HOST=0.0.0.0
+      - API_PORT=5000
+      - ENVIRONMENT=${ENVIRONMENT:-production}
+
+      # Database (SQLite by default, PostgreSQL if profile enabled)
+      - DATABASE_URL=${DATABASE_URL:-sqlite:////app/data/toolkit.db}
+
+      # Security
+      - WEBSOCKET_API_KEY=${WEBSOCKET_API_KEY:-dev-key-change-in-production}
+
+      # Playwright
+      - PLAYWRIGHT_HEADLESS=${PLAYWRIGHT_HEADLESS:-true}
+      - PLAYWRIGHT_BROWSER=chromium
+      - PLAYWRIGHT_TIMEOUT=30000
+      - PLAYWRIGHT_BROWSERS_PATH=/home/appuser/.cache/ms-playwright
+
+      # Logging
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - LOG_FORMAT=${LOG_FORMAT:-json}
+
+      # AI (optional)
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - CLAUDE_MODEL=${CLAUDE_MODEL:-claude-sonnet-4-5-20250929}
+
+    volumes:
+      # Data persistence
+      - ./data:/app/data
+      - ./playbooks:/app/playbooks
+      - ~/.ignition-toolkit:/home/appuser/.ignition-toolkit
+
+      # Frontend build (production)
+      - ./frontend/dist:/app/frontend/dist:ro
+
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+    networks:
+      - ignition-network
+
+  # ========================================
+  # Frontend Development Server (dev profile only)
+  # ========================================
+  frontend-dev:
+    profiles: ["dev"]
+    image: node:22-alpine
+    container_name: ignition-toolkit-frontend-dev
+    working_dir: /app
+    command: sh -c "npm install && npm run dev -- --host 0.0.0.0"
+    ports:
+      - "5173:5173"  # Vite dev server
+    environment:
+      - NODE_ENV=development
+      - VITE_API_URL=http://localhost:5000
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules  # Anonymous volume for node_modules
+    depends_on:
+      - backend
+    networks:
+      - ignition-network
+
+  # ========================================
+  # PostgreSQL Database (postgres profile only)
+  # ========================================
+  postgres:
+    profiles: ["postgres"]
+    image: postgres:16-alpine
+    container_name: ignition-toolkit-postgres
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB:-ignition_toolkit}
+      - POSTGRES_USER=${POSTGRES_USER:-ignition}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-changeme}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-ignition}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - ignition-network
+
+# ========================================
+# Networks
+# ========================================
+networks:
+  ignition-network:
+    name: ignition-toolkit-network
+    driver: bridge
+
+# ========================================
+# Volumes
+# ========================================
+volumes:
+  postgres-data:
+    name: ignition-toolkit-postgres-data
