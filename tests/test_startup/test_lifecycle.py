@@ -2,15 +2,14 @@
 Tests for startup lifecycle manager
 """
 
-import pytest
-from unittest.mock import patch, MagicMock, AsyncMock
-from contextlib import asynccontextmanager
+from unittest.mock import AsyncMock, patch
 
+import pytest
 from fastapi import FastAPI
 
-from ignition_toolkit.startup.lifecycle import lifespan
-from ignition_toolkit.startup.health import get_health_state, reset_health_state, HealthStatus
 from ignition_toolkit.startup.exceptions import DatabaseInitError, VaultInitError
+from ignition_toolkit.startup.health import HealthStatus, get_health_state, reset_health_state
+from ignition_toolkit.startup.lifecycle import lifespan
 
 
 @pytest.fixture(autouse=True)
@@ -26,11 +25,23 @@ async def test_lifespan_successful_startup():
     """Test successful startup sequence"""
     app = FastAPI()
 
-    with patch('ignition_toolkit.startup.lifecycle.validate_environment', new_callable=AsyncMock) as mock_env, \
-         patch('ignition_toolkit.startup.lifecycle.initialize_database', new_callable=AsyncMock) as mock_db, \
-         patch('ignition_toolkit.startup.lifecycle.initialize_vault', new_callable=AsyncMock) as mock_vault, \
-         patch('ignition_toolkit.startup.lifecycle.validate_playbooks', new_callable=AsyncMock) as mock_playbooks, \
-         patch('ignition_toolkit.startup.lifecycle.validate_frontend', new_callable=AsyncMock) as mock_frontend:
+    with (
+        patch(
+            "ignition_toolkit.startup.lifecycle.validate_environment", new_callable=AsyncMock
+        ) as mock_env,
+        patch(
+            "ignition_toolkit.startup.lifecycle.initialize_database", new_callable=AsyncMock
+        ) as mock_db,
+        patch(
+            "ignition_toolkit.startup.lifecycle.initialize_vault", new_callable=AsyncMock
+        ) as mock_vault,
+        patch(
+            "ignition_toolkit.startup.lifecycle.validate_playbooks", new_callable=AsyncMock
+        ) as mock_playbooks,
+        patch(
+            "ignition_toolkit.startup.lifecycle.validate_frontend", new_callable=AsyncMock
+        ) as mock_frontend,
+    ):
 
         mock_playbooks.return_value = {"total": 5, "gateway": 2, "perspective": 2, "examples": 1}
 
@@ -56,8 +67,12 @@ async def test_lifespan_database_failure():
     """Test startup failure during database initialization"""
     app = FastAPI()
 
-    with patch('ignition_toolkit.startup.lifecycle.validate_environment', new_callable=AsyncMock), \
-         patch('ignition_toolkit.startup.lifecycle.initialize_database', new_callable=AsyncMock) as mock_db:
+    with (
+        patch("ignition_toolkit.startup.lifecycle.validate_environment", new_callable=AsyncMock),
+        patch(
+            "ignition_toolkit.startup.lifecycle.initialize_database", new_callable=AsyncMock
+        ) as mock_db,
+    ):
 
         mock_db.side_effect = DatabaseInitError("Database connection failed")
 
@@ -76,9 +91,13 @@ async def test_lifespan_vault_failure():
     """Test startup failure during vault initialization"""
     app = FastAPI()
 
-    with patch('ignition_toolkit.startup.lifecycle.validate_environment', new_callable=AsyncMock), \
-         patch('ignition_toolkit.startup.lifecycle.initialize_database', new_callable=AsyncMock), \
-         patch('ignition_toolkit.startup.lifecycle.initialize_vault', new_callable=AsyncMock) as mock_vault:
+    with (
+        patch("ignition_toolkit.startup.lifecycle.validate_environment", new_callable=AsyncMock),
+        patch("ignition_toolkit.startup.lifecycle.initialize_database", new_callable=AsyncMock),
+        patch(
+            "ignition_toolkit.startup.lifecycle.initialize_vault", new_callable=AsyncMock
+        ) as mock_vault,
+    ):
 
         mock_vault.side_effect = VaultInitError("Vault encryption failed")
 
@@ -97,11 +116,15 @@ async def test_lifespan_playbook_validation_non_fatal():
     """Test that playbook validation failures are non-fatal"""
     app = FastAPI()
 
-    with patch('ignition_toolkit.startup.lifecycle.validate_environment', new_callable=AsyncMock), \
-         patch('ignition_toolkit.startup.lifecycle.initialize_database', new_callable=AsyncMock), \
-         patch('ignition_toolkit.startup.lifecycle.initialize_vault', new_callable=AsyncMock), \
-         patch('ignition_toolkit.startup.lifecycle.validate_playbooks', new_callable=AsyncMock) as mock_playbooks, \
-         patch('ignition_toolkit.startup.lifecycle.validate_frontend', new_callable=AsyncMock):
+    with (
+        patch("ignition_toolkit.startup.lifecycle.validate_environment", new_callable=AsyncMock),
+        patch("ignition_toolkit.startup.lifecycle.initialize_database", new_callable=AsyncMock),
+        patch("ignition_toolkit.startup.lifecycle.initialize_vault", new_callable=AsyncMock),
+        patch(
+            "ignition_toolkit.startup.lifecycle.validate_playbooks", new_callable=AsyncMock
+        ) as mock_playbooks,
+        patch("ignition_toolkit.startup.lifecycle.validate_frontend", new_callable=AsyncMock),
+    ):
 
         mock_playbooks.side_effect = Exception("Playbook directory not found")
 
@@ -121,12 +144,18 @@ async def test_lifespan_frontend_validation_non_fatal():
     """Test that frontend validation failures are non-fatal"""
     app = FastAPI()
 
-    with patch('ignition_toolkit.startup.lifecycle.validate_environment', new_callable=AsyncMock), \
-         patch('ignition_toolkit.startup.lifecycle.initialize_database', new_callable=AsyncMock), \
-         patch('ignition_toolkit.startup.lifecycle.initialize_vault', new_callable=AsyncMock), \
-         patch('ignition_toolkit.startup.lifecycle.validate_playbooks', new_callable=AsyncMock) as mock_playbooks, \
-         patch('ignition_toolkit.startup.lifecycle.validate_frontend', new_callable=AsyncMock) as mock_frontend, \
-         patch('ignition_toolkit.startup.lifecycle.is_dev_mode') as mock_dev:
+    with (
+        patch("ignition_toolkit.startup.lifecycle.validate_environment", new_callable=AsyncMock),
+        patch("ignition_toolkit.startup.lifecycle.initialize_database", new_callable=AsyncMock),
+        patch("ignition_toolkit.startup.lifecycle.initialize_vault", new_callable=AsyncMock),
+        patch(
+            "ignition_toolkit.startup.lifecycle.validate_playbooks", new_callable=AsyncMock
+        ) as mock_playbooks,
+        patch(
+            "ignition_toolkit.startup.lifecycle.validate_frontend", new_callable=AsyncMock
+        ) as mock_frontend,
+        patch("ignition_toolkit.startup.lifecycle.is_dev_mode") as mock_dev,
+    ):
 
         mock_playbooks.return_value = {"total": 3, "gateway": 1, "perspective": 1, "examples": 1}
         mock_frontend.side_effect = Exception("Frontend build not found")
@@ -148,12 +177,18 @@ async def test_lifespan_dev_mode_skips_frontend():
     """Test that dev mode skips frontend validation"""
     app = FastAPI()
 
-    with patch('ignition_toolkit.startup.lifecycle.validate_environment', new_callable=AsyncMock), \
-         patch('ignition_toolkit.startup.lifecycle.initialize_database', new_callable=AsyncMock), \
-         patch('ignition_toolkit.startup.lifecycle.initialize_vault', new_callable=AsyncMock), \
-         patch('ignition_toolkit.startup.lifecycle.validate_playbooks', new_callable=AsyncMock) as mock_playbooks, \
-         patch('ignition_toolkit.startup.lifecycle.validate_frontend', new_callable=AsyncMock) as mock_frontend, \
-         patch('ignition_toolkit.startup.lifecycle.is_dev_mode') as mock_dev:
+    with (
+        patch("ignition_toolkit.startup.lifecycle.validate_environment", new_callable=AsyncMock),
+        patch("ignition_toolkit.startup.lifecycle.initialize_database", new_callable=AsyncMock),
+        patch("ignition_toolkit.startup.lifecycle.initialize_vault", new_callable=AsyncMock),
+        patch(
+            "ignition_toolkit.startup.lifecycle.validate_playbooks", new_callable=AsyncMock
+        ) as mock_playbooks,
+        patch(
+            "ignition_toolkit.startup.lifecycle.validate_frontend", new_callable=AsyncMock
+        ) as mock_frontend,
+        patch("ignition_toolkit.startup.lifecycle.is_dev_mode") as mock_dev,
+    ):
 
         mock_playbooks.return_value = {"total": 3, "gateway": 1, "perspective": 1, "examples": 1}
         mock_dev.return_value = True  # Dev mode
@@ -172,11 +207,15 @@ async def test_lifespan_degraded_overall_status():
     """Test that warnings result in degraded overall status"""
     app = FastAPI()
 
-    with patch('ignition_toolkit.startup.lifecycle.validate_environment', new_callable=AsyncMock), \
-         patch('ignition_toolkit.startup.lifecycle.initialize_database', new_callable=AsyncMock), \
-         patch('ignition_toolkit.startup.lifecycle.initialize_vault', new_callable=AsyncMock), \
-         patch('ignition_toolkit.startup.lifecycle.validate_playbooks', new_callable=AsyncMock) as mock_playbooks, \
-         patch('ignition_toolkit.startup.lifecycle.validate_frontend', new_callable=AsyncMock):
+    with (
+        patch("ignition_toolkit.startup.lifecycle.validate_environment", new_callable=AsyncMock),
+        patch("ignition_toolkit.startup.lifecycle.initialize_database", new_callable=AsyncMock),
+        patch("ignition_toolkit.startup.lifecycle.initialize_vault", new_callable=AsyncMock),
+        patch(
+            "ignition_toolkit.startup.lifecycle.validate_playbooks", new_callable=AsyncMock
+        ) as mock_playbooks,
+        patch("ignition_toolkit.startup.lifecycle.validate_frontend", new_callable=AsyncMock),
+    ):
 
         mock_playbooks.side_effect = Exception("Some playbooks invalid")
 
@@ -193,11 +232,15 @@ async def test_lifespan_sets_startup_time():
     """Test that startup time is recorded"""
     app = FastAPI()
 
-    with patch('ignition_toolkit.startup.lifecycle.validate_environment', new_callable=AsyncMock), \
-         patch('ignition_toolkit.startup.lifecycle.initialize_database', new_callable=AsyncMock), \
-         patch('ignition_toolkit.startup.lifecycle.initialize_vault', new_callable=AsyncMock), \
-         patch('ignition_toolkit.startup.lifecycle.validate_playbooks', new_callable=AsyncMock) as mock_playbooks, \
-         patch('ignition_toolkit.startup.lifecycle.validate_frontend', new_callable=AsyncMock):
+    with (
+        patch("ignition_toolkit.startup.lifecycle.validate_environment", new_callable=AsyncMock),
+        patch("ignition_toolkit.startup.lifecycle.initialize_database", new_callable=AsyncMock),
+        patch("ignition_toolkit.startup.lifecycle.initialize_vault", new_callable=AsyncMock),
+        patch(
+            "ignition_toolkit.startup.lifecycle.validate_playbooks", new_callable=AsyncMock
+        ) as mock_playbooks,
+        patch("ignition_toolkit.startup.lifecycle.validate_frontend", new_callable=AsyncMock),
+    ):
 
         mock_playbooks.return_value = {"total": 1, "gateway": 1, "perspective": 0, "examples": 0}
 

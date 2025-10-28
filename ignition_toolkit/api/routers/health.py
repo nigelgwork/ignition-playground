@@ -8,17 +8,18 @@ Provides Kubernetes-style health check endpoints for monitoring and debugging:
 - GET /health/detailed - Detailed component-level health information
 """
 
-from fastapi import APIRouter, Response
-from typing import Dict, Any
+from typing import Any
 
-from ignition_toolkit.startup.health import get_health_state, HealthStatus
+from fastapi import APIRouter, Response
+
 from ignition_toolkit import __version__
+from ignition_toolkit.startup.health import HealthStatus, get_health_state
 
 router = APIRouter(prefix="/health", tags=["health"])
 
 
 @router.get("")
-async def health_check(response: Response) -> Dict[str, Any]:
+async def health_check(response: Response) -> dict[str, Any]:
     """
     Overall health check
 
@@ -48,7 +49,7 @@ async def health_check(response: Response) -> Dict[str, Any]:
 
 
 @router.get("/live")
-async def liveness_probe() -> Dict[str, str]:
+async def liveness_probe() -> dict[str, str]:
     """
     Liveness probe (Kubernetes-style)
 
@@ -62,7 +63,7 @@ async def liveness_probe() -> Dict[str, str]:
 
 
 @router.get("/ready")
-async def readiness_probe(response: Response) -> Dict[str, Any]:
+async def readiness_probe(response: Response) -> dict[str, Any]:
     """
     Readiness probe (Kubernetes-style)
 
@@ -86,7 +87,7 @@ async def readiness_probe(response: Response) -> Dict[str, Any]:
 
 
 @router.get("/detailed")
-async def detailed_health(response: Response) -> Dict[str, Any]:
+async def detailed_health(response: Response) -> dict[str, Any]:
     """
     Detailed health check with component-level information
 

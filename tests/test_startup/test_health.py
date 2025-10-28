@@ -2,18 +2,19 @@
 Tests for startup health state management
 """
 
-import pytest
 from datetime import datetime
 
+import pytest
+
 from ignition_toolkit.startup.health import (
-    HealthStatus,
     ComponentHealth,
+    HealthStatus,
     SystemHealth,
     get_health_state,
+    reset_health_state,
+    set_component_degraded,
     set_component_healthy,
     set_component_unhealthy,
-    set_component_degraded,
-    reset_health_state,
 )
 
 
@@ -35,11 +36,7 @@ def test_health_status_enum():
 
 def test_component_health_creation():
     """Test ComponentHealth dataclass creation"""
-    comp = ComponentHealth(
-        status=HealthStatus.HEALTHY,
-        message="Test message",
-        error=None
-    )
+    comp = ComponentHealth(status=HealthStatus.HEALTHY, message="Test message", error=None)
 
     assert comp.status == HealthStatus.HEALTHY
     assert comp.message == "Test message"
@@ -50,9 +47,7 @@ def test_component_health_creation():
 def test_component_health_to_dict():
     """Test ComponentHealth serialization"""
     comp = ComponentHealth(
-        status=HealthStatus.UNHEALTHY,
-        message="Failed",
-        error="Connection timeout"
+        status=HealthStatus.UNHEALTHY, message="Failed", error="Connection timeout"
     )
 
     data = comp.to_dict()

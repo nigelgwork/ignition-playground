@@ -45,9 +45,7 @@ class ValidationError(ToolkitError):
     """Validation errors (parameters, input, etc.)"""
 
     def __init__(self, message: str, recovery_hint: str = ""):
-        super().__init__(
-            message, component="Validation", recovery_hint=recovery_hint
-        )
+        super().__init__(message, component="Validation", recovery_hint=recovery_hint)
 
 
 class AuthenticationError(ToolkitError):

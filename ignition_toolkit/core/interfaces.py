@@ -7,7 +7,7 @@ and loose coupling between modules.
 
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Protocol, ContextManager, Generator, Any, Dict
+from typing import Any, ContextManager, Protocol
 
 from sqlalchemy.orm import Session
 
@@ -114,7 +114,7 @@ class IPlaybookEngine(Protocol):
     async def execute_playbook(
         self,
         playbook: Any,
-        parameters: Dict[str, Any],
+        parameters: dict[str, Any],
         base_path: Path | None = None,
         execution_id: str | None = None,
     ) -> Any:

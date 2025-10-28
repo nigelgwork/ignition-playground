@@ -2,12 +2,14 @@
 Tests for parameter resolver
 """
 
-import pytest
 import tempfile
 from pathlib import Path
-from ignition_toolkit.playbook.parameters import ParameterResolver
+
+import pytest
+
+from ignition_toolkit.credentials import Credential, CredentialVault
 from ignition_toolkit.playbook.exceptions import ParameterResolutionError
-from ignition_toolkit.credentials import CredentialVault, Credential
+from ignition_toolkit.playbook.parameters import ParameterResolver
 
 
 @pytest.fixture
@@ -21,19 +23,13 @@ def temp_vault_dir():
 def vault_with_credentials(temp_vault_dir):
     """Create vault with test credentials"""
     vault = CredentialVault(vault_path=temp_vault_dir)
-    vault.save_credential(Credential(
-        name="test_cred",
-        username="testuser",
-        password="testpass"
-    ))
+    vault.save_credential(Credential(name="test_cred", username="testuser", password="testpass"))
     return vault
 
 
 def test_resolve_parameter():
     """Test resolving parameter reference"""
-    resolver = ParameterResolver(
-        parameters={"url": "http://localhost:8088"}
-    )
+    resolver = ParameterResolver(parameters={"url": "http://localhost:8088"})
 
     result = resolver.resolve("{{ parameter.url }}")
     assert result == "http://localhost:8088"
@@ -41,9 +37,7 @@ def test_resolve_parameter():
 
 def test_resolve_variable():
     """Test resolving variable reference"""
-    resolver = ParameterResolver(
-        variables={"step_name": "Login"}
-    )
+    resolver = ParameterResolver(variables={"step_name": "Login"})
 
     result = resolver.resolve("{{ variable.step_name }}")
     assert result == "Login"
@@ -51,9 +45,7 @@ def test_resolve_variable():
 
 def test_resolve_credential(vault_with_credentials):
     """Test resolving credential reference"""
-    resolver = ParameterResolver(
-        credential_vault=vault_with_credentials
-    )
+    resolver = ParameterResolver(credential_vault=vault_with_credentials)
 
     result = resolver.resolve("{{ credential.test_cred }}")
     assert result.username == "testuser"
@@ -62,9 +54,7 @@ def test_resolve_credential(vault_with_credentials):
 
 def test_resolve_multiple_references():
     """Test resolving multiple references in one string"""
-    resolver = ParameterResolver(
-        parameters={"host": "localhost", "port": "8088"}
-    )
+    resolver = ParameterResolver(parameters={"host": "localhost", "port": "8088"})
 
     result = resolver.resolve("http://{{ parameter.host }}:{{ parameter.port }}")
     assert result == "http://localhost:8088"
@@ -72,16 +62,12 @@ def test_resolve_multiple_references():
 
 def test_resolve_dict():
     """Test resolving references in dictionary"""
-    resolver = ParameterResolver(
-        parameters={"username": "admin", "timeout": 30}
-    )
+    resolver = ParameterResolver(parameters={"username": "admin", "timeout": 30})
 
     data = {
         "user": "{{ parameter.username }}",
         "timeout": "{{ parameter.timeout }}",
-        "nested": {
-            "value": "{{ parameter.username }}"
-        }
+        "nested": {"value": "{{ parameter.username }}"},
     }
 
     result = resolver.resolve(data)
@@ -92,9 +78,7 @@ def test_resolve_dict():
 
 def test_resolve_list():
     """Test resolving references in list"""
-    resolver = ParameterResolver(
-        parameters={"item1": "first", "item2": "second"}
-    )
+    resolver = ParameterResolver(parameters={"item1": "first", "item2": "second"})
 
     data = ["{{ parameter.item1 }}", "{{ parameter.item2 }}"]
     result = resolver.resolve(data)
@@ -165,14 +149,9 @@ def test_resolve_file_path(temp_vault_dir):
     test_file = temp_vault_dir / "test.txt"
     test_file.write_text("test content")
 
-    resolver = ParameterResolver(
-        parameters={"filename": "test.txt"}
-    )
+    resolver = ParameterResolver(parameters={"filename": "test.txt"})
 
-    result = resolver.resolve_file_path(
-        "{{ parameter.filename }}",
-        base_path=temp_vault_dir
-    )
+    result = resolver.resolve_file_path("{{ parameter.filename }}", base_path=temp_vault_dir)
 
     assert result.exists()
     assert result.name == "test.txt"
@@ -180,22 +159,15 @@ def test_resolve_file_path(temp_vault_dir):
 
 def test_resolve_nonexistent_file_path(temp_vault_dir):
     """Test error resolving nonexistent file"""
-    resolver = ParameterResolver(
-        parameters={"filename": "nonexistent.txt"}
-    )
+    resolver = ParameterResolver(parameters={"filename": "nonexistent.txt"})
 
     with pytest.raises(ParameterResolutionError, match="File not found"):
-        resolver.resolve_file_path(
-            "{{ parameter.filename }}",
-            base_path=temp_vault_dir
-        )
+        resolver.resolve_file_path("{{ parameter.filename }}", base_path=temp_vault_dir)
 
 
 def test_whitespace_in_references():
     """Test that whitespace is handled correctly"""
-    resolver = ParameterResolver(
-        parameters={"value": "test"}
-    )
+    resolver = ParameterResolver(parameters={"value": "test"})
 
     # With spaces
     result1 = resolver.resolve("{{  parameter.value  }}")

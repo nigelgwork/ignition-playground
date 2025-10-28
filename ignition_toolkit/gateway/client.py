@@ -5,29 +5,21 @@ Async Ignition Gateway REST API client
 import asyncio
 import logging
 from pathlib import Path
-from typing import List, Optional, Dict, Any
-from datetime import datetime
 
 import httpx
 
 from ignition_toolkit.gateway.endpoints import GatewayEndpoints
+from ignition_toolkit.gateway.exceptions import (
+    AuthenticationError,
+    GatewayConnectionError,
+    ModuleInstallationError,
+)
 from ignition_toolkit.gateway.models import (
+    GatewayInfo,
+    HealthStatus,
     Module,
     ModuleState,
     Project,
-    ProjectStatus,
-    Tag,
-    TagQuality,
-    GatewayInfo,
-    HealthStatus,
-)
-from ignition_toolkit.gateway.exceptions import (
-    GatewayException,
-    AuthenticationError,
-    ResourceNotFoundError,
-    GatewayConnectionError,
-    ModuleInstallationError,
-    GatewayRestartError,
 )
 
 logger = logging.getLogger(__name__)
@@ -55,8 +47,8 @@ class GatewayClient:
     def __init__(
         self,
         base_url: str,
-        username: Optional[str] = None,
-        password: Optional[str] = None,
+        username: str | None = None,
+        password: str | None = None,
         timeout: float = 30.0,
     ):
         """
@@ -212,7 +204,7 @@ class GatewayClient:
 
     # Module Operations
 
-    async def list_modules(self) -> List[Module]:
+    async def list_modules(self) -> list[Module]:
         """
         List all installed modules
 
@@ -231,13 +223,15 @@ class GatewayClient:
         modules = []
 
         for module_data in modules_data:
-            modules.append(Module(
-                name=module_data.get("name", "unknown"),
-                version=module_data.get("version", "unknown"),
-                state=ModuleState(module_data.get("state", "unknown")),
-                description=module_data.get("description"),
-                license_required=module_data.get("licenseRequired", False),
-            ))
+            modules.append(
+                Module(
+                    name=module_data.get("name", "unknown"),
+                    version=module_data.get("version", "unknown"),
+                    state=ModuleState(module_data.get("state", "unknown")),
+                    description=module_data.get("description"),
+                    license_required=module_data.get("licenseRequired", False),
+                )
+            )
 
         return modules
 
@@ -313,7 +307,7 @@ class GatewayClient:
 
     # Project Operations
 
-    async def list_projects(self) -> List[Project]:
+    async def list_projects(self) -> list[Project]:
         """
         List all projects
 
@@ -332,18 +326,20 @@ class GatewayClient:
         projects = []
 
         for project_data in projects_data:
-            projects.append(Project(
-                name=project_data.get("name", "unknown"),
-                title=project_data.get("title", project_data.get("name", "unknown")),
-                enabled=project_data.get("enabled", False),
-                description=project_data.get("description"),
-                parent=project_data.get("parent"),
-                version=project_data.get("version"),
-            ))
+            projects.append(
+                Project(
+                    name=project_data.get("name", "unknown"),
+                    title=project_data.get("title", project_data.get("name", "unknown")),
+                    enabled=project_data.get("enabled", False),
+                    description=project_data.get("description"),
+                    parent=project_data.get("parent"),
+                    version=project_data.get("version"),
+                )
+            )
 
         return projects
 
-    async def get_project(self, project_name: str) -> Optional[Project]:
+    async def get_project(self, project_name: str) -> Project | None:
         """
         Get project details
 

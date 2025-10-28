@@ -3,8 +3,7 @@ Credential data models
 """
 
 from dataclasses import dataclass
-from typing import Optional
-from datetime import datetime, UTC
+from datetime import UTC, datetime
 
 
 @dataclass
@@ -21,13 +20,14 @@ class Credential:
         created_at: Creation timestamp
         updated_at: Last update timestamp
     """
+
     name: str
     username: str
     password: str
-    gateway_url: Optional[str] = None
-    description: Optional[str] = None
-    created_at: Optional[datetime] = None
-    updated_at: Optional[datetime] = None
+    gateway_url: str | None = None
+    description: str | None = None
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
 
     def __post_init__(self) -> None:
         """Set timestamps if not provided"""

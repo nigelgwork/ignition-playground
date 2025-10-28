@@ -4,21 +4,22 @@ Playbook loader - YAML parsing and validation
 Handles loading playbook definitions from YAML files with validation.
 """
 
-import yaml
 from pathlib import Path
-from typing import Dict, Any, List
+from typing import Any
 
-from ignition_toolkit.playbook.models import (
-    Playbook,
-    PlaybookStep,
-    PlaybookParameter,
-    ParameterType,
-    StepType,
-    OnFailureAction,
-)
+import yaml
+
 from ignition_toolkit.playbook.exceptions import (
     PlaybookLoadError,
     PlaybookValidationError,
+)
+from ignition_toolkit.playbook.models import (
+    OnFailureAction,
+    ParameterType,
+    Playbook,
+    PlaybookParameter,
+    PlaybookStep,
+    StepType,
 )
 
 
@@ -50,7 +51,7 @@ class PlaybookLoader:
             raise PlaybookLoadError(f"Playbook file not found: {file_path}")
 
         try:
-            with open(file_path, "r") as f:
+            with open(file_path) as f:
                 data = yaml.safe_load(f)
         except yaml.YAMLError as e:
             raise PlaybookLoadError(f"Invalid YAML syntax: {e}")
@@ -103,7 +104,7 @@ class PlaybookLoader:
             raise PlaybookLoadError(f"Error writing file: {e}")
 
     @staticmethod
-    def _parse_playbook(data: Dict[str, Any], source_path: Path = None) -> Playbook:
+    def _parse_playbook(data: dict[str, Any], source_path: Path = None) -> Playbook:
         """
         Parse playbook data structure
 
@@ -161,7 +162,7 @@ class PlaybookLoader:
         )
 
     @staticmethod
-    def _parse_parameter(data: Dict[str, Any]) -> PlaybookParameter:
+    def _parse_parameter(data: dict[str, Any]) -> PlaybookParameter:
         """
         Parse parameter definition
 
@@ -201,7 +202,7 @@ class PlaybookLoader:
         )
 
     @staticmethod
-    def _parse_step(data: Dict[str, Any]) -> PlaybookStep:
+    def _parse_step(data: dict[str, Any]) -> PlaybookStep:
         """
         Parse step definition
 
@@ -257,7 +258,7 @@ class PlaybookLoader:
         )
 
     @staticmethod
-    def _serialize_playbook(playbook: Playbook) -> Dict[str, Any]:
+    def _serialize_playbook(playbook: Playbook) -> dict[str, Any]:
         """
         Convert playbook to dictionary for YAML serialization
 

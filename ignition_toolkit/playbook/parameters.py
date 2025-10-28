@@ -8,8 +8,8 @@ Handles resolving parameter references like:
 """
 
 import re
-from typing import Any, Dict, Optional
 from pathlib import Path
+from typing import Any
 
 from ignition_toolkit.credentials import CredentialVault
 from ignition_toolkit.playbook.exceptions import ParameterResolutionError
@@ -38,9 +38,9 @@ class ParameterResolver:
 
     def __init__(
         self,
-        credential_vault: Optional[CredentialVault] = None,
-        parameters: Optional[Dict[str, Any]] = None,
-        variables: Optional[Dict[str, Any]] = None,
+        credential_vault: CredentialVault | None = None,
+        parameters: dict[str, Any] | None = None,
+        variables: dict[str, Any] | None = None,
     ):
         """
         Initialize parameter resolver
@@ -219,7 +219,7 @@ class ParameterResolver:
             raise ParameterResolutionError(f"Parameter '{name}' not found in playbook parameters")
         return self.parameters[name]
 
-    def resolve_file_path(self, path: str, base_path: Optional[Path] = None) -> Path:
+    def resolve_file_path(self, path: str, base_path: Path | None = None) -> Path:
         """
         Resolve file path (handle relative paths)
 

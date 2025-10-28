@@ -8,19 +8,17 @@ import asyncio
 import logging
 import os
 import pty
-import subprocess
 import select
-import signal
 import shutil
-from pathlib import Path
-from typing import Dict, List
+import signal
+import subprocess
 from datetime import datetime
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
-from ignition_toolkit.playbook.models import ExecutionState
-from ignition_toolkit.playbook.engine import PlaybookEngine
 from ignition_toolkit.core.paths import get_playbooks_dir
+from ignition_toolkit.playbook.engine import PlaybookEngine
+from ignition_toolkit.playbook.models import ExecutionState
 
 logger = logging.getLogger(__name__)
 
@@ -28,27 +26,31 @@ router = APIRouter(tags=["websockets"])
 
 
 # Dependency injection functions to access global state
-def get_websocket_connections() -> List[WebSocket]:
+def get_websocket_connections() -> list[WebSocket]:
     """Get shared websocket connections list from app"""
     from ignition_toolkit.api.app import websocket_connections
+
     return websocket_connections
 
 
-def get_active_engines() -> Dict[str, "PlaybookEngine"]:
+def get_active_engines() -> dict[str, "PlaybookEngine"]:
     """Get shared active engines dict from app"""
     from ignition_toolkit.api.app import active_engines
+
     return active_engines
 
 
-def get_claude_code_processes() -> Dict[str, subprocess.Popen]:
+def get_claude_code_processes() -> dict[str, subprocess.Popen]:
     """Get shared claude code processes dict from app"""
     from ignition_toolkit.api.app import claude_code_processes
+
     return claude_code_processes
 
 
 # ============================================================================
 # WebSocket Endpoints
 # ============================================================================
+
 
 @router.websocket("/ws/executions")
 async def websocket_endpoint(websocket: WebSocket):
@@ -77,10 +79,13 @@ async def websocket_endpoint(websocket: WebSocket):
             # Parse message to check for ping
             try:
                 import json
+
                 message = json.loads(data)
-                if message.get('type') == 'ping':
+                if message.get("type") == "ping":
                     # Respond to heartbeat ping
-                    await websocket.send_json({"type": "pong", "timestamp": message.get('timestamp')})
+                    await websocket.send_json(
+                        {"type": "pong", "timestamp": message.get("timestamp")}
+                    )
                     logger.debug("Heartbeat ping received and acknowledged")
                 else:
                     # Echo back other messages for compatibility
@@ -116,19 +121,15 @@ async def claude_code_terminal(websocket: WebSocket, execution_id: str):
         active_engines = get_active_engines()
         engine = active_engines.get(execution_id)
         if not engine:
-            await websocket.send_json({
-                "type": "error",
-                "message": "Execution not found or not active"
-            })
+            await websocket.send_json(
+                {"type": "error", "message": "Execution not found or not active"}
+            )
             await websocket.close(code=1008, reason="Execution not found")
             return
 
         execution_state = engine.get_current_execution()
         if not execution_state:
-            await websocket.send_json({
-                "type": "error",
-                "message": "Execution state not available"
-            })
+            await websocket.send_json({"type": "error", "message": "Execution state not available"})
             await websocket.close(code=1008, reason="No execution state")
             return
 
@@ -138,15 +139,16 @@ async def claude_code_terminal(websocket: WebSocket, execution_id: str):
         playbook_path = None
 
         import yaml
+
         # Search for playbook by name
         for yaml_file in playbooks_dir.rglob("*.yaml"):
             # Skip backup files
-            if '.backup.' in yaml_file.name:
+            if ".backup." in yaml_file.name:
                 continue
             try:
-                with open(yaml_file, 'r') as f:
+                with open(yaml_file) as f:
                     playbook_data = yaml.safe_load(f)
-                    if playbook_data and playbook_data.get('name') == playbook_name:
+                    if playbook_data and playbook_data.get("name") == playbook_name:
                         playbook_path = str(yaml_file.absolute())
                         logger.info(f"Found playbook: {playbook_path}")
                         break
@@ -157,33 +159,38 @@ async def claude_code_terminal(websocket: WebSocket, execution_id: str):
         if not playbook_path:
             error_msg = f"Playbook file not found for '{playbook_name}' in {playbooks_dir}"
             logger.error(error_msg)
-            await websocket.send_json({
-                "type": "error",
-                "message": error_msg
-            })
+            await websocket.send_json({"type": "error", "message": error_msg})
             await websocket.close(code=1008, reason="Playbook not found")
             return
 
         # Build context message
         context_parts = [
-            f"# Playbook Execution Debug Session",
-            f"",
+            "# Playbook Execution Debug Session",
+            "",
             f"**Execution ID:** {execution_id}",
             f"**Playbook:** {playbook_name}",
             f"**Status:** {execution_state.status.value}",
             f"**Current Step:** {execution_state.current_step_index + 1 if execution_state.current_step_index is not None else 'N/A'}",
-            f"",
+            "",
         ]
 
         # Add step results
         if execution_state.step_results:
             context_parts.append("## Step Results:")
             for idx, result in enumerate(execution_state.step_results, 1):
-                status_str = result.status.value if hasattr(result, 'status') else str(result.get('status', 'unknown'))
+                status_str = (
+                    result.status.value
+                    if hasattr(result, "status")
+                    else str(result.get("status", "unknown"))
+                )
                 status_emoji = "✅" if status_str == "success" else "❌"
-                step_name = result.step_name if hasattr(result, 'step_name') else result.get('step_name', 'Unknown')
+                step_name = (
+                    result.step_name
+                    if hasattr(result, "step_name")
+                    else result.get("step_name", "Unknown")
+                )
                 context_parts.append(f"{status_emoji} **Step {idx}:** {step_name}")
-                error = result.error if hasattr(result, 'error') else result.get('error')
+                error = result.error if hasattr(result, "error") else result.get("error")
                 if error:
                     context_parts.append(f"   Error: {error}")
             context_parts.append("")
@@ -201,10 +208,7 @@ async def claude_code_terminal(websocket: WebSocket, execution_id: str):
             if not shutil.which(claude_cmd):
                 error_msg = f"Configured Claude CLI command '{claude_cmd}' not found. Set CLAUDE_CLI_COMMAND environment variable to the correct command."
                 logger.error(error_msg)
-                await websocket.send_json({
-                    "type": "error",
-                    "message": error_msg
-                })
+                await websocket.send_json({"type": "error", "message": error_msg})
                 await websocket.close(code=1008, reason="Claude CLI not found")
                 return
         else:
@@ -221,10 +225,7 @@ async def claude_code_terminal(websocket: WebSocket, execution_id: str):
                     "Or set CLAUDE_CLI_COMMAND environment variable to your Claude CLI command name."
                 )
                 logger.error(error_msg)
-                await websocket.send_json({
-                    "type": "error",
-                    "message": error_msg
-                })
+                await websocket.send_json({"type": "error", "message": error_msg})
                 await websocket.close(code=1008, reason="Claude CLI not found")
                 return
 
@@ -238,29 +239,20 @@ async def claude_code_terminal(websocket: WebSocket, execution_id: str):
         is_shell_script = False
         if cmd_file_info:
             try:
-                with open(claude_cmd, 'rb') as f:
+                with open(claude_cmd, "rb") as f:
                     first_bytes = f.read(20)
-                    if first_bytes.startswith(b'#!/'):
+                    if first_bytes.startswith(b"#!/"):
                         is_shell_script = True
             except Exception:
                 pass
 
         if is_shell_script:
             # It's a shell script - need to invoke through bash
-            cmd_args = [
-                "/bin/bash",
-                claude_cmd,
-                "-p", playbook_path,
-                "-m", context_msg
-            ]
+            cmd_args = ["/bin/bash", claude_cmd, "-p", playbook_path, "-m", context_msg]
             logger.info(f"Detected shell script, using: /bin/bash {claude_cmd}")
         else:
             # It's a binary - call directly
-            cmd_args = [
-                claude_cmd,
-                "-p", playbook_path,
-                "-m", context_msg
-            ]
+            cmd_args = [claude_cmd, "-p", playbook_path, "-m", context_msg]
 
         process = subprocess.Popen(
             cmd_args,
@@ -268,7 +260,7 @@ async def claude_code_terminal(websocket: WebSocket, execution_id: str):
             stdout=slave_fd,
             stderr=slave_fd,
             preexec_fn=os.setsid,  # Create new process group
-            close_fds=True
+            close_fds=True,
         )
 
         os.close(slave_fd)  # Parent doesn't need slave_fd
@@ -279,11 +271,13 @@ async def claude_code_terminal(websocket: WebSocket, execution_id: str):
         logger.info(f"Claude Code process started: PID={process.pid}, playbook={playbook_path}")
 
         # Send initial welcome message
-        await websocket.send_json({
-            "type": "connected",
-            "message": f"Claude Code session started for {playbook_name}",
-            "pid": process.pid
-        })
+        await websocket.send_json(
+            {
+                "type": "connected",
+                "message": f"Claude Code session started for {playbook_name}",
+                "pid": process.pid,
+            }
+        )
 
         # Create tasks for bidirectional I/O
         async def read_from_pty():
@@ -293,10 +287,7 @@ async def claude_code_terminal(websocket: WebSocket, execution_id: str):
                     # Check if process is still alive
                     if process.poll() is not None:
                         logger.info(f"Claude Code process exited: {process.pid}")
-                        await websocket.send_json({
-                            "type": "exit",
-                            "code": process.returncode
-                        })
+                        await websocket.send_json({"type": "exit", "code": process.returncode})
                         break
 
                     # Use select to check if data is available (non-blocking)
@@ -330,6 +321,7 @@ async def claude_code_terminal(websocket: WebSocket, execution_id: str):
                     elif "text" in message:
                         # Text message (e.g., resize events)
                         import json
+
                         try:
                             msg = json.loads(message["text"])
                             if msg.get("type") == "resize":
@@ -345,11 +337,7 @@ async def claude_code_terminal(websocket: WebSocket, execution_id: str):
                     break
 
         # Run both tasks concurrently
-        await asyncio.gather(
-            read_from_pty(),
-            write_to_pty(),
-            return_exceptions=True
-        )
+        await asyncio.gather(read_from_pty(), write_to_pty(), return_exceptions=True)
 
     except Exception as e:
         logger.exception(f"Claude Code WebSocket error: {e}")
@@ -395,6 +383,7 @@ async def claude_code_terminal(websocket: WebSocket, execution_id: str):
 # ============================================================================
 # Broadcast Helper Functions
 # ============================================================================
+
 
 async def broadcast_execution_state(state: ExecutionState):
     """Broadcast execution state to all connected WebSocket clients"""
@@ -460,10 +449,9 @@ async def shell_terminal(websocket: WebSocket):
     try:
         # Validate working directory exists
         if not os.path.isdir(working_dir):
-            await websocket.send_json({
-                "type": "error",
-                "message": f"Directory does not exist: {working_dir}"
-            })
+            await websocket.send_json(
+                {"type": "error", "message": f"Directory does not exist: {working_dir}"}
+            )
             await websocket.close(code=1008, reason="Invalid directory")
             return
 
@@ -479,7 +467,7 @@ async def shell_terminal(websocket: WebSocket):
             cwd=working_dir,
             preexec_fn=os.setsid,  # Create new process group
             close_fds=True,
-            env={**os.environ, "PS1": "$ "}  # Simple prompt
+            env={**os.environ, "PS1": "$ "},  # Simple prompt
         )
 
         os.close(slave_fd)  # Parent doesn't need slave_fd
@@ -494,10 +482,7 @@ async def shell_terminal(websocket: WebSocket):
                     # Check if process is still alive
                     if process.poll() is not None:
                         logger.info(f"Shell process exited: {process.pid}")
-                        await websocket.send_json({
-                            "type": "exit",
-                            "code": process.returncode
-                        })
+                        await websocket.send_json({"type": "exit", "code": process.returncode})
                         break
 
                     # Use select to check if data is available (non-blocking)
@@ -508,7 +493,7 @@ async def shell_terminal(websocket: WebSocket):
                             break
                         # Send as JSON with output field
                         try:
-                            decoded = data.decode('utf-8', errors='replace')
+                            decoded = data.decode("utf-8", errors="replace")
                             await websocket.send_json({"output": decoded})
                         except Exception as e:
                             logger.error(f"Error decoding output: {e}")
@@ -531,7 +516,7 @@ async def shell_terminal(websocket: WebSocket):
                     if "input" in message:
                         # Text input from terminal
                         data = message["input"]
-                        os.write(master_fd, data.encode('utf-8'))
+                        os.write(master_fd, data.encode("utf-8"))
 
                 except WebSocketDisconnect:
                     break
@@ -540,11 +525,7 @@ async def shell_terminal(websocket: WebSocket):
                     break
 
         # Run both tasks concurrently
-        await asyncio.gather(
-            read_from_pty(),
-            write_to_pty(),
-            return_exceptions=True
-        )
+        await asyncio.gather(read_from_pty(), write_to_pty(), return_exceptions=True)
 
     except Exception as e:
         logger.exception(f"Shell WebSocket error: {e}")
@@ -601,8 +582,8 @@ async def broadcast_screenshot_frame(execution_id: str, screenshot_b64: str):
         "data": {
             "executionId": execution_id,  # camelCase to match frontend
             "screenshot": screenshot_b64,
-            "timestamp": datetime.now().isoformat()
-        }
+            "timestamp": datetime.now().isoformat(),
+        },
     }
 
     # Send to all connected clients

@@ -5,17 +5,17 @@ Handles execution of different step types with proper error handling and retries
 """
 
 import asyncio
+import logging
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, Optional
-import logging
+from typing import Any
 
-from ignition_toolkit.gateway import GatewayClient
-from ignition_toolkit.browser import BrowserManager
 from ignition_toolkit.ai import AIAssistant
-from ignition_toolkit.playbook.models import PlaybookStep, StepType, StepResult, StepStatus
-from ignition_toolkit.playbook.parameters import ParameterResolver
+from ignition_toolkit.browser import BrowserManager
+from ignition_toolkit.gateway import GatewayClient
 from ignition_toolkit.playbook.exceptions import StepExecutionError
+from ignition_toolkit.playbook.models import PlaybookStep, StepResult, StepStatus, StepType
+from ignition_toolkit.playbook.parameters import ParameterResolver
 
 logger = logging.getLogger(__name__)
 
@@ -31,12 +31,12 @@ class StepExecutor:
 
     def __init__(
         self,
-        gateway_client: Optional[GatewayClient] = None,
-        browser_manager: Optional[BrowserManager] = None,
-        ai_assistant: Optional[AIAssistant] = None,
-        parameter_resolver: Optional[ParameterResolver] = None,
-        base_path: Optional[Path] = None,
-        state_manager: Optional[Any] = None,  # StateManager type hint causes circular import
+        gateway_client: GatewayClient | None = None,
+        browser_manager: BrowserManager | None = None,
+        ai_assistant: AIAssistant | None = None,
+        parameter_resolver: ParameterResolver | None = None,
+        base_path: Path | None = None,
+        state_manager: Any | None = None,  # StateManager type hint causes circular import
     ):
         """
         Initialize step executor
@@ -79,9 +79,7 @@ class StepExecutor:
         while retry_count <= step.retry_count:
             try:
                 # Execute step with timeout
-                output = await asyncio.wait_for(
-                    self._execute_step_impl(step), timeout=step.timeout
-                )
+                output = await asyncio.wait_for(self._execute_step_impl(step), timeout=step.timeout)
 
                 # Success
                 result.status = StepStatus.COMPLETED
@@ -130,7 +128,7 @@ class StepExecutor:
         result.retry_count = retry_count - 1
         return result
 
-    async def _capture_debug_context(self, step: PlaybookStep, error: str) -> Dict[str, Any]:
+    async def _capture_debug_context(self, step: PlaybookStep, error: str) -> dict[str, Any]:
         """
         Capture debug context on failure
 
@@ -162,7 +160,7 @@ class StepExecutor:
 
         return context
 
-    async def _execute_step_impl(self, step: PlaybookStep) -> Dict[str, Any]:
+    async def _execute_step_impl(self, step: PlaybookStep) -> dict[str, Any]:
         """
         Execute step implementation (without retries/timeout)
 
@@ -197,8 +195,8 @@ class StepExecutor:
             raise StepExecutionError(step.id, f"Unknown step type: {step.type}")
 
     async def _execute_gateway_step(
-        self, step_type: StepType, params: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        self, step_type: StepType, params: dict[str, Any]
+    ) -> dict[str, Any]:
         """
         Execute gateway operation step
 
@@ -248,9 +246,7 @@ class StepExecutor:
             elif step_type == StepType.GATEWAY_UPLOAD_MODULE:
                 file_path = params.get("file")
                 if self.parameter_resolver:
-                    file_path = self.parameter_resolver.resolve_file_path(
-                        file_path, self.base_path
-                    )
+                    file_path = self.parameter_resolver.resolve_file_path(file_path, self.base_path)
                 else:
                     file_path = Path(file_path)
                 module_id = await self.gateway_client.upload_module(file_path)
@@ -288,8 +284,8 @@ class StepExecutor:
             raise StepExecutionError("gateway", f"Gateway operation failed: {e}")
 
     async def _execute_browser_step(
-        self, step_type: StepType, params: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        self, step_type: StepType, params: dict[str, Any]
+    ) -> dict[str, Any]:
         """
         Execute browser automation step
 
@@ -354,12 +350,12 @@ class StepExecutor:
                 if exists and not element_found:
                     raise StepExecutionError(
                         "browser",
-                        f"Verification failed: Expected element '{selector}' to exist, but it was not found"
+                        f"Verification failed: Expected element '{selector}' to exist, but it was not found",
                     )
                 elif not exists and element_found:
                     raise StepExecutionError(
                         "browser",
-                        f"Verification failed: Expected element '{selector}' to NOT exist, but it was found"
+                        f"Verification failed: Expected element '{selector}' to NOT exist, but it was found",
                     )
 
                 # Verification passed
@@ -369,7 +365,7 @@ class StepExecutor:
                     "exists": element_found,
                     "expected": exists,
                     "status": "verified",
-                    "message": f"Element '{selector}' {verification_result} as expected"
+                    "message": f"Element '{selector}' {verification_result} as expected",
                 }
 
             else:
@@ -379,8 +375,8 @@ class StepExecutor:
             raise StepExecutionError("browser", f"Browser operation failed: {e}")
 
     async def _execute_playbook_step(
-        self, step_type: StepType, params: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        self, step_type: StepType, params: dict[str, Any]
+    ) -> dict[str, Any]:
         """
         Execute nested playbook as a single step (composable playbooks)
 
@@ -414,10 +410,7 @@ class StepExecutor:
             full_path = self.base_path / playbook_path
 
             if not full_path.exists():
-                raise StepExecutionError(
-                    "playbook",
-                    f"Playbook not found: {playbook_path}"
-                )
+                raise StepExecutionError("playbook", f"Playbook not found: {playbook_path}")
 
             # Get relative path for metadata lookup
             relative_path = playbook_path.replace("playbooks/", "")
@@ -428,16 +421,16 @@ class StepExecutor:
                 raise StepExecutionError(
                     "playbook",
                     f"Playbook '{relative_path}' must be verified before it can be used as a step. "
-                    f"Mark it as verified via the UI 3-dot menu."
+                    f"Mark it as verified via the UI 3-dot menu.",
                 )
 
             # Check for circular dependencies (basic check)
             # TODO: Implement full call stack tracking for deeper nesting
-            if hasattr(self, '_execution_stack'):
+            if hasattr(self, "_execution_stack"):
                 if playbook_path in self._execution_stack:
                     raise StepExecutionError(
                         "playbook",
-                        f"Circular dependency detected: playbook '{playbook_path}' calls itself"
+                        f"Circular dependency detected: playbook '{playbook_path}' calls itself",
                     )
             else:
                 self._execution_stack = []
@@ -452,7 +445,7 @@ class StepExecutor:
                 raise StepExecutionError(
                     "playbook",
                     f"Maximum nesting depth ({MAX_NESTING_DEPTH}) exceeded. "
-                    f"Current stack: {' -> '.join(self._execution_stack)}"
+                    f"Current stack: {' -> '.join(self._execution_stack)}",
                 )
 
             try:
@@ -476,7 +469,7 @@ class StepExecutor:
                     "message": "Nested playbook execution not fully implemented yet",
                     "verified": True,
                     "parameters": child_params,
-                    "steps_count": len(nested_playbook.steps)
+                    "steps_count": len(nested_playbook.steps),
                 }
 
             finally:
@@ -487,8 +480,8 @@ class StepExecutor:
             raise StepExecutionError("playbook", f"Unknown playbook step type: {step_type}")
 
     async def _execute_utility_step(
-        self, step_type: StepType, params: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        self, step_type: StepType, params: dict[str, Any]
+    ) -> dict[str, Any]:
         """
         Execute utility step
 
@@ -531,9 +524,7 @@ class StepExecutor:
         else:
             raise StepExecutionError("utility", f"Unknown utility step type: {step_type}")
 
-    async def _execute_ai_step(
-        self, step_type: StepType, params: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    async def _execute_ai_step(self, step_type: StepType, params: dict[str, Any]) -> dict[str, Any]:
         """
         Execute AI operation step (placeholder)
 

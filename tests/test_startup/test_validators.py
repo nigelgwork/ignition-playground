@@ -2,22 +2,22 @@
 Tests for startup validators
 """
 
-import pytest
 import sys
-from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
+import pytest
+
+from ignition_toolkit.startup.exceptions import (
+    DatabaseInitError,
+    EnvironmentError,
+    VaultInitError,
+)
 from ignition_toolkit.startup.validators import (
-    validate_environment,
     initialize_database,
     initialize_vault,
-    validate_playbooks,
+    validate_environment,
     validate_frontend,
-)
-from ignition_toolkit.startup.exceptions import (
-    EnvironmentError,
-    DatabaseInitError,
-    VaultInitError,
+    validate_playbooks,
 )
 
 
@@ -31,7 +31,7 @@ async def test_validate_environment_success():
 @pytest.mark.asyncio
 async def test_validate_environment_python_version():
     """Test Python version check"""
-    with patch.object(sys, 'version_info', (3, 9)):
+    with patch.object(sys, "version_info", (3, 9)):
         with pytest.raises(EnvironmentError) as exc_info:
             await validate_environment()
 
@@ -45,7 +45,7 @@ async def test_validate_environment_data_directory(tmp_path):
     # Should create directory if it doesn't exist
     test_db_path = tmp_path / "test_data" / "test.db"
 
-    with patch('ignition_toolkit.startup.validators.get_settings') as mock_settings:
+    with patch("ignition_toolkit.startup.validators.get_settings") as mock_settings:
         settings = MagicMock()
         settings.database_path = test_db_path
         settings.vault_path = tmp_path / ".ignition-toolkit" / "vault"
@@ -59,7 +59,7 @@ async def test_validate_environment_data_directory(tmp_path):
 @pytest.mark.asyncio
 async def test_initialize_database_success():
     """Test successful database initialization"""
-    with patch('ignition_toolkit.startup.validators.get_database') as mock_get_db:
+    with patch("ignition_toolkit.startup.validators.get_database") as mock_get_db:
         mock_db = MagicMock()
         mock_db.create_tables = MagicMock()
         mock_db.session_scope = MagicMock()
@@ -84,7 +84,7 @@ async def test_initialize_database_success():
 @pytest.mark.asyncio
 async def test_initialize_database_failure():
     """Test database initialization failure"""
-    with patch('ignition_toolkit.startup.validators.get_database') as mock_get_db:
+    with patch("ignition_toolkit.startup.validators.get_database") as mock_get_db:
         mock_db = MagicMock()
         mock_db.create_tables.side_effect = Exception("Database error")
         mock_get_db.return_value = mock_db
@@ -99,7 +99,7 @@ async def test_initialize_database_failure():
 @pytest.mark.asyncio
 async def test_initialize_vault_success():
     """Test successful vault initialization"""
-    with patch('ignition_toolkit.startup.validators.get_credential_vault') as mock_get_vault:
+    with patch("ignition_toolkit.startup.validators.get_credential_vault") as mock_get_vault:
         mock_vault = MagicMock()
         mock_vault.initialize = MagicMock()
         mock_vault.test_encryption.return_value = True
@@ -114,7 +114,7 @@ async def test_initialize_vault_success():
 @pytest.mark.asyncio
 async def test_initialize_vault_encryption_failure():
     """Test vault encryption test failure"""
-    with patch('ignition_toolkit.startup.validators.get_credential_vault') as mock_get_vault:
+    with patch("ignition_toolkit.startup.validators.get_credential_vault") as mock_get_vault:
         mock_vault = MagicMock()
         mock_vault.initialize = MagicMock()
         mock_vault.test_encryption.return_value = False
@@ -145,7 +145,7 @@ async def test_validate_playbooks_success(tmp_path):
     (perspective_dir / "test3.yaml").write_text("test")
     (examples_dir / "test4.yaml").write_text("test")
 
-    with patch('ignition_toolkit.startup.validators.Path') as mock_path:
+    with patch("ignition_toolkit.startup.validators.Path") as mock_path:
         mock_path.return_value = playbooks_dir
 
         stats = await validate_playbooks()
@@ -161,7 +161,7 @@ async def test_validate_playbooks_missing_directory(tmp_path):
     """Test playbook validation with missing directory"""
     nonexistent = tmp_path / "nonexistent"
 
-    with patch('ignition_toolkit.startup.validators.Path') as mock_path:
+    with patch("ignition_toolkit.startup.validators.Path") as mock_path:
         mock_path.return_value = nonexistent
 
         with pytest.raises(Exception) as exc_info:
@@ -177,7 +177,7 @@ async def test_validate_frontend_success(tmp_path):
     frontend_dir.mkdir(parents=True)
     (frontend_dir / "index.html").write_text("<html></html>")
 
-    with patch('ignition_toolkit.startup.validators.get_settings') as mock_settings:
+    with patch("ignition_toolkit.startup.validators.get_settings") as mock_settings:
         settings = MagicMock()
         settings.frontend_dir = frontend_dir
         mock_settings.return_value = settings
@@ -190,7 +190,7 @@ async def test_validate_frontend_missing_directory(tmp_path):
     """Test frontend validation with missing directory"""
     nonexistent = tmp_path / "nonexistent"
 
-    with patch('ignition_toolkit.startup.validators.get_settings') as mock_settings:
+    with patch("ignition_toolkit.startup.validators.get_settings") as mock_settings:
         settings = MagicMock()
         settings.frontend_dir = nonexistent
         mock_settings.return_value = settings
@@ -207,7 +207,7 @@ async def test_validate_frontend_missing_index_html(tmp_path):
     frontend_dir = tmp_path / "frontend" / "dist"
     frontend_dir.mkdir(parents=True)
 
-    with patch('ignition_toolkit.startup.validators.get_settings') as mock_settings:
+    with patch("ignition_toolkit.startup.validators.get_settings") as mock_settings:
         settings = MagicMock()
         settings.frontend_dir = frontend_dir
         mock_settings.return_value = settings

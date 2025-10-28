@@ -4,50 +4,32 @@ FastAPI application - Main API server
 Provides REST endpoints for playbook management and execution control.
 """
 
-import asyncio
 import logging
 import os
-import pty
 import subprocess
-import select
-import signal
-import shutil
-from pathlib import Path
-from typing import Any, Dict, List, Optional
 from datetime import datetime
+from pathlib import Path
 
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, BackgroundTasks, Request, Response
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
-from pydantic import BaseModel, validator
-
-from ignition_toolkit.playbook.loader import PlaybookLoader
-from ignition_toolkit.playbook.engine import PlaybookEngine
-from ignition_toolkit.playbook.models import ExecutionState, ExecutionStatus
-from ignition_toolkit.playbook.metadata import PlaybookMetadataStore
-from ignition_toolkit.gateway import GatewayClient
-from ignition_toolkit.credentials import CredentialVault
-from ignition_toolkit.storage import get_database
-from ignition_toolkit.ai import AIAssistant
-from ignition_toolkit import __version__
-from ignition_toolkit.startup.lifecycle import lifespan
-from ignition_toolkit.api.routers import health_router
-from ignition_toolkit.api.routers.playbooks import router as playbooks_router
-from ignition_toolkit.api.routers.executions import router as executions_router
-from ignition_toolkit.api.routers.credentials import router as credentials_router
-from ignition_toolkit.api.routers.ai import router as ai_router
-from ignition_toolkit.api.routers.websockets import router as websockets_router
-from ignition_toolkit.api.routers.models import (
-    ParameterInfo,
-    StepInfo,
-    PlaybookInfo,
-    ExecutionRequest,
-    ExecutionResponse,
-    StepResultResponse,
-    ExecutionStatusResponse
+from fastapi import (
+    FastAPI,
+    Response,
+    WebSocket,
 )
-from ignition_toolkit.core.paths import get_playbooks_dir, get_playbook_path
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
+
+from ignition_toolkit import __version__
+from ignition_toolkit.ai import AIAssistant
+from ignition_toolkit.api.routers import health_router
+from ignition_toolkit.api.routers.ai import router as ai_router
+from ignition_toolkit.api.routers.credentials import router as credentials_router
+from ignition_toolkit.api.routers.executions import router as executions_router
+from ignition_toolkit.api.routers.playbooks import router as playbooks_router
+from ignition_toolkit.api.routers.websockets import router as websockets_router
+from ignition_toolkit.playbook.engine import PlaybookEngine
+from ignition_toolkit.playbook.metadata import PlaybookMetadataStore
+from ignition_toolkit.startup.lifecycle import lifespan
 
 logger = logging.getLogger(__name__)
 
@@ -78,10 +60,10 @@ app.include_router(ai_router)
 app.include_router(websockets_router)
 
 # CORS middleware - Restrict to localhost only (secure default)
-import os
+
 ALLOWED_ORIGINS = os.getenv(
     "ALLOWED_ORIGINS",
-    "http://localhost:5000,http://127.0.0.1:5000,http://localhost:3000,http://127.0.0.1:3000"
+    "http://localhost:5000,http://127.0.0.1:5000,http://localhost:3000,http://127.0.0.1:3000",
 ).split(",")
 
 app.add_middleware(
@@ -93,10 +75,12 @@ app.add_middleware(
 )
 
 # Global state
-active_engines: Dict[str, PlaybookEngine] = {}
-engine_completion_times: Dict[str, datetime] = {}  # Track when engines completed for TTL cleanup
-websocket_connections: List[WebSocket] = []
-claude_code_processes: Dict[str, subprocess.Popen] = {}  # Track Claude Code PTY processes by execution_id
+active_engines: dict[str, PlaybookEngine] = {}
+engine_completion_times: dict[str, datetime] = {}  # Track when engines completed for TTL cleanup
+websocket_connections: list[WebSocket] = []
+claude_code_processes: dict[str, subprocess.Popen] = (
+    {}
+)  # Track Claude Code PTY processes by execution_id
 
 # AI Assistant (will use ANTHROPIC_API_KEY from environment)
 ai_assistant = AIAssistant()
@@ -127,7 +111,6 @@ class NoCacheStaticFiles(StaticFiles):
 frontend_dist = Path(__file__).parent.parent.parent / "frontend" / "dist"
 
 
-
 # Execution endpoints
 
 
@@ -137,21 +120,9 @@ frontend_dist = Path(__file__).parent.parent.parent / "frontend" / "dist"
 # Playbook Metadata Endpoints
 
 
-
-
-
-
-
-
-
-
-
 # WebSocket endpoints moved to routers/websockets.py
 
 # AI routes moved to routers/ai.py
-
-
-
 
 
 # ============================================================================
@@ -183,8 +154,11 @@ if frontend_dist.exists() and (frontend_dist / "index.html").exists():
         response.headers["Pragma"] = "no-cache"
         response.headers["Expires"] = "0"
         return response
+
 else:
-    logger.warning("Frontend build not found at frontend/dist - run 'npm run build' in frontend/ directory")
+    logger.warning(
+        "Frontend build not found at frontend/dist - run 'npm run build' in frontend/ directory"
+    )
 
 
 # Note: Shutdown logic moved to startup/lifecycle.py lifespan manager

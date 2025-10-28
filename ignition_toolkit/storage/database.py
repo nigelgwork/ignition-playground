@@ -3,15 +3,16 @@ SQLite database connection and session management
 """
 
 import logging
-from pathlib import Path
-from typing import Generator, Optional
+from collections.abc import Generator
 from contextlib import contextmanager
-from sqlalchemy import create_engine, event, text
-from sqlalchemy.orm import sessionmaker, Session
-from sqlalchemy.engine import Engine
+from pathlib import Path
 
-from ignition_toolkit.storage.models import Base
+from sqlalchemy import create_engine, event, text
+from sqlalchemy.engine import Engine
+from sqlalchemy.orm import Session, sessionmaker
+
 from ignition_toolkit.config import get_toolkit_data_dir
+from ignition_toolkit.storage.models import Base
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +33,7 @@ class Database:
     Handles SQLite connection, session management, and table creation.
     """
 
-    def __init__(self, database_path: Optional[Path] = None):
+    def __init__(self, database_path: Path | None = None):
         """
         Initialize database connection
 
@@ -147,10 +148,10 @@ class Database:
 
 
 # Global database instance (singleton)
-_database: Optional[Database] = None
+_database: Database | None = None
 
 
-def get_database(database_path: Optional[Path] = None) -> Database:
+def get_database(database_path: Path | None = None) -> Database:
     """
     Get the global database instance (singleton pattern)
 

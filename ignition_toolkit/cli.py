@@ -2,9 +2,10 @@
 Command-line interface for Ignition Automation Toolkit
 """
 
+from pathlib import Path
+
 import click
 import uvicorn
-from pathlib import Path
 from rich.console import Console
 from rich.panel import Panel
 
@@ -54,7 +55,9 @@ def init() -> None:
 
     console.print(f"✅ Credential vault created: [green]{vault_path}[/green]")
     console.print(f"✅ Encryption key generated: [green]{vault_path / 'encryption.key'}[/green]")
-    console.print("\n[yellow]⚠️  Keep your encryption key safe! Loss of key = loss of credentials[/yellow]")
+    console.print(
+        "\n[yellow]⚠️  Keep your encryption key safe! Loss of key = loss of credentials[/yellow]"
+    )
 
     # Create data directory
     data_dir = Path("./data")
@@ -86,8 +89,8 @@ def credential() -> None:
 @click.option("--description", default="", help="Credential description")
 def credential_add(name: str, username: str, password: str, description: str) -> None:
     """Add a new credential"""
-    from ignition_toolkit.credentials.vault import CredentialVault
     from ignition_toolkit.credentials.models import Credential
+    from ignition_toolkit.credentials.vault import CredentialVault
 
     vault = CredentialVault()
     credential = Credential(
@@ -105,8 +108,9 @@ def credential_add(name: str, username: str, password: str, description: str) ->
 @credential.command("list")
 def credential_list() -> None:
     """List all stored credentials"""
-    from ignition_toolkit.credentials.vault import CredentialVault
     from rich.table import Table
+
+    from ignition_toolkit.credentials.vault import CredentialVault
 
     vault = CredentialVault()
     credentials = vault.list_credentials()
@@ -152,6 +156,7 @@ def playbook() -> None:
 def playbook_list() -> None:
     """List available playbooks"""
     from pathlib import Path
+
     from rich.table import Table
 
     playbooks_dir = Path("./playbooks")
@@ -196,11 +201,13 @@ def playbook_run(
     """Run a playbook"""
     import asyncio
     from pathlib import Path
+
     from rich.progress import Progress, SpinnerColumn, TextColumn
-    from ignition_toolkit.playbook.loader import PlaybookLoader
-    from ignition_toolkit.playbook.engine import PlaybookEngine
-    from ignition_toolkit.gateway import GatewayClient
+
     from ignition_toolkit.credentials import CredentialVault
+    from ignition_toolkit.gateway import GatewayClient
+    from ignition_toolkit.playbook.engine import PlaybookEngine
+    from ignition_toolkit.playbook.loader import PlaybookLoader
     from ignition_toolkit.storage import get_database
 
     # Load playbook
@@ -234,15 +241,11 @@ def playbook_run(
     for param_def in playbook.parameters:
         if param_def.required and param_def.name not in parameters:
             if param_def.type.value == "credential":
-                console.print(
-                    f"[yellow]Required credential parameter:[/yellow] {param_def.name}"
-                )
+                console.print(f"[yellow]Required credential parameter:[/yellow] {param_def.name}")
                 console.print(f"Use: --param {param_def.name}=<credential_name>\n")
                 return
             else:
-                value = click.prompt(
-                    f"Enter value for '{param_def.name}' ({param_def.type.value})"
-                )
+                value = click.prompt(f"Enter value for '{param_def.name}' ({param_def.type.value})")
                 parameters[param_def.name] = value
 
     # Initialize components
@@ -289,7 +292,7 @@ def playbook_run(
                 progress.stop()
 
                 # Show results
-                console.print(f"\n[bold]Execution Status:[/bold] ", end="")
+                console.print("\n[bold]Execution Status:[/bold] ", end="")
                 if execution_state.status.value == "completed":
                     console.print(f"[bold green]{execution_state.status.value}[/bold green]")
                 elif execution_state.status.value == "failed":
@@ -342,9 +345,10 @@ def playbook_run(
 @click.option("--output", "-o", help="Output JSON file path")
 def playbook_export(playbook_path: str, output: str | None) -> None:
     """Export playbook to JSON for sharing"""
-    from ignition_toolkit.playbook.loader import PlaybookLoader
-    from ignition_toolkit.playbook.exporter import PlaybookExporter
     from pathlib import Path
+
+    from ignition_toolkit.playbook.exporter import PlaybookExporter
+    from ignition_toolkit.playbook.loader import PlaybookLoader
 
     # Load playbook
     loader = PlaybookLoader()
@@ -361,7 +365,7 @@ def playbook_export(playbook_path: str, output: str | None) -> None:
     Path(output).write_text(json_data)
 
     console.print(f"\n✅ Playbook exported to: [green]{output}[/green]")
-    console.print(f"   Share this file with colleagues\n")
+    console.print("   Share this file with colleagues\n")
 
 
 @playbook.command("import")
@@ -369,8 +373,9 @@ def playbook_export(playbook_path: str, output: str | None) -> None:
 @click.option("--output-dir", default="./playbooks/imported", help="Output directory")
 def playbook_import(json_path: str, output_dir: str) -> None:
     """Import playbook from JSON"""
-    from ignition_toolkit.playbook.exporter import PlaybookExporter
     from pathlib import Path
+
+    from ignition_toolkit.playbook.exporter import PlaybookExporter
 
     # Import from JSON
     exporter = PlaybookExporter()
@@ -383,6 +388,7 @@ def playbook_import(json_path: str, output_dir: str) -> None:
     yaml_path = output_path / f"{playbook.name.lower().replace(' ', '_')}.yaml"
 
     from ignition_toolkit.playbook.loader import PlaybookLoader
+
     loader = PlaybookLoader()
     loader.save_to_file(playbook, yaml_path)
 

@@ -8,11 +8,11 @@ and debugging.
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Optional
 
 
 class HealthStatus(str, Enum):
     """Health status for system components"""
+
     HEALTHY = "healthy"
     DEGRADED = "degraded"
     UNHEALTHY = "unhealthy"
@@ -30,10 +30,11 @@ class ComponentHealth:
         last_checked: When health was last checked
         error: Error message if unhealthy
     """
+
     status: HealthStatus
     message: str = ""
     last_checked: datetime = field(default_factory=datetime.utcnow)
-    error: Optional[str] = None
+    error: str | None = None
 
     def to_dict(self) -> dict:
         """Convert to JSON-serializable dict"""
@@ -53,14 +54,17 @@ class SystemHealth:
     Tracks overall system health and individual component health.
     Used for startup validation and health check endpoints.
     """
+
     overall: HealthStatus = HealthStatus.UNKNOWN
     ready: bool = False
-    startup_time: Optional[datetime] = None
+    startup_time: datetime | None = None
 
     # Component health
     database: ComponentHealth = field(default_factory=lambda: ComponentHealth(HealthStatus.UNKNOWN))
     vault: ComponentHealth = field(default_factory=lambda: ComponentHealth(HealthStatus.UNKNOWN))
-    playbooks: ComponentHealth = field(default_factory=lambda: ComponentHealth(HealthStatus.UNKNOWN))
+    playbooks: ComponentHealth = field(
+        default_factory=lambda: ComponentHealth(HealthStatus.UNKNOWN)
+    )
     frontend: ComponentHealth = field(default_factory=lambda: ComponentHealth(HealthStatus.UNKNOWN))
 
     # Startup issues

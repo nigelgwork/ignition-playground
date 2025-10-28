@@ -5,28 +5,28 @@ Orchestrates application startup and shutdown using FastAPI's lifespan
 context manager pattern.
 """
 
+import logging
 from contextlib import asynccontextmanager
 from datetime import datetime
-import logging
 
 from fastapi import FastAPI
 
-from ignition_toolkit.startup.validators import (
-    validate_environment,
-    initialize_database,
-    initialize_vault,
-    validate_playbooks,
-    validate_frontend,
-)
+from ignition_toolkit.core.config import is_dev_mode
+from ignition_toolkit.startup.exceptions import StartupError
 from ignition_toolkit.startup.health import (
+    HealthStatus,
     get_health_state,
+    set_component_degraded,
     set_component_healthy,
     set_component_unhealthy,
-    set_component_degraded,
-    HealthStatus,
 )
-from ignition_toolkit.startup.exceptions import StartupError
-from ignition_toolkit.core.config import get_settings, is_dev_mode
+from ignition_toolkit.startup.validators import (
+    initialize_database,
+    initialize_vault,
+    validate_environment,
+    validate_frontend,
+    validate_playbooks,
+)
 
 logger = logging.getLogger(__name__)
 

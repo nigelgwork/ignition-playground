@@ -4,10 +4,9 @@ Configuration and paths for Ignition Toolkit
 Provides consistent, environment-independent paths for data storage.
 """
 
-import os
 import logging
+import os
 from pathlib import Path
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -109,6 +108,7 @@ def migrate_credentials_if_needed() -> None:
 
             # Copy files
             import shutil
+
             shutil.copy2(creds_file, new_location / "credentials.json")
             shutil.copy2(key_file, new_location / "encryption.key")
 

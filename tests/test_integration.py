@@ -2,14 +2,15 @@
 Integration tests for playbook execution
 """
 
-import pytest
-import asyncio
 import tempfile
 from pathlib import Path
-from ignition_toolkit.playbook.loader import PlaybookLoader
+
+import pytest
+
+from ignition_toolkit.credentials import Credential, CredentialVault
 from ignition_toolkit.playbook.engine import PlaybookEngine
+from ignition_toolkit.playbook.loader import PlaybookLoader
 from ignition_toolkit.playbook.models import ExecutionStatus
-from ignition_toolkit.credentials import CredentialVault, Credential
 from ignition_toolkit.storage import get_database
 
 
@@ -24,11 +25,7 @@ def temp_dir():
 def vault(temp_dir):
     """Create credential vault"""
     vault = CredentialVault(vault_path=temp_dir / "vault")
-    vault.save_credential(Credential(
-        name="test_cred",
-        username="testuser",
-        password="testpass"
-    ))
+    vault.save_credential(Credential(name="test_cred", username="testuser", password="testpass"))
     return vault
 
 
@@ -90,10 +87,7 @@ async def test_simple_playbook_execution(simple_playbook_yaml, vault, database):
     playbook = loader.load_from_string(simple_playbook_yaml)
 
     # Create engine
-    engine = PlaybookEngine(
-        credential_vault=vault,
-        database=database
-    )
+    engine = PlaybookEngine(credential_vault=vault, database=database)
 
     # Execute
     parameters = {"message": "Test Complete"}
@@ -135,10 +129,7 @@ steps:
     loader = PlaybookLoader()
     playbook = loader.load_from_string(yaml_content)
 
-    engine = PlaybookEngine(
-        credential_vault=vault,
-        database=database
-    )
+    engine = PlaybookEngine(credential_vault=vault, database=database)
 
     execution_state = await engine.execute_playbook(playbook, {})
 
@@ -173,10 +164,7 @@ steps:
     loader = PlaybookLoader()
     playbook = loader.load_from_string(yaml_content)
 
-    engine = PlaybookEngine(
-        credential_vault=vault,
-        database=database
-    )
+    engine = PlaybookEngine(credential_vault=vault, database=database)
 
     execution_state = await engine.execute_playbook(playbook, {})
 
@@ -210,14 +198,10 @@ steps:
     loader = PlaybookLoader()
     playbook = loader.load_from_string(yaml_content)
 
-    engine = PlaybookEngine(
-        credential_vault=vault,
-        database=database
-    )
+    engine = PlaybookEngine(credential_vault=vault, database=database)
 
     execution_state = await engine.execute_playbook(
-        playbook,
-        {"test_message": "Resolved Successfully"}
+        playbook, {"test_message": "Resolved Successfully"}
     )
 
     assert execution_state.status == ExecutionStatus.COMPLETED
@@ -229,18 +213,14 @@ async def test_execution_callback(simple_playbook_yaml, vault, database):
     loader = PlaybookLoader()
     playbook = loader.load_from_string(simple_playbook_yaml)
 
-    engine = PlaybookEngine(
-        credential_vault=vault,
-        database=database
-    )
+    engine = PlaybookEngine(credential_vault=vault, database=database)
 
     updates = []
 
     def callback(state):
-        updates.append({
-            "step_index": state.current_step_index,
-            "step_count": len(state.step_results)
-        })
+        updates.append(
+            {"step_index": state.current_step_index, "step_count": len(state.step_results)}
+        )
 
     engine.set_update_callback(callback)
 
@@ -256,10 +236,7 @@ async def test_database_tracking(simple_playbook_yaml, vault, database):
     loader = PlaybookLoader()
     playbook = loader.load_from_string(simple_playbook_yaml)
 
-    engine = PlaybookEngine(
-        credential_vault=vault,
-        database=database
-    )
+    engine = PlaybookEngine(credential_vault=vault, database=database)
 
     execution_state = await engine.execute_playbook(playbook, {})
 
@@ -275,7 +252,5 @@ async def test_database_tracking(simple_playbook_yaml, vault, database):
         assert execution.status == "completed"
 
         # Check step results
-        steps = session.query(StepResultModel).filter_by(
-            execution_id=execution.id
-        ).all()
+        steps = session.query(StepResultModel).filter_by(execution_id=execution.id).all()
         assert len(steps) == 4

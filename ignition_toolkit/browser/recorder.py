@@ -6,9 +6,8 @@ Records browser sessions for playback and debugging.
 
 import asyncio
 import logging
-from pathlib import Path
-from typing import Optional, List
 from datetime import datetime
+from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
@@ -37,8 +36,8 @@ class BrowserRecorder:
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
         self._recording = False
-        self._screenshot_task: Optional[asyncio.Task] = None
-        self._screenshots: List[Path] = []
+        self._screenshot_task: asyncio.Task | None = None
+        self._screenshots: list[Path] = []
 
     async def start_recording(self, interval: float = 1.0) -> None:
         """
@@ -56,7 +55,7 @@ class BrowserRecorder:
 
         logger.info(f"Started recording (interval: {interval}s)")
 
-    async def stop_recording(self) -> List[Path]:
+    async def stop_recording(self) -> list[Path]:
         """
         Stop recording
 
@@ -79,7 +78,7 @@ class BrowserRecorder:
         logger.info(f"Stopped recording ({len(self._screenshots)} screenshots)")
         return self._screenshots
 
-    async def capture_screenshot(self, browser_manager, name: Optional[str] = None) -> Path:
+    async def capture_screenshot(self, browser_manager, name: str | None = None) -> Path:
         """
         Capture single screenshot
 
@@ -98,7 +97,7 @@ class BrowserRecorder:
         self._screenshots.append(screenshot_path)
         return screenshot_path
 
-    def get_screenshots(self) -> List[Path]:
+    def get_screenshots(self) -> list[Path]:
         """
         Get list of captured screenshots
 

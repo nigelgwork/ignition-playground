@@ -1,8 +1,10 @@
 """
 Tests for executions router endpoints
 """
+
 import pytest
 from fastapi.testclient import TestClient
+
 from ignition_toolkit.api.app import app
 
 
@@ -23,10 +25,7 @@ def test_list_executions_empty(client):
 
 def test_start_execution_missing_playbook(client):
     """Test starting execution with missing playbook"""
-    payload = {
-        "playbook_path": "nonexistent.yaml",
-        "parameters": {}
-    }
+    payload = {"playbook_path": "nonexistent.yaml", "parameters": {}}
     response = client.post("/api/executions/start", json=payload)
     assert response.status_code in [400, 404]
 

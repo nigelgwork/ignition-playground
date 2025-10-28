@@ -3,13 +3,14 @@ Gateway data models
 """
 
 from dataclasses import dataclass
-from typing import Optional, List, Dict, Any
 from datetime import datetime
 from enum import Enum
+from typing import Any
 
 
 class ModuleState(str, Enum):
     """Module installation state"""
+
     RUNNING = "running"
     LOADED = "loaded"
     INSTALLED = "installed"
@@ -18,12 +19,14 @@ class ModuleState(str, Enum):
 
 class ProjectStatus(str, Enum):
     """Project enabled/disabled status"""
+
     ENABLED = "enabled"
     DISABLED = "disabled"
 
 
 class TagQuality(str, Enum):
     """Tag quality codes"""
+
     GOOD = "Good"
     BAD = "Bad"
     ERROR = "Error"
@@ -42,10 +45,11 @@ class Module:
         description: Module description
         license_required: Whether module requires a license
     """
+
     name: str
     version: str
     state: ModuleState
-    description: Optional[str] = None
+    description: str | None = None
     license_required: bool = False
 
     def __repr__(self) -> str:
@@ -65,12 +69,13 @@ class Project:
         parent: Parent project name (for inheritance)
         version: Project version
     """
+
     name: str
     title: str
     enabled: bool
-    description: Optional[str] = None
-    parent: Optional[str] = None
-    version: Optional[str] = None
+    description: str | None = None
+    parent: str | None = None
+    version: str | None = None
 
     def __repr__(self) -> str:
         status = "enabled" if self.enabled else "disabled"
@@ -90,12 +95,13 @@ class Tag:
         timestamp: Last update timestamp
         data_type: Tag data type (Int4, Float8, String, Boolean, etc.)
     """
+
     name: str
     path: str
     value: Any
     quality: TagQuality
-    timestamp: Optional[datetime] = None
-    data_type: Optional[str] = None
+    timestamp: datetime | None = None
+    data_type: str | None = None
 
     def __repr__(self) -> str:
         return f"Tag(path='{self.path}', value={self.value}, quality='{self.quality.value}')"
@@ -113,11 +119,12 @@ class GatewayInfo:
         license_key: License key (partially masked)
         uptime_seconds: Gateway uptime in seconds
     """
+
     version: str
     platform_version: str
     edition: str
-    license_key: Optional[str] = None
-    uptime_seconds: Optional[int] = None
+    license_key: str | None = None
+    uptime_seconds: int | None = None
 
     def __repr__(self) -> str:
         return f"GatewayInfo(version='{self.version}', edition='{self.edition}')"
@@ -135,14 +142,15 @@ class HealthStatus:
         memory_used_mb: Memory usage in MB
         memory_max_mb: Maximum memory allocation in MB
     """
+
     healthy: bool
     uptime_seconds: int
-    thread_count: Optional[int] = None
-    memory_used_mb: Optional[float] = None
-    memory_max_mb: Optional[float] = None
+    thread_count: int | None = None
+    memory_used_mb: float | None = None
+    memory_max_mb: float | None = None
 
     @property
-    def memory_usage_percent(self) -> Optional[float]:
+    def memory_usage_percent(self) -> float | None:
         """Calculate memory usage percentage"""
         if self.memory_used_mb is not None and self.memory_max_mb is not None:
             return (self.memory_used_mb / self.memory_max_mb) * 100

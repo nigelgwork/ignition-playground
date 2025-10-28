@@ -6,42 +6,45 @@ Handles playbook execution control, status tracking, and lifecycle management.
 
 import logging
 from datetime import datetime, timedelta
-from typing import Dict, List, Optional
 
-from fastapi import APIRouter, HTTPException, BackgroundTasks
+from fastapi import APIRouter, BackgroundTasks, HTTPException
 from pydantic import BaseModel
 
-from ignition_toolkit.playbook.engine import PlaybookEngine
-from ignition_toolkit.playbook.models import ExecutionState, ExecutionStatus
-from ignition_toolkit.storage import get_database
 from ignition_toolkit.api.routers.models import (
     ExecutionRequest,
     ExecutionResponse,
+    ExecutionStatusResponse,
     StepResultResponse,
-    ExecutionStatusResponse
 )
+from ignition_toolkit.playbook.engine import PlaybookEngine
+from ignition_toolkit.playbook.models import ExecutionState
+from ignition_toolkit.storage import get_database
 
 logger = logging.getLogger(__name__)
 
 # Create router
 router = APIRouter(prefix="/api/executions", tags=["executions"])
 
+
 # Dependency injection for global state
 def get_active_engines():
     """Get shared active engines dict from app"""
     from ignition_toolkit.api.app import active_engines
+
     return active_engines
 
 
 def get_engine_completion_times():
     """Get shared engine completion times dict from app"""
     from ignition_toolkit.api.app import engine_completion_times
+
     return engine_completion_times
 
 
 def get_execution_ttl_minutes():
     """Get execution TTL configuration from app"""
     from ignition_toolkit.api.app import EXECUTION_TTL_MINUTES
+
     return EXECUTION_TTL_MINUTES
 
 
@@ -52,12 +55,14 @@ def get_execution_ttl_minutes():
 
 class PlaybookCodeUpdateRequest(BaseModel):
     """Request to update playbook code during execution"""
+
     code: str
 
 
 # ============================================================================
 # Background Tasks
 # ============================================================================
+
 
 async def cleanup_old_executions():
     """Remove completed executions older than TTL from memory"""
@@ -87,15 +92,17 @@ async def cleanup_old_executions():
 # Routes
 # ============================================================================
 
+
 @router.post("", response_model=ExecutionResponse)
 async def start_execution(request: ExecutionRequest, background_tasks: BackgroundTasks):
     """Start playbook execution"""
-    from ignition_toolkit.playbook.loader import PlaybookLoader
+    import uuid
+    from pathlib import Path
+
+    from ignition_toolkit.core.paths import get_playbooks_dir
     from ignition_toolkit.credentials import CredentialVault
     from ignition_toolkit.gateway import GatewayClient
-    from ignition_toolkit.core.paths import get_playbooks_dir
-    from pathlib import Path
-    import uuid
+    from ignition_toolkit.playbook.loader import PlaybookLoader
 
     active_engines = get_active_engines()
 
@@ -107,7 +114,7 @@ async def start_execution(request: ExecutionRequest, background_tasks: Backgroun
         if ".." in str(playbook_relative_path) or playbook_relative_path.is_absolute():
             raise HTTPException(
                 status_code=400,
-                detail="Invalid playbook path - relative paths only, no directory traversal"
+                detail="Invalid playbook path - relative paths only, no directory traversal",
             )
 
         # Resolve full path relative to playbooks directory
@@ -116,8 +123,7 @@ async def start_execution(request: ExecutionRequest, background_tasks: Backgroun
 
         if not playbook_path.exists():
             raise HTTPException(
-                status_code=404,
-                detail=f"Playbook file not found: {request.playbook_path}"
+                status_code=404, detail=f"Playbook file not found: {request.playbook_path}"
             )
 
         loader = PlaybookLoader()
@@ -135,8 +141,7 @@ async def start_execution(request: ExecutionRequest, background_tasks: Backgroun
             credential = vault.get_credential(request.credential_name)
             if not credential:
                 raise HTTPException(
-                    status_code=404,
-                    detail=f"Credential '{request.credential_name}' not found"
+                    status_code=404, detail=f"Credential '{request.credential_name}' not found"
                 )
 
             # Auto-fill gateway_url if not provided
@@ -150,25 +155,36 @@ async def start_execution(request: ExecutionRequest, background_tasks: Backgroun
 
             # Auto-fill gateway_url parameter if it exists in playbook
             for param in playbook.parameters:
-                if param.name.lower() in ['gateway_url', 'url'] and param.name not in parameters:
+                if param.name.lower() in ["gateway_url", "url"] and param.name not in parameters:
                     if credential.gateway_url:
                         parameters[param.name] = credential.gateway_url
 
             # Auto-fill username/password parameters if they exist
             for param in playbook.parameters:
-                if param.name.lower() in ['username', 'user', 'gateway_username'] and param.name not in parameters:
+                if (
+                    param.name.lower() in ["username", "user", "gateway_username"]
+                    and param.name not in parameters
+                ):
                     parameters[param.name] = credential.username
-                elif param.name.lower() in ['password', 'pass', 'gateway_password'] and param.name not in parameters:
+                elif (
+                    param.name.lower() in ["password", "pass", "gateway_password"]
+                    and param.name not in parameters
+                ):
                     parameters[param.name] = credential.password
 
-        logger.info(f"Execution parameters after credential auto-fill: gateway_url={gateway_url}, params={parameters}")
+        logger.info(
+            f"Execution parameters after credential auto-fill: gateway_url={gateway_url}, params={parameters}"
+        )
 
         gateway_client = None
         if gateway_url:
             gateway_client = GatewayClient(gateway_url)
 
         # Create screenshot callback for browser streaming
-        from ignition_toolkit.api.routers.websockets import broadcast_screenshot_frame, broadcast_execution_state
+        from ignition_toolkit.api.routers.websockets import (
+            broadcast_execution_state,
+            broadcast_screenshot_frame,
+        )
 
         async def screenshot_callback(execution_id: str, screenshot_b64: str):
             await broadcast_screenshot_frame(execution_id, screenshot_b64)
@@ -236,7 +252,7 @@ async def start_execution(request: ExecutionRequest, background_tasks: Backgroun
             execution_id=execution_id,
             playbook_name=playbook.name,
             status="started",
-            message=f"Execution started with ID: {execution_id}"
+            message=f"Execution started with ID: {execution_id}",
         )
     except HTTPException:
         raise
@@ -245,8 +261,8 @@ async def start_execution(request: ExecutionRequest, background_tasks: Backgroun
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("", response_model=List[ExecutionStatusResponse])
-async def list_executions(limit: int = 50, status: Optional[str] = None):
+@router.get("", response_model=list[ExecutionStatusResponse])
+async def list_executions(limit: int = 50, status: str | None = None):
     """List all executions (active + recent completed from database)"""
     active_engines = get_active_engines()
     db = get_database()
@@ -266,7 +282,7 @@ async def list_executions(limit: int = 50, status: Optional[str] = None):
                 status=result.status.value,
                 error=result.error,
                 started_at=result.started_at,
-                completed_at=result.completed_at
+                completed_at=result.completed_at,
             )
             for result in state.step_results
         ]
@@ -282,7 +298,7 @@ async def list_executions(limit: int = 50, status: Optional[str] = None):
                 total_steps=len(engine._current_playbook.steps) if engine._current_playbook else 0,
                 error=state.error,
                 debug_mode=engine.state_manager.is_debug_mode_enabled(),
-                step_results=step_results
+                step_results=step_results,
             )
         )
 
@@ -290,6 +306,7 @@ async def list_executions(limit: int = 50, status: Optional[str] = None):
     try:
         with db.session_scope() as session:
             from ignition_toolkit.storage.models import ExecutionModel
+
             query = session.query(ExecutionModel).order_by(ExecutionModel.started_at.desc())
 
             if status:
@@ -313,7 +330,7 @@ async def list_executions(limit: int = 50, status: Optional[str] = None):
                         total_steps=0,
                         error=db_exec.error_message,
                         debug_mode=False,
-                        step_results=[]
+                        step_results=[],
                     )
                 )
     except Exception as e:
@@ -341,7 +358,7 @@ async def get_execution_status(execution_id: str):
                 status=result.status.value,
                 error=result.error,
                 started_at=result.started_at,
-                completed_at=result.completed_at
+                completed_at=result.completed_at,
             )
             for result in state.step_results
         ]
@@ -356,7 +373,7 @@ async def get_execution_status(execution_id: str):
             total_steps=len(engine._current_playbook.steps) if engine._current_playbook else 0,
             error=state.error,
             debug_mode=engine.state_manager.is_debug_mode_enabled(),
-            step_results=step_results
+            step_results=step_results,
         )
 
     # Try to load from database
@@ -364,9 +381,12 @@ async def get_execution_status(execution_id: str):
     try:
         with db.session_scope() as session:
             from ignition_toolkit.storage.models import ExecutionModel
-            execution = session.query(ExecutionModel).filter(
-                ExecutionModel.execution_id == execution_id
-            ).first()
+
+            execution = (
+                session.query(ExecutionModel)
+                .filter(ExecutionModel.execution_id == execution_id)
+                .first()
+            )
 
             if execution:
                 return ExecutionStatusResponse(
@@ -379,7 +399,7 @@ async def get_execution_status(execution_id: str):
                     total_steps=0,
                     error=execution.error_message,
                     debug_mode=False,
-                    step_results=[]
+                    step_results=[],
                 )
     except Exception as e:
         logger.error(f"Error loading execution from database: {e}")
@@ -487,7 +507,7 @@ async def get_playbook_code(execution_id: str):
         "execution_id": execution_id,
         "playbook_path": str(playbook_path),
         "playbook_name": playbook_name,
-        "code": yaml_content  # Frontend expects 'code' field
+        "code": yaml_content,  # Frontend expects 'code' field
     }
 
 
@@ -508,13 +528,16 @@ async def update_playbook_code(execution_id: str, request: PlaybookCodeUpdateReq
 
     # Validate YAML
     import yaml
+
     try:
         yaml.safe_load(request.code)
     except yaml.YAMLError as e:
         raise HTTPException(status_code=400, detail=f"Invalid YAML: {str(e)}")
 
     # Create backup
-    backup_path = playbook_path.with_suffix(f".backup.{datetime.now().strftime('%Y%m%d_%H%M%S')}.yaml")
+    backup_path = playbook_path.with_suffix(
+        f".backup.{datetime.now().strftime('%Y%m%d_%H%M%S')}.yaml"
+    )
     backup_path.write_text(playbook_path.read_text())
     logger.info(f"Created backup: {backup_path}")
 
@@ -526,5 +549,5 @@ async def update_playbook_code(execution_id: str, request: PlaybookCodeUpdateReq
         "message": "Playbook code updated",
         "execution_id": execution_id,
         "playbook_path": str(playbook_path),
-        "backup_path": str(backup_path.name)
+        "backup_path": str(backup_path.name),
     }

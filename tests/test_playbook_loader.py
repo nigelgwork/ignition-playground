@@ -2,12 +2,14 @@
 Tests for playbook loader
 """
 
-import pytest
 import tempfile
 from pathlib import Path
-from ignition_toolkit.playbook.loader import PlaybookLoader
-from ignition_toolkit.playbook.models import ParameterType, StepType, OnFailureAction
+
+import pytest
+
 from ignition_toolkit.playbook.exceptions import PlaybookLoadError, PlaybookValidationError
+from ignition_toolkit.playbook.loader import PlaybookLoader
+from ignition_toolkit.playbook.models import OnFailureAction, ParameterType, StepType
 
 
 @pytest.fixture

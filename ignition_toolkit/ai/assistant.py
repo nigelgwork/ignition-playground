@@ -7,8 +7,8 @@ execution, debugging, and test generation.
 
 import logging
 import os
-from typing import Optional, Dict, Any
 from dataclasses import dataclass
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -20,7 +20,7 @@ class AIResponse:
     success: bool
     content: str
     confidence: float = 0.0
-    metadata: Dict[str, Any] = None
+    metadata: dict[str, Any] = None
 
     def __post_init__(self):
         if self.metadata is None:
@@ -39,7 +39,7 @@ class AIAssistant:
         )
     """
 
-    def __init__(self, api_key: Optional[str] = None, model: str = "claude-sonnet-4-5-20250929"):
+    def __init__(self, api_key: str | None = None, model: str = "claude-sonnet-4-5-20250929"):
         """
         Initialize AI assistant
 
@@ -54,6 +54,7 @@ class AIAssistant:
         if self.api_key:
             try:
                 from anthropic import Anthropic
+
                 self._client = Anthropic(api_key=self.api_key)
                 logger.info(f"AI Assistant initialized with model: {model}")
             except ImportError:
@@ -63,7 +64,7 @@ class AIAssistant:
             logger.warning("AI Assistant initialized without API key (placeholder mode)")
 
     async def generate_test_steps(
-        self, description: str, context: Optional[Dict[str, Any]] = None
+        self, description: str, context: dict[str, Any] | None = None
     ) -> AIResponse:
         """
         Generate test steps from description
@@ -86,7 +87,7 @@ class AIAssistant:
         )
 
     async def validate_result(
-        self, expected: str, actual: str, context: Optional[Dict[str, Any]] = None
+        self, expected: str, actual: str, context: dict[str, Any] | None = None
     ) -> AIResponse:
         """
         Validate test result using AI
@@ -109,9 +110,7 @@ class AIAssistant:
             metadata={"phase": "placeholder", "expected": expected, "actual": actual},
         )
 
-    async def analyze_screenshot(
-        self, screenshot_path: str, question: str
-    ) -> AIResponse:
+    async def analyze_screenshot(self, screenshot_path: str, question: str) -> AIResponse:
         """
         Analyze screenshot using AI vision
 
@@ -133,7 +132,7 @@ class AIAssistant:
         )
 
     async def generate_assertion(
-        self, description: str, context: Optional[Dict[str, Any]] = None
+        self, description: str, context: dict[str, Any] | None = None
     ) -> AIResponse:
         """
         Generate assertion code from description
@@ -155,9 +154,7 @@ class AIAssistant:
             metadata={"phase": "placeholder", "description": description},
         )
 
-    async def debug_execution(
-        self, user_question: str, execution_context: str
-    ) -> AIResponse:
+    async def debug_execution(self, user_question: str, execution_context: str) -> AIResponse:
         """
         Get AI assistance with debugging a failed playbook execution
 
@@ -205,13 +202,13 @@ Please analyze the situation and provide specific recommendations to fix the iss
                 model=self.model,
                 max_tokens=2048,
                 system=system_prompt,
-                messages=[
-                    {"role": "user", "content": user_message}
-                ]
+                messages=[{"role": "user", "content": user_message}],
             )
 
             # Extract the response text
-            response_text = response.content[0].text if response.content else "No response generated."
+            response_text = (
+                response.content[0].text if response.content else "No response generated."
+            )
 
             return AIResponse(
                 success=True,
@@ -220,9 +217,13 @@ Please analyze the situation and provide specific recommendations to fix the iss
                 metadata={
                     "model": self.model,
                     "usage": {
-                        "input_tokens": response.usage.input_tokens if hasattr(response, 'usage') else 0,
-                        "output_tokens": response.usage.output_tokens if hasattr(response, 'usage') else 0,
-                    }
+                        "input_tokens": (
+                            response.usage.input_tokens if hasattr(response, "usage") else 0
+                        ),
+                        "output_tokens": (
+                            response.usage.output_tokens if hasattr(response, "usage") else 0
+                        ),
+                    },
                 },
             )
 

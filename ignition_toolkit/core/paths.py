@@ -11,12 +11,11 @@ This module provides reliable path resolution that works regardless of:
 All paths are calculated dynamically from the installed package location.
 """
 
-from pathlib import Path
-from typing import Optional
 import os
-
+from pathlib import Path
 
 # === Core Project Structure ===
+
 
 def get_package_root() -> Path:
     """
@@ -57,6 +56,7 @@ def get_package_dir() -> Path:
 
 # === Playbook Paths ===
 
+
 def get_playbooks_dir() -> Path:
     """
     Get the playbooks directory.
@@ -94,6 +94,7 @@ def get_playbook_path(playbook_name: str) -> Path:
 
 
 # === Data Paths ===
+
 
 def get_data_dir() -> Path:
     """
@@ -148,6 +149,7 @@ def get_playwright_browsers_dir() -> Path:
 
 # === Frontend Paths ===
 
+
 def get_frontend_dir() -> Path:
     """
     Get the frontend directory.
@@ -179,6 +181,7 @@ def get_frontend_dist_dir() -> Path:
 
 
 # === User Data Paths ===
+
 
 def get_user_data_dir() -> Path:
     """
@@ -237,6 +240,7 @@ def get_database_file() -> Path:
 
 # === Environment-Aware Paths ===
 
+
 def get_env_file() -> Path:
     """
     Get the path to the .env file.
@@ -253,6 +257,7 @@ def get_env_file() -> Path:
 
 
 # === Validation ===
+
 
 def validate_paths() -> dict:
     """
@@ -294,6 +299,7 @@ def validate_paths() -> dict:
 
 # === Convenience Functions ===
 
+
 def ensure_directories() -> None:
     """
     Ensure all required directories exist.
@@ -310,7 +316,7 @@ def ensure_directories() -> None:
     get_user_data_dir()
 
 
-def get_relative_path(absolute_path: Path) -> Optional[Path]:
+def get_relative_path(absolute_path: Path) -> Path | None:
     """
     Get a path relative to the package root.
 

@@ -2,8 +2,10 @@
 Tests for AI assistant functionality
 """
 
-import pytest
 import os
+
+import pytest
+
 from ignition_toolkit.ai import AIAssistant
 
 
@@ -44,10 +46,7 @@ async def test_generate_test_steps_placeholder():
 async def test_validate_result_placeholder():
     """Test validate_result returns placeholder response"""
     assistant = AIAssistant()
-    response = await assistant.validate_result(
-        expected="Status: OK",
-        actual="Status: OK"
-    )
+    response = await assistant.validate_result(expected="Status: OK", actual="Status: OK")
 
     assert response.success is False
     assert "placeholder" in response.content.lower()
@@ -59,8 +58,7 @@ async def test_analyze_screenshot_placeholder():
     """Test analyze_screenshot returns placeholder response"""
     assistant = AIAssistant()
     response = await assistant.analyze_screenshot(
-        screenshot_path="/tmp/screenshot.png",
-        question="What do you see?"
+        screenshot_path="/tmp/screenshot.png", question="What do you see?"
     )
 
     assert response.success is False
@@ -71,9 +69,7 @@ async def test_analyze_screenshot_placeholder():
 async def test_generate_assertion_placeholder():
     """Test generate_assertion returns placeholder response"""
     assistant = AIAssistant()
-    response = await assistant.generate_assertion(
-        description="Check status is 200"
-    )
+    response = await assistant.generate_assertion(description="Check status is 200")
 
     assert response.success is False
     assert "placeholder" in response.content.lower()
@@ -90,8 +86,7 @@ async def test_debug_execution_no_api_key():
     try:
         assistant = AIAssistant()
         response = await assistant.debug_execution(
-            user_question="Why did this fail?",
-            execution_context="Step 1 failed with timeout"
+            user_question="Why did this fail?", execution_context="Step 1 failed with timeout"
         )
 
         assert response.success is False
@@ -117,8 +112,7 @@ async def test_debug_execution_with_context():
     """
 
     response = await assistant.debug_execution(
-        user_question="Why can't it find the login button?",
-        execution_context=execution_context
+        user_question="Why can't it find the login button?", execution_context=execution_context
     )
 
     # Should return error since no API key
@@ -128,16 +122,14 @@ async def test_debug_execution_with_context():
 
 # Optional test - only runs if ANTHROPIC_API_KEY is set
 @pytest.mark.skipif(
-    not os.getenv("ANTHROPIC_API_KEY"),
-    reason="Requires ANTHROPIC_API_KEY environment variable"
+    not os.getenv("ANTHROPIC_API_KEY"), reason="Requires ANTHROPIC_API_KEY environment variable"
 )
 @pytest.mark.asyncio
 async def test_debug_execution_real_api():
     """Test debug_execution with real API call (requires API key)"""
     assistant = AIAssistant()
     response = await assistant.debug_execution(
-        user_question="What is 2+2?",
-        execution_context="Simple math test"
+        user_question="What is 2+2?", execution_context="Simple math test"
     )
 
     assert response.success is True
@@ -153,10 +145,7 @@ def test_ai_response_dataclass():
 
     # Test with metadata
     response = AIResponse(
-        success=True,
-        content="Test response",
-        confidence=0.9,
-        metadata={"key": "value"}
+        success=True, content="Test response", confidence=0.9, metadata={"key": "value"}
     )
     assert response.success is True
     assert response.content == "Test response"

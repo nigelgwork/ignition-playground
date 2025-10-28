@@ -10,18 +10,18 @@ Provides async client for interacting with Ignition Gateway operations:
 """
 
 from ignition_toolkit.gateway.client import GatewayClient
+from ignition_toolkit.gateway.exceptions import (
+    AuthenticationError,
+    GatewayConnectionError,
+    GatewayException,
+    ResourceNotFoundError,
+)
 from ignition_toolkit.gateway.models import (
+    GatewayInfo,
+    HealthStatus,
     Module,
     Project,
     Tag,
-    GatewayInfo,
-    HealthStatus,
-)
-from ignition_toolkit.gateway.exceptions import (
-    GatewayException,
-    AuthenticationError,
-    ResourceNotFoundError,
-    GatewayConnectionError,
 )
 
 __all__ = [

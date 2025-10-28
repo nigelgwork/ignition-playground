@@ -18,11 +18,7 @@ class EnvironmentError(StartupError):
     """Environment validation failed"""
 
     def __init__(self, message: str, recovery_hint: str = ""):
-        super().__init__(
-            message,
-            component="Environment",
-            recovery_hint=recovery_hint
-        )
+        super().__init__(message, component="Environment", recovery_hint=recovery_hint)
 
 
 class DatabaseInitError(StartupError):
@@ -32,7 +28,7 @@ class DatabaseInitError(StartupError):
         super().__init__(
             message,
             component="Database",
-            recovery_hint=recovery_hint or "Check database file permissions and disk space"
+            recovery_hint=recovery_hint or "Check database file permissions and disk space",
         )
 
 
@@ -43,5 +39,5 @@ class VaultInitError(StartupError):
         super().__init__(
             message,
             component="Vault",
-            recovery_hint=recovery_hint or "Run 'ignition-toolkit init' to create vault"
+            recovery_hint=recovery_hint or "Run 'ignition-toolkit init' to create vault",
         )

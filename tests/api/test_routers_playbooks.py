@@ -1,8 +1,10 @@
 """
 Tests for playbooks router endpoints
 """
+
 import pytest
 from fastapi.testclient import TestClient
+
 from ignition_toolkit.api.app import app
 
 

@@ -5,9 +5,8 @@ Handles pause, resume, skip functionality for playbook execution.
 """
 
 import asyncio
-from enum import Enum
-from typing import Optional
 import logging
+from enum import Enum
 
 logger = logging.getLogger(__name__)
 

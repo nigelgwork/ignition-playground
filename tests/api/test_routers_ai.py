@@ -1,8 +1,10 @@
 """
 Tests for AI router endpoints
 """
+
 import pytest
 from fastapi.testclient import TestClient
+
 from ignition_toolkit.api.app import app
 
 
@@ -42,9 +44,7 @@ def test_create_ai_credential_missing_fields(client):
 
 def test_update_ai_credential_not_found(client):
     """Test updating non-existent AI credential"""
-    payload = {
-        "api_key": "new-key"
-    }
+    payload = {"api_key": "new-key"}
     response = client.put("/api/ai/credentials/nonexistent", json=payload)
     assert response.status_code == 404
 
@@ -57,10 +57,7 @@ def test_delete_ai_credential_not_found(client):
 
 def test_ai_assist_not_configured(client):
     """Test AI assist without configuration"""
-    payload = {
-        "execution_id": 1,
-        "prompt": "Help me debug this"
-    }
+    payload = {"execution_id": 1, "prompt": "Help me debug this"}
     response = client.post("/api/ai/assist", json=payload)
     # Should return error if AI not configured
     assert response.status_code in [400, 404, 500]

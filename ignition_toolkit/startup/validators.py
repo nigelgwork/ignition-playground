@@ -9,21 +9,21 @@ Validates system components during startup in phases:
 5. Frontend build (production only)
 """
 
-import sys
-import os
-from pathlib import Path
 import logging
+import os
+import sys
+
 from sqlalchemy import text
 
 from ignition_toolkit.core.config import get_settings
-from ignition_toolkit.core.paths import get_playbooks_dir, get_frontend_dist_dir
-from ignition_toolkit.storage.database import get_database
+from ignition_toolkit.core.paths import get_playbooks_dir
 from ignition_toolkit.credentials.vault import get_credential_vault
 from ignition_toolkit.startup.exceptions import (
     DatabaseInitError,
-    VaultInitError,
     EnvironmentError,
+    VaultInitError,
 )
+from ignition_toolkit.storage.database import get_database
 
 logger = logging.getLogger(__name__)
 
@@ -44,7 +44,7 @@ async def validate_environment() -> None:
     if sys.version_info < (3, 10):
         raise EnvironmentError(
             f"Python 3.10+ required, found {sys.version}",
-            recovery_hint="Upgrade Python: https://www.python.org/downloads/"
+            recovery_hint="Upgrade Python: https://www.python.org/downloads/",
         )
     logger.info(f"✓ Python version: {sys.version_info.major}.{sys.version_info.minor}")
 
@@ -58,14 +58,13 @@ async def validate_environment() -> None:
             logger.info(f"✓ Created data directory: {data_dir.absolute()}")
         except Exception as e:
             raise EnvironmentError(
-                f"Cannot create data directory: {e}",
-                recovery_hint="Check filesystem permissions"
+                f"Cannot create data directory: {e}", recovery_hint="Check filesystem permissions"
             )
 
     if not os.access(data_dir, os.W_OK):
         raise EnvironmentError(
             f"Data directory not writable: {data_dir.absolute()}",
-            recovery_hint=f"Fix permissions: chmod u+w {data_dir}"
+            recovery_hint=f"Fix permissions: chmod u+w {data_dir}",
         )
     logger.info(f"✓ Data directory writable: {data_dir.absolute()}")
 
@@ -78,7 +77,7 @@ async def validate_environment() -> None:
         except Exception as e:
             raise EnvironmentError(
                 f"Cannot create toolkit directory: {e}",
-                recovery_hint="Check home directory permissions"
+                recovery_hint="Check home directory permissions",
             )
     logger.info(f"✓ Toolkit directory: {toolkit_dir}")
 
@@ -115,7 +114,7 @@ async def initialize_database() -> None:
             raise
         raise DatabaseInitError(
             f"Database initialization failed: {e}",
-            recovery_hint="Delete data/toolkit.db and restart"
+            recovery_hint="Delete data/toolkit.db and restart",
         )
 
 
@@ -147,7 +146,7 @@ async def initialize_vault() -> None:
             raise
         raise VaultInitError(
             f"Vault initialization failed: {e}",
-            recovery_hint="Run 'ignition-toolkit init' to reset vault"
+            recovery_hint="Run 'ignition-toolkit init' to reset vault",
         )
 
 
@@ -170,9 +169,21 @@ async def validate_playbooks() -> dict:
         raise Exception(f"Playbooks directory not found: {playbooks_dir}")
 
     # Count playbooks by domain
-    gateway_playbooks = list((playbooks_dir / "gateway").glob("*.yaml")) if (playbooks_dir / "gateway").exists() else []
-    perspective_playbooks = list((playbooks_dir / "perspective").glob("*.yaml")) if (playbooks_dir / "perspective").exists() else []
-    example_playbooks = list((playbooks_dir / "examples").glob("*.yaml")) if (playbooks_dir / "examples").exists() else []
+    gateway_playbooks = (
+        list((playbooks_dir / "gateway").glob("*.yaml"))
+        if (playbooks_dir / "gateway").exists()
+        else []
+    )
+    perspective_playbooks = (
+        list((playbooks_dir / "perspective").glob("*.yaml"))
+        if (playbooks_dir / "perspective").exists()
+        else []
+    )
+    example_playbooks = (
+        list((playbooks_dir / "examples").glob("*.yaml"))
+        if (playbooks_dir / "examples").exists()
+        else []
+    )
 
     total = len(gateway_playbooks) + len(perspective_playbooks) + len(example_playbooks)
 

@@ -5,9 +5,9 @@ Defines the core data models for playbook definitions, parameters, and execution
 """
 
 from dataclasses import dataclass, field
-from enum import Enum
-from typing import Any, Dict, List, Optional
 from datetime import datetime
+from enum import Enum
+from typing import Any
 
 
 class ParameterType(str, Enum):
@@ -107,7 +107,7 @@ class PlaybookParameter:
     name: str
     type: ParameterType
     required: bool = True
-    default: Optional[Any] = None
+    default: Any | None = None
     description: str = ""
 
     def validate(self, value: Any) -> bool:
@@ -170,7 +170,7 @@ class PlaybookStep:
     id: str
     name: str
     type: StepType
-    parameters: Dict[str, Any] = field(default_factory=dict)
+    parameters: dict[str, Any] = field(default_factory=dict)
     on_failure: OnFailureAction = OnFailureAction.ABORT
     timeout: int = 300
     retry_count: int = 0
@@ -194,11 +194,11 @@ class Playbook:
     name: str
     version: str
     description: str = ""
-    parameters: List[PlaybookParameter] = field(default_factory=list)
-    steps: List[PlaybookStep] = field(default_factory=list)
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    parameters: list[PlaybookParameter] = field(default_factory=list)
+    steps: list[PlaybookStep] = field(default_factory=list)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    def get_parameter(self, name: str) -> Optional[PlaybookParameter]:
+    def get_parameter(self, name: str) -> PlaybookParameter | None:
         """
         Get parameter definition by name
 
@@ -213,7 +213,7 @@ class Playbook:
                 return param
         return None
 
-    def get_step(self, step_id: str) -> Optional[PlaybookStep]:
+    def get_step(self, step_id: str) -> PlaybookStep | None:
         """
         Get step by ID
 
@@ -249,9 +249,9 @@ class StepResult:
     step_name: str
     status: StepStatus
     started_at: datetime
-    completed_at: Optional[datetime] = None
-    output: Optional[Dict[str, Any]] = None
-    error: Optional[str] = None
+    completed_at: datetime | None = None
+    output: dict[str, Any] | None = None
+    error: str | None = None
     retry_count: int = 0
 
 
@@ -276,13 +276,13 @@ class ExecutionState:
     playbook_name: str
     status: ExecutionStatus
     started_at: datetime
-    completed_at: Optional[datetime] = None
+    completed_at: datetime | None = None
     current_step_index: int = 0
-    step_results: List[StepResult] = field(default_factory=list)
-    variables: Dict[str, Any] = field(default_factory=dict)
-    error: Optional[str] = None
+    step_results: list[StepResult] = field(default_factory=list)
+    variables: dict[str, Any] = field(default_factory=dict)
+    error: str | None = None
 
-    def get_step_result(self, step_id: str) -> Optional[StepResult]:
+    def get_step_result(self, step_id: str) -> StepResult | None:
         """
         Get result for specific step
 

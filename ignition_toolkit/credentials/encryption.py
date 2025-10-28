@@ -2,10 +2,10 @@
 Credential encryption using Fernet (symmetric encryption)
 """
 
-from cryptography.fernet import Fernet
-from pathlib import Path
-from typing import Optional
 import logging
+from pathlib import Path
+
+from cryptography.fernet import Fernet
 
 logger = logging.getLogger(__name__)
 
@@ -18,7 +18,7 @@ class CredentialEncryption:
     Loss of the key means loss of all stored credentials.
     """
 
-    def __init__(self, key_path: Optional[Path] = None):
+    def __init__(self, key_path: Path | None = None):
         """
         Initialize encryption handler
 
@@ -27,10 +27,11 @@ class CredentialEncryption:
         """
         if key_path is None:
             from ignition_toolkit.config import get_toolkit_data_dir
+
             key_path = get_toolkit_data_dir() / "encryption.key"
 
         self.key_path = key_path
-        self._fernet: Optional[Fernet] = None
+        self._fernet: Fernet | None = None
 
     def _ensure_key_exists(self) -> None:
         """Create encryption key if it doesn't exist"""

@@ -7,15 +7,13 @@ with environment variable support.
 IMPORTANT: Uses dynamic path resolution from paths.py to work from any directory.
 """
 
-import os
 from pathlib import Path
-from typing import List
 
 from pydantic_settings import BaseSettings
 
 from .paths import (
-    get_database_file,
     get_credentials_file,
+    get_database_file,
     get_frontend_dist_dir,
     get_playwright_browsers_dir,
 )
@@ -41,7 +39,7 @@ class Settings(BaseSettings):
     api_host: str = "0.0.0.0"
     api_port: int = 5000
     api_workers: int = 1
-    cors_origins: List[str] = ["*"]
+    cors_origins: list[str] = ["*"]
     websocket_api_key: str = "dev-key-change-in-production"
 
     # Environment

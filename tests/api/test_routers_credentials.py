@@ -1,8 +1,10 @@
 """
 Tests for credentials router endpoints
 """
+
 import pytest
 from fastapi.testclient import TestClient
+
 from ignition_toolkit.api.app import app
 
 
@@ -33,21 +35,14 @@ def test_add_credential_missing_fields(client):
 
 def test_add_credential_invalid_name(client):
     """Test adding credential with invalid name"""
-    payload = {
-        "name": "",  # Empty name
-        "username": "testuser",
-        "password": "testpass"
-    }
+    payload = {"name": "", "username": "testuser", "password": "testpass"}  # Empty name
     response = client.post("/api/credentials", json=payload)
     assert response.status_code == 422  # Validation error
 
 
 def test_update_credential_not_found(client):
     """Test updating non-existent credential"""
-    payload = {
-        "username": "newuser",
-        "password": "newpass"
-    }
+    payload = {"username": "newuser", "password": "newpass"}
     response = client.put("/api/credentials/nonexistent", json=payload)
     assert response.status_code == 404
 

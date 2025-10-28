@@ -6,15 +6,17 @@ Handles browser lifecycle and basic operations with screenshot streaming.
 
 # Import config first to set environment variables before Playwright import
 from ignition_toolkit.config import setup_environment
+
 setup_environment()
 
 import asyncio
 import base64
 import logging
 import os
+from collections.abc import Awaitable, Callable
 from pathlib import Path
-from typing import Optional, Callable, Awaitable
-from playwright.async_api import async_playwright, Browser, BrowserContext, Page
+
+from playwright.async_api import Browser, BrowserContext, Page, async_playwright
 
 logger = logging.getLogger(__name__)
 
@@ -39,8 +41,8 @@ class BrowserManager:
         self,
         headless: bool = False,
         slow_mo: int = 0,
-        screenshots_dir: Optional[Path] = None,
-        screenshot_callback: Optional[Callable[[str], Awaitable[None]]] = None,
+        screenshots_dir: Path | None = None,
+        screenshot_callback: Callable[[str], Awaitable[None]] | None = None,
     ):
         """
         Initialize browser manager
@@ -58,12 +60,12 @@ class BrowserManager:
         self.screenshot_callback = screenshot_callback
 
         self._playwright = None
-        self._browser: Optional[Browser] = None
-        self._context: Optional[BrowserContext] = None
-        self._page: Optional[Page] = None
+        self._browser: Browser | None = None
+        self._context: BrowserContext | None = None
+        self._page: Page | None = None
 
         # Screenshot streaming state
-        self._streaming_task: Optional[asyncio.Task] = None
+        self._streaming_task: asyncio.Task | None = None
         self._streaming_active = False
         self._streaming_paused = False
 
@@ -249,9 +251,10 @@ class BrowserManager:
             Base64-encoded PNG screenshot
         """
         import base64
+
         page = await self.get_page()
         screenshot_bytes = await page.screenshot(type="png")
-        return base64.b64encode(screenshot_bytes).decode('utf-8')
+        return base64.b64encode(screenshot_bytes).decode("utf-8")
 
     async def evaluate(self, script: str) -> any:
         """
@@ -335,9 +338,9 @@ class BrowserManager:
                 if not self._streaming_paused:
                     # Capture screenshot
                     screenshot_bytes = await page.screenshot(
-                        type='jpeg',
+                        type="jpeg",
                         quality=SCREENSHOT_QUALITY,
-                        full_page=False  # Viewport only for performance
+                        full_page=False,  # Viewport only for performance
                     )
 
                     # Encode to base64

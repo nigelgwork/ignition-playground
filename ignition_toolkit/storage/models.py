@@ -2,8 +2,9 @@
 SQLAlchemy database models
 """
 
-from datetime import datetime, UTC
-from sqlalchemy import Column, Integer, String, DateTime, Text, ForeignKey, JSON, Index
+from datetime import UTC, datetime
+
+from sqlalchemy import JSON, Column, DateTime, ForeignKey, Index, Integer, String, Text
 from sqlalchemy.orm import declarative_base, relationship
 
 Base = declarative_base()
@@ -20,10 +21,13 @@ class ExecutionModel(Base):
 
     Tracks each playbook run with timestamps, status, and results.
     """
+
     __tablename__ = "executions"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    execution_id = Column(String(255), unique=True, nullable=False, index=True)  # UUID from frontend
+    execution_id = Column(
+        String(255), unique=True, nullable=False, index=True
+    )  # UUID from frontend
     playbook_name = Column(String(255), nullable=False)
     playbook_version = Column(String(50), nullable=True)
     status = Column(String(50), nullable=False)  # pending, running, completed, failed, paused
@@ -34,14 +38,18 @@ class ExecutionModel(Base):
     execution_metadata = Column(JSON, nullable=True)  # Additional execution metadata
 
     # Relationships
-    step_results = relationship("StepResultModel", back_populates="execution", cascade="all, delete-orphan")
+    step_results = relationship(
+        "StepResultModel", back_populates="execution", cascade="all, delete-orphan"
+    )
 
     # Indexes for performance
     __table_args__ = (
-        Index('idx_executions_status', 'status'),
-        Index('idx_executions_started_at', 'started_at'),
-        Index('idx_executions_playbook_name', 'playbook_name'),
-        Index('idx_executions_status_started', 'status', 'started_at'),  # Composite index for filtered queries
+        Index("idx_executions_status", "status"),
+        Index("idx_executions_started_at", "started_at"),
+        Index("idx_executions_playbook_name", "playbook_name"),
+        Index(
+            "idx_executions_status_started", "status", "started_at"
+        ),  # Composite index for filtered queries
     )
 
     def to_dict(self) -> dict:
@@ -65,6 +73,7 @@ class StepResultModel(Base):
     """
     Stores individual step execution results within a playbook run
     """
+
     __tablename__ = "step_results"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -83,8 +92,8 @@ class StepResultModel(Base):
 
     # Indexes for performance
     __table_args__ = (
-        Index('idx_step_results_execution_id', 'execution_id'),
-        Index('idx_step_results_status', 'status'),
+        Index("idx_step_results_execution_id", "execution_id"),
+        Index("idx_step_results_status", "status"),
     )
 
     def to_dict(self) -> dict:
@@ -109,6 +118,7 @@ class PlaybookConfigModel(Base):
 
     Allows users to save parameter sets for reuse (e.g., "Production Gateway" config)
     """
+
     __tablename__ = "playbook_configs"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -121,8 +131,8 @@ class PlaybookConfigModel(Base):
 
     # Indexes for performance
     __table_args__ = (
-        Index('idx_playbook_configs_playbook_name', 'playbook_name'),
-        Index('idx_playbook_configs_config_name', 'config_name'),
+        Index("idx_playbook_configs_playbook_name", "playbook_name"),
+        Index("idx_playbook_configs_config_name", "config_name"),
     )
 
     def to_dict(self) -> dict:
@@ -145,13 +155,16 @@ class AISettingsModel(Base):
     Supports multiple AI providers (OpenAI, Anthropic, Local LLMs)
     Now supports multiple credential entries with unique names
     """
+
     __tablename__ = "ai_settings"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     name = Column(String(100), nullable=False, unique=True)  # Unique credential name
     provider = Column(String(50), nullable=False)  # "openai", "anthropic", "gemini", "local"
     api_key = Column(Text, nullable=True)  # Encrypted API key
-    api_base_url = Column(String(500), nullable=True)  # For local LLMs (e.g., http://localhost:1234/v1)
+    api_base_url = Column(
+        String(500), nullable=True
+    )  # For local LLMs (e.g., http://localhost:1234/v1)
     model_name = Column(String(100), nullable=True)  # e.g., "gpt-4", "claude-3-sonnet", "llama-3"
     enabled = Column(String(10), nullable=False, default="false")  # "true" or "false" string
     created_at = Column(DateTime, default=utcnow, nullable=False)

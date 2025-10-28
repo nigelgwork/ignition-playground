@@ -5,11 +5,10 @@ Tracks playbook versions, verification status, and enabled/disabled state.
 """
 
 import json
-from pathlib import Path
-from datetime import datetime
-from typing import Dict, Optional
-from dataclasses import dataclass, asdict
 import logging
+from dataclasses import asdict, dataclass
+from datetime import datetime
+from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
@@ -17,14 +16,15 @@ logger = logging.getLogger(__name__)
 @dataclass
 class PlaybookMetadata:
     """Metadata for a playbook"""
+
     playbook_path: str  # Relative path from playbooks directory
     version: str = "1.0.0"
     revision: int = 0
     verified: bool = False
     enabled: bool = True
-    last_modified: Optional[str] = None
-    verified_at: Optional[str] = None
-    verified_by: Optional[str] = None
+    last_modified: str | None = None
+    verified_at: str | None = None
+    verified_by: str | None = None
     notes: str = ""
 
     def increment_revision(self):
@@ -67,19 +67,16 @@ class PlaybookMetadataStore:
             metadata_file = config_dir / "playbook_metadata.json"
 
         self.metadata_file = metadata_file
-        self._metadata: Dict[str, PlaybookMetadata] = {}
+        self._metadata: dict[str, PlaybookMetadata] = {}
         self._load()
 
     def _load(self):
         """Load metadata from file"""
         if self.metadata_file.exists():
             try:
-                with open(self.metadata_file, 'r') as f:
+                with open(self.metadata_file) as f:
                     data = json.load(f)
-                    self._metadata = {
-                        path: PlaybookMetadata(**meta)
-                        for path, meta in data.items()
-                    }
+                    self._metadata = {path: PlaybookMetadata(**meta) for path, meta in data.items()}
                 logger.debug(f"Loaded metadata for {len(self._metadata)} playbooks")
             except Exception as e:
                 logger.error(f"Error loading playbook metadata: {e}")
@@ -90,11 +87,8 @@ class PlaybookMetadataStore:
     def _save(self):
         """Save metadata to file"""
         try:
-            data = {
-                path: asdict(meta)
-                for path, meta in self._metadata.items()
-            }
-            with open(self.metadata_file, 'w') as f:
+            data = {path: asdict(meta) for path, meta in self._metadata.items()}
+            with open(self.metadata_file, "w") as f:
                 json.dump(data, f, indent=2)
             logger.debug(f"Saved metadata for {len(self._metadata)} playbooks")
         except Exception as e:
@@ -176,7 +170,7 @@ class PlaybookMetadataStore:
         self.update_metadata(playbook_path, metadata)
         logger.info(f"Set {playbook_path} enabled={enabled}")
 
-    def list_all(self) -> Dict[str, PlaybookMetadata]:
+    def list_all(self) -> dict[str, PlaybookMetadata]:
         """
         Get all playbook metadata
 

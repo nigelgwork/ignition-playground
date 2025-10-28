@@ -6,29 +6,29 @@ Handles playbook listing, retrieval, updates, metadata operations, and deletion.
 
 import logging
 import os
-import shutil
-import yaml
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
+import yaml
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
+from ignition_toolkit.api.routers.models import ParameterInfo, PlaybookInfo, StepInfo
+from ignition_toolkit.core.paths import get_playbooks_dir
 from ignition_toolkit.playbook.loader import PlaybookLoader
-from ignition_toolkit.playbook.metadata import PlaybookMetadataStore
-from ignition_toolkit.core.paths import get_playbooks_dir, get_playbook_path
-from ignition_toolkit.api.routers.models import ParameterInfo, StepInfo, PlaybookInfo
 
 logger = logging.getLogger(__name__)
 
 # Create router
 router = APIRouter(prefix="/api/playbooks", tags=["playbooks"])
 
+
 # Dependency injection for metadata store
 def get_metadata_store():
     """Get shared metadata store from app"""
     from ignition_toolkit.api.app import metadata_store
+
     return metadata_store
 
 
@@ -39,27 +39,31 @@ def get_metadata_store():
 
 class PlaybookUpdateRequest(BaseModel):
     """Request to update a playbook YAML file"""
+
     playbook_path: str  # Relative path from playbooks directory
     yaml_content: str  # New YAML content
 
 
 class PlaybookMetadataUpdateRequest(BaseModel):
     """Request to update playbook name and description"""
+
     playbook_path: str
-    name: Optional[str] = None
-    description: Optional[str] = None
+    name: str | None = None
+    description: str | None = None
 
 
 class StepEditRequest(BaseModel):
     """Request to edit a step in a playbook"""
+
     playbook_path: str
     step_id: str
-    new_parameters: Dict[str, Any]
+    new_parameters: dict[str, Any]
 
 
 # ============================================================================
 # Helper Functions
 # ============================================================================
+
 
 def validate_playbook_path(path_str: str) -> Path:
     """
@@ -85,12 +89,11 @@ def validate_playbook_path(path_str: str) -> Path:
     # Check if path is within playbooks directory
     if not playbook_path.is_relative_to(playbooks_dir):
         raise HTTPException(
-            status_code=400,
-            detail="Playbook path must be within ./playbooks directory"
+            status_code=400, detail="Playbook path must be within ./playbooks directory"
         )
 
     # Check file extension
-    if playbook_path.suffix not in ['.yaml', '.yml']:
+    if playbook_path.suffix not in [".yaml", ".yml"]:
         raise HTTPException(status_code=400, detail="Playbook must be a YAML file")
 
     # Check file exists
@@ -127,7 +130,8 @@ def get_relative_playbook_path(path_str: str) -> str:
 # Routes
 # ============================================================================
 
-@router.get("", response_model=List[PlaybookInfo])
+
+@router.get("", response_model=list[PlaybookInfo])
 async def list_playbooks():
     """List all available playbooks"""
     metadata_store = get_metadata_store()
@@ -138,7 +142,7 @@ async def list_playbooks():
     playbooks = []
     for yaml_file in playbooks_dir.rglob("*.yaml"):
         # Skip backup files
-        if '.backup.' in yaml_file.name:
+        if ".backup." in yaml_file.name:
             continue
         try:
             loader = PlaybookLoader()
@@ -274,7 +278,9 @@ async def update_playbook(request: PlaybookUpdateRequest):
             raise HTTPException(status_code=404, detail="Playbook not found")
 
         # Create backup with timestamp
-        backup_path = playbook_path.with_suffix(f".backup.{datetime.now().strftime('%Y%m%d_%H%M%S')}.yaml")
+        backup_path = playbook_path.with_suffix(
+            f".backup.{datetime.now().strftime('%Y%m%d_%H%M%S')}.yaml"
+        )
         backup_path.write_text(playbook_path.read_text())
         logger.info(f"Created backup: {backup_path}")
 
@@ -297,7 +303,7 @@ async def update_playbook(request: PlaybookUpdateRequest):
             "playbook_path": str(request.playbook_path),
             "backup_path": str(backup_path.name),
             "revision": meta.revision,
-            "message": f"Playbook updated successfully (revision {meta.revision})"
+            "message": f"Playbook updated successfully (revision {meta.revision})",
         }
 
     except HTTPException:
@@ -321,21 +327,23 @@ async def update_playbook_metadata(request: PlaybookMetadataUpdateRequest):
             raise HTTPException(status_code=404, detail="Playbook not found")
 
         # Read current YAML
-        with open(playbook_path, 'r') as f:
+        with open(playbook_path) as f:
             playbook_data = yaml.safe_load(f)
 
         # Update name and/or description
         if request.name is not None:
-            playbook_data['name'] = request.name
+            playbook_data["name"] = request.name
         if request.description is not None:
-            playbook_data['description'] = request.description
+            playbook_data["description"] = request.description
 
         # Create backup
-        backup_path = playbook_path.with_suffix(f".backup.{datetime.now().strftime('%Y%m%d_%H%M%S')}.yaml")
+        backup_path = playbook_path.with_suffix(
+            f".backup.{datetime.now().strftime('%Y%m%d_%H%M%S')}.yaml"
+        )
         backup_path.write_text(playbook_path.read_text())
 
         # Write updated YAML
-        with open(playbook_path, 'w') as f:
+        with open(playbook_path, "w") as f:
             yaml.safe_dump(playbook_data, f, default_flow_style=False, sort_keys=False)
 
         # Increment revision
@@ -347,10 +355,10 @@ async def update_playbook_metadata(request: PlaybookMetadataUpdateRequest):
         return {
             "status": "success",
             "playbook_path": str(request.playbook_path),
-            "name": playbook_data.get('name'),
-            "description": playbook_data.get('description'),
+            "name": playbook_data.get("name"),
+            "description": playbook_data.get("description"),
             "revision": meta.revision,
-            "message": "Playbook metadata updated successfully"
+            "message": "Playbook metadata updated successfully",
         }
 
     except HTTPException:
@@ -374,7 +382,7 @@ async def mark_playbook_verified(playbook_path: str):
             "playbook_path": playbook_path,
             "verified": meta.verified,
             "verified_at": meta.verified_at,
-            "message": "Playbook marked as verified"
+            "message": "Playbook marked as verified",
         }
     except Exception as e:
         logger.error(f"Error marking playbook as verified: {e}")
@@ -393,7 +401,7 @@ async def unmark_playbook_verified(playbook_path: str):
             "status": "success",
             "playbook_path": playbook_path,
             "verified": False,
-            "message": "Playbook verification removed"
+            "message": "Playbook verification removed",
         }
     except Exception as e:
         logger.error(f"Error unmarking playbook as verified: {e}")
@@ -412,7 +420,7 @@ async def enable_playbook(playbook_path: str):
             "status": "success",
             "playbook_path": playbook_path,
             "enabled": True,
-            "message": "Playbook enabled"
+            "message": "Playbook enabled",
         }
     except Exception as e:
         logger.error(f"Error enabling playbook: {e}")
@@ -431,7 +439,7 @@ async def disable_playbook(playbook_path: str):
             "status": "success",
             "playbook_path": playbook_path,
             "enabled": False,
-            "message": "Playbook disabled"
+            "message": "Playbook disabled",
         }
     except Exception as e:
         logger.error(f"Error disabling playbook: {e}")
@@ -452,8 +460,7 @@ async def delete_playbook(playbook_path: str):
         # Safety check - only allow deleting files in playbooks/ directory
         if "playbooks/" not in str(full_path):
             raise HTTPException(
-                status_code=400,
-                detail="Can only delete playbooks from the playbooks/ directory"
+                status_code=400, detail="Can only delete playbooks from the playbooks/ directory"
             )
 
         if not full_path.exists():
@@ -479,10 +486,7 @@ async def delete_playbook(playbook_path: str):
         except Exception as meta_error:
             logger.warning(f"Could not delete metadata: {meta_error}")
 
-        return {
-            "status": "success",
-            "message": f"Playbook deleted: {playbook_path}"
-        }
+        return {"status": "success", "message": f"Playbook deleted: {playbook_path}"}
 
     except HTTPException:
         raise
@@ -497,22 +501,22 @@ async def edit_step(request: StepEditRequest):
     try:
         playbook_path = validate_playbook_path(request.playbook_path)
 
-        with open(playbook_path, 'r') as f:
+        with open(playbook_path) as f:
             playbook_data = yaml.safe_load(f)
 
         step_found = False
-        for step in playbook_data.get('steps', []):
-            if step.get('id') == request.step_id:
-                if 'parameters' not in step:
-                    step['parameters'] = {}
-                step['parameters'].update(request.new_parameters)
+        for step in playbook_data.get("steps", []):
+            if step.get("id") == request.step_id:
+                if "parameters" not in step:
+                    step["parameters"] = {}
+                step["parameters"].update(request.new_parameters)
                 step_found = True
                 break
 
         if not step_found:
             raise HTTPException(status_code=404, detail=f"Step not found: {request.step_id}")
 
-        with open(playbook_path, 'w') as f:
+        with open(playbook_path, "w") as f:
             yaml.safe_dump(playbook_data, f, default_flow_style=False, sort_keys=False)
 
         logger.info(f"Updated step '{request.step_id}' in {playbook_path}")

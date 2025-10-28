@@ -7,11 +7,11 @@ stripped for security.
 
 import json
 import re
-from typing import Any, Dict
+from typing import Any
 
-from ignition_toolkit.playbook.models import Playbook
-from ignition_toolkit.playbook.loader import PlaybookLoader
 from ignition_toolkit.playbook.exceptions import PlaybookLoadError
+from ignition_toolkit.playbook.loader import PlaybookLoader
+from ignition_toolkit.playbook.models import Playbook
 
 
 class PlaybookExporter:
@@ -86,7 +86,7 @@ class PlaybookExporter:
         return PlaybookLoader._parse_playbook(data)
 
     @staticmethod
-    def _strip_credentials(data: Dict[str, Any]) -> Dict[str, Any]:
+    def _strip_credentials(data: dict[str, Any]) -> dict[str, Any]:
         """
         Recursively strip credential values from data structure
 
@@ -157,7 +157,7 @@ class PlaybookExporter:
             PlaybookLoadError: If file cannot be read
         """
         try:
-            with open(file_path, "r") as f:
+            with open(file_path) as f:
                 json_data = f.read()
         except Exception as e:
             raise PlaybookLoadError(f"Error reading file: {e}")

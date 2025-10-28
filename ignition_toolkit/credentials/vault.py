@@ -4,13 +4,12 @@ Credential vault for secure local storage
 
 import json
 import logging
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import List, Optional
-from datetime import datetime, UTC
 
-from ignition_toolkit.credentials.models import Credential
-from ignition_toolkit.credentials.encryption import CredentialEncryption
 from ignition_toolkit.config import get_toolkit_data_dir, migrate_credentials_if_needed
+from ignition_toolkit.credentials.encryption import CredentialEncryption
+from ignition_toolkit.credentials.models import Credential
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +27,7 @@ class CredentialVault:
     Both files are excluded from git via .gitignore
     """
 
-    def __init__(self, vault_path: Optional[Path] = None):
+    def __init__(self, vault_path: Path | None = None):
         """
         Initialize credential vault
 
@@ -97,14 +96,18 @@ class CredentialVault:
             "password": encrypted_password,  # Already encrypted
             "gateway_url": credential.gateway_url,
             "description": credential.description,
-            "created_at": credential.created_at.isoformat() if credential.created_at else datetime.now(UTC).isoformat(),
+            "created_at": (
+                credential.created_at.isoformat()
+                if credential.created_at
+                else datetime.now(UTC).isoformat()
+            ),
             "updated_at": datetime.now(UTC).isoformat(),
         }
 
         self._save_credentials_file(credentials_data)
         logger.info(f"Credential '{credential.name}' saved successfully")
 
-    def get_credential(self, name: str) -> Optional[Credential]:
+    def get_credential(self, name: str) -> Credential | None:
         """
         Retrieve a credential by name
 
@@ -132,11 +135,19 @@ class CredentialVault:
             password=decrypted_password,
             gateway_url=cred_data.get("gateway_url"),
             description=cred_data.get("description"),
-            created_at=datetime.fromisoformat(cred_data["created_at"]) if cred_data.get("created_at") else None,
-            updated_at=datetime.fromisoformat(cred_data["updated_at"]) if cred_data.get("updated_at") else None,
+            created_at=(
+                datetime.fromisoformat(cred_data["created_at"])
+                if cred_data.get("created_at")
+                else None
+            ),
+            updated_at=(
+                datetime.fromisoformat(cred_data["updated_at"])
+                if cred_data.get("updated_at")
+                else None
+            ),
         )
 
-    def list_credentials(self) -> List[Credential]:
+    def list_credentials(self) -> list[Credential]:
         """
         List all stored credentials (without passwords)
 
@@ -147,15 +158,25 @@ class CredentialVault:
 
         credentials = []
         for name, cred_data in credentials_data.items():
-            credentials.append(Credential(
-                name=cred_data["name"],
-                username=cred_data["username"],
-                password="<encrypted>",  # Don't return actual password
-                gateway_url=cred_data.get("gateway_url"),
-                description=cred_data.get("description"),
-                created_at=datetime.fromisoformat(cred_data["created_at"]) if cred_data.get("created_at") else None,
-                updated_at=datetime.fromisoformat(cred_data["updated_at"]) if cred_data.get("updated_at") else None,
-            ))
+            credentials.append(
+                Credential(
+                    name=cred_data["name"],
+                    username=cred_data["username"],
+                    password="<encrypted>",  # Don't return actual password
+                    gateway_url=cred_data.get("gateway_url"),
+                    description=cred_data.get("description"),
+                    created_at=(
+                        datetime.fromisoformat(cred_data["created_at"])
+                        if cred_data.get("created_at")
+                        else None
+                    ),
+                    updated_at=(
+                        datetime.fromisoformat(cred_data["updated_at"])
+                        if cred_data.get("updated_at")
+                        else None
+                    ),
+                )
+            )
 
         return sorted(credentials, key=lambda c: c.name)
 
@@ -249,10 +270,10 @@ class CredentialVault:
 
 
 # Global vault instance (singleton)
-_credential_vault: Optional[CredentialVault] = None
+_credential_vault: CredentialVault | None = None
 
 
-def get_credential_vault(vault_path: Optional[Path] = None) -> CredentialVault:
+def get_credential_vault(vault_path: Path | None = None) -> CredentialVault:
     """
     Get the global credential vault instance (singleton pattern)
 

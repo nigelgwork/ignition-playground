@@ -5,29 +5,29 @@ Main orchestration logic for executing playbooks with state management.
 """
 
 import asyncio
+import logging
 import uuid
+from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, Optional, Callable
-import logging
+from typing import Any
 
-from ignition_toolkit.gateway import GatewayClient
 from ignition_toolkit.browser import BrowserManager
 from ignition_toolkit.credentials import CredentialVault
-from ignition_toolkit.storage import Database, ExecutionModel, StepResultModel
+from ignition_toolkit.gateway import GatewayClient
+from ignition_toolkit.playbook.exceptions import PlaybookExecutionError
 from ignition_toolkit.playbook.models import (
-    Playbook,
     ExecutionState,
     ExecutionStatus,
+    OnFailureAction,
+    Playbook,
     StepResult,
     StepStatus,
-    OnFailureAction,
 )
-from ignition_toolkit.playbook.loader import PlaybookLoader
 from ignition_toolkit.playbook.parameters import ParameterResolver
-from ignition_toolkit.playbook.step_executor import StepExecutor
 from ignition_toolkit.playbook.state_manager import StateManager
-from ignition_toolkit.playbook.exceptions import PlaybookExecutionError
+from ignition_toolkit.playbook.step_executor import StepExecutor
+from ignition_toolkit.storage import Database, ExecutionModel, StepResultModel
 
 logger = logging.getLogger(__name__)
 
@@ -57,11 +57,11 @@ class PlaybookEngine:
 
     def __init__(
         self,
-        gateway_client: Optional[GatewayClient] = None,
-        credential_vault: Optional[CredentialVault] = None,
-        database: Optional[Database] = None,
-        state_manager: Optional[StateManager] = None,
-        screenshot_callback: Optional[Callable[[str, str], None]] = None,
+        gateway_client: GatewayClient | None = None,
+        credential_vault: CredentialVault | None = None,
+        database: Database | None = None,
+        state_manager: StateManager | None = None,
+        screenshot_callback: Callable[[str, str], None] | None = None,
     ):
         """
         Initialize playbook engine
@@ -78,11 +78,11 @@ class PlaybookEngine:
         self.database = database
         self.state_manager = state_manager or StateManager()
         self.screenshot_callback = screenshot_callback
-        self._current_execution: Optional[ExecutionState] = None
-        self._current_playbook: Optional[Playbook] = None
-        self._playbook_path: Optional[Path] = None
-        self._update_callback: Optional[Callable[[ExecutionState], None]] = None
-        self._browser_manager: Optional[BrowserManager] = None
+        self._current_execution: ExecutionState | None = None
+        self._current_playbook: Playbook | None = None
+        self._playbook_path: Path | None = None
+        self._update_callback: Callable[[ExecutionState], None] | None = None
+        self._browser_manager: BrowserManager | None = None
 
     def set_update_callback(self, callback: Callable[[ExecutionState], None]) -> None:
         """
@@ -105,10 +105,10 @@ class PlaybookEngine:
     async def execute_playbook(
         self,
         playbook: Playbook,
-        parameters: Dict[str, Any],
-        base_path: Optional[Path] = None,
-        execution_id: Optional[str] = None,
-        playbook_path: Optional[Path] = None,
+        parameters: dict[str, Any],
+        base_path: Path | None = None,
+        execution_id: str | None = None,
+        playbook_path: Path | None = None,
     ) -> ExecutionState:
         """
         Execute playbook with parameters
@@ -186,7 +186,7 @@ class PlaybookEngine:
 
                 browser_manager = BrowserManager(
                     headless=True,  # Headless mode with screenshot streaming for embedded view
-                    screenshot_callback=screenshot_frame_callback
+                    screenshot_callback=screenshot_frame_callback,
                 )
                 await browser_manager.start()
                 await browser_manager.start_screenshot_streaming()
@@ -222,7 +222,9 @@ class PlaybookEngine:
                 # Check if skip back requested
                 if self.state_manager.is_skip_back_requested():
                     if step_index > 0:
-                        logger.info(f"Skipping back from step {step_index} to step {step_index - 1}")
+                        logger.info(
+                            f"Skipping back from step {step_index} to step {step_index - 1}"
+                        )
                         step_index -= 1  # Go back 1 position
                         self.state_manager.clear_skip_back()
                         # Remove the last step result to re-execute it
@@ -303,14 +305,16 @@ class PlaybookEngine:
                         return execution_state
 
                     elif step.on_failure == OnFailureAction.CONTINUE:
-                        logger.warning(f"Continuing after failure (on_failure=continue)")
+                        logger.warning("Continuing after failure (on_failure=continue)")
                         step_index += 1
                         continue
 
                     elif step.on_failure == OnFailureAction.ROLLBACK:
                         logger.warning("Rollback not yet implemented, aborting")
                         execution_state.status = ExecutionStatus.FAILED
-                        execution_state.error = f"Step '{step.id}' failed (rollback requested but not implemented)"
+                        execution_state.error = (
+                            f"Step '{step.id}' failed (rollback requested but not implemented)"
+                        )
                         execution_state.completed_at = datetime.now()
                         await self._notify_update(execution_state)
                         if self.database:
@@ -354,7 +358,7 @@ class PlaybookEngine:
 
         return execution_state
 
-    def _validate_parameters(self, playbook: Playbook, parameters: Dict[str, Any]) -> None:
+    def _validate_parameters(self, playbook: Playbook, parameters: dict[str, Any]) -> None:
         """
         Validate provided parameters against playbook definition
 
@@ -389,7 +393,7 @@ class PlaybookEngine:
                 logger.exception(f"Error in update callback: {e}")
 
     async def _save_execution_start(
-        self, execution_state: ExecutionState, playbook: Playbook, parameters: Dict[str, Any]
+        self, execution_state: ExecutionState, playbook: Playbook, parameters: dict[str, Any]
     ) -> None:
         """Save execution start to database"""
         try:
@@ -417,8 +421,10 @@ class PlaybookEngine:
         try:
             logger.info(f"Saving execution end to database: {execution_state.execution_id}")
             with self.database.session_scope() as session:
-                if not hasattr(execution_state, 'db_execution_id'):
-                    logger.warning(f"No database execution ID found for {execution_state.execution_id}, skipping save")
+                if not hasattr(execution_state, "db_execution_id"):
+                    logger.warning(
+                        f"No database execution ID found for {execution_state.execution_id}, skipping save"
+                    )
                     return
                 execution_model = (
                     session.query(ExecutionModel)
@@ -429,9 +435,13 @@ class PlaybookEngine:
                     execution_model.status = execution_state.status.value
                     execution_model.completed_at = execution_state.completed_at
                     execution_model.error_message = execution_state.error
-                    logger.info(f"Execution end saved: {execution_state.execution_id} - Status: {execution_state.status.value}")
+                    logger.info(
+                        f"Execution end saved: {execution_state.execution_id} - Status: {execution_state.status.value}"
+                    )
                 else:
-                    logger.warning(f"Execution model not found in database for ID: {execution_state.db_execution_id}")
+                    logger.warning(
+                        f"Execution model not found in database for ID: {execution_state.db_execution_id}"
+                    )
         except Exception as e:
             logger.exception(f"Error updating execution in database: {e}")
 
@@ -440,7 +450,7 @@ class PlaybookEngine:
     ) -> None:
         """Save step result to database"""
         try:
-            if not hasattr(execution_state, 'db_execution_id'):
+            if not hasattr(execution_state, "db_execution_id"):
                 logger.warning("No database execution ID found, skipping step result save")
                 return
             with self.database.session_scope() as session:
@@ -486,7 +496,7 @@ class PlaybookEngine:
         """Cancel execution"""
         await self.state_manager.cancel()
 
-    def get_current_execution(self) -> Optional[ExecutionState]:
+    def get_current_execution(self) -> ExecutionState | None:
         """
         Get current execution state
 

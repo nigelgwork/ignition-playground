@@ -4,7 +4,6 @@ Prompt templates for AI operations
 Provides structured prompts for various AI-assisted testing scenarios.
 """
 
-from typing import Dict, Any
 from string import Template
 
 

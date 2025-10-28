@@ -5,7 +5,6 @@ Handles secure credential storage, retrieval, updates, and deletion.
 """
 
 import logging
-from typing import List, Optional
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
@@ -23,28 +22,32 @@ router = APIRouter(prefix="/api/credentials", tags=["credentials"])
 # Pydantic Models
 # ============================================================================
 
+
 class CredentialInfo(BaseModel):
     """Credential information (without password)"""
+
     name: str
     username: str
-    gateway_url: Optional[str] = None
-    description: Optional[str] = ""
+    gateway_url: str | None = None
+    description: str | None = ""
 
 
 class CredentialCreate(BaseModel):
     """Credential creation request"""
+
     name: str
     username: str
     password: str
-    gateway_url: Optional[str] = None
-    description: Optional[str] = ""
+    gateway_url: str | None = None
+    description: str | None = ""
 
 
 # ============================================================================
 # Routes
 # ============================================================================
 
-@router.get("", response_model=List[CredentialInfo])
+
+@router.get("", response_model=list[CredentialInfo])
 async def list_credentials():
     """List all credentials (without passwords)"""
     try:
@@ -55,7 +58,7 @@ async def list_credentials():
                 name=cred.name,
                 username=cred.username,
                 gateway_url=cred.gateway_url,
-                description=cred.description
+                description=cred.description,
             )
             for cred in credentials
         ]
@@ -74,7 +77,9 @@ async def add_credential(credential: CredentialCreate):
         try:
             existing = vault.get_credential(credential.name)
             if existing:
-                raise HTTPException(status_code=400, detail=f"Credential '{credential.name}' already exists")
+                raise HTTPException(
+                    status_code=400, detail=f"Credential '{credential.name}' already exists"
+                )
         except ValueError:
             # Credential doesn't exist, which is what we want
             pass
@@ -86,7 +91,7 @@ async def add_credential(credential: CredentialCreate):
                 username=credential.username,
                 password=credential.password,
                 gateway_url=credential.gateway_url,
-                description=credential.description
+                description=credential.description,
             )
         )
 
@@ -120,7 +125,7 @@ async def update_credential(name: str, credential: CredentialCreate):
                 username=credential.username,
                 password=credential.password,
                 gateway_url=credential.gateway_url,
-                description=credential.description
+                description=credential.description,
             )
         )
 

@@ -2,10 +2,12 @@
 Tests for credential vault
 """
 
-import pytest
 import tempfile
 from pathlib import Path
-from ignition_toolkit.credentials import CredentialVault, Credential
+
+import pytest
+
+from ignition_toolkit.credentials import Credential, CredentialVault
 
 
 @pytest.fixture
@@ -24,10 +26,7 @@ def vault(temp_vault_dir):
 def test_credential_creation():
     """Test creating a credential"""
     cred = Credential(
-        name="test_cred",
-        username="testuser",
-        password="testpass",
-        description="Test credential"
+        name="test_cred", username="testuser", password="testpass", description="Test credential"
     )
 
     assert cred.name == "test_cred"
@@ -44,11 +43,7 @@ def test_vault_initialization(vault):
 
 def test_save_and_get_credential(vault):
     """Test saving and retrieving credential"""
-    cred = Credential(
-        name="gateway_admin",
-        username="admin",
-        password="secret123"
-    )
+    cred = Credential(name="gateway_admin", username="admin", password="secret123")
 
     vault.save_credential(cred)
     retrieved = vault.get_credential("gateway_admin")
