@@ -5,7 +5,7 @@ Lightweight, transferable automation platform for Ignition SCADA Gateway operati
 """
 
 __version__ = (
-    "3.5.0"  # Updated: 2025-10-28 - UI improvements: fixed execution completion, removed Claude terminal and Back button, renamed Stop to Cancel
+    "3.5.1"  # Updated: 2025-10-28 - UX improvements: debug toggle auto-resumes, persist final screenshot
 )
 __build_date__ = "2025-10-28"
 __phases_complete__ = "8/8 (100%)"

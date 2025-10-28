@@ -23,6 +23,7 @@ interface ClickCoordinate {
 export function LiveBrowserView({ executionId }: LiveBrowserViewProps) {
   const currentScreenshots = useStore((state) => state.currentScreenshots);
   const screenshot = currentScreenshots.get(executionId);
+  const [lastScreenshot, setLastScreenshot] = useState<string | null>(null);
   const [clickCoords, setClickCoords] = useState<ClickCoordinate | null>(null);
   const [showClickIndicator, setShowClickIndicator] = useState(false);
   const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'error' }>({
@@ -31,6 +32,14 @@ export function LiveBrowserView({ executionId }: LiveBrowserViewProps) {
     severity: 'success',
   });
   const imgRef = useRef<HTMLImageElement>(null);
+
+  // Persist the last screenshot so it remains visible after execution completes
+  if (screenshot && screenshot.screenshot !== lastScreenshot) {
+    setLastScreenshot(screenshot.screenshot);
+  }
+
+  // Use current screenshot if available, otherwise use last persisted screenshot
+  const displayScreenshot = screenshot?.screenshot || lastScreenshot;
 
   const handleImageClick = async (event: React.MouseEvent<HTMLImageElement>) => {
     if (!imgRef.current) return;
@@ -141,7 +150,7 @@ export function LiveBrowserView({ executionId }: LiveBrowserViewProps) {
           position: 'relative',
         }}
       >
-        {screenshot ? (
+        {displayScreenshot ? (
           <Box
             sx={{
               position: 'relative',
@@ -162,7 +171,7 @@ export function LiveBrowserView({ executionId }: LiveBrowserViewProps) {
             >
               <img
                 ref={imgRef}
-                src={`data:image/jpeg;base64,${screenshot.screenshot}`}
+                src={`data:image/jpeg;base64,${displayScreenshot}`}
                 alt="Browser screenshot"
                 onClick={handleImageClick}
                 style={{

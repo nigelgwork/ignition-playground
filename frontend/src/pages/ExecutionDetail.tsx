@@ -253,6 +253,10 @@ export function ExecutionDetail() {
                       await api.executions.enableDebug(executionId);
                     } else {
                       await api.executions.disableDebug(executionId);
+                      // If currently paused, resume execution when debug mode is turned off
+                      if (execution.status === 'paused') {
+                        await api.executions.resume(executionId);
+                      }
                     }
                   } catch (error) {
                     console.error('Failed to toggle debug mode:', error);
