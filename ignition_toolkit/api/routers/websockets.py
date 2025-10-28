@@ -197,68 +197,26 @@ async def claude_code_terminal(websocket: WebSocket, execution_id: str):
 
         context_message = "\n".join(context_parts)
 
-        # Spawn Claude Code with PTY
+        # Spawn interactive bash shell in playbook directory with PTY
         master_fd, slave_fd = pty.openpty()
 
-        # Build command - check environment variable first, then try common names
-        claude_cmd = os.getenv("CLAUDE_CLI_COMMAND")  # User can override with env var
+        # Get playbook directory
+        playbook_dir = os.path.dirname(playbook_path)
 
-        if claude_cmd:
-            # User-specified command - verify it exists
-            if not shutil.which(claude_cmd):
-                error_msg = f"Configured Claude CLI command '{claude_cmd}' not found. Set CLAUDE_CLI_COMMAND environment variable to the correct command."
-                logger.error(error_msg)
-                await websocket.send_json({"type": "error", "message": error_msg})
-                await websocket.close(code=1008, reason="Claude CLI not found")
-                return
-        else:
-            # Auto-detect: try common Claude CLI names
-            for cmd_name in ["claude-code", "claude-work", "claude", "claude-personal"]:
-                found_cmd = shutil.which(cmd_name)
-                if found_cmd:
-                    claude_cmd = found_cmd
-                    break
+        # Spawn interactive bash shell
+        cmd_args = ["/bin/bash"]
 
-            if not claude_cmd:
-                error_msg = (
-                    "Claude CLI not found. Please install one of: claude-code, claude-work, claude, claude-personal\n"
-                    "Or set CLAUDE_CLI_COMMAND environment variable to your Claude CLI command name."
-                )
-                logger.error(error_msg)
-                await websocket.send_json({"type": "error", "message": error_msg})
-                await websocket.close(code=1008, reason="Claude CLI not found")
-                return
-
-        logger.info(f"Using Claude CLI: {claude_cmd}")
-
-        # Build arguments - check if it's a script that needs bash
-        cmd_file_info = os.path.isfile(claude_cmd)
-        context_msg = f"{context_message}\n\nYou are debugging a paused Ignition Automation Toolkit playbook execution. The playbook YAML file is open for editing."
-
-        # Check if the command is a shell script (not a binary)
-        is_shell_script = False
-        if cmd_file_info:
-            try:
-                with open(claude_cmd, "rb") as f:
-                    first_bytes = f.read(20)
-                    if first_bytes.startswith(b"#!/"):
-                        is_shell_script = True
-            except Exception:
-                pass
-
-        if is_shell_script:
-            # It's a shell script - need to invoke through bash
-            cmd_args = ["/bin/bash", claude_cmd, "-p", playbook_path, "-m", context_msg]
-            logger.info(f"Detected shell script, using: /bin/bash {claude_cmd}")
-        else:
-            # It's a binary - call directly
-            cmd_args = [claude_cmd, "-p", playbook_path, "-m", context_msg]
+        # Set up environment
+        env = os.environ.copy()
+        env["PS1"] = f"\\[\\033[1;32m\\]{playbook_name}\\[\\033[0m\\]:\\[\\033[1;34m\\]\\w\\[\\033[0m\\]$ "
 
         process = subprocess.Popen(
             cmd_args,
             stdin=slave_fd,
             stdout=slave_fd,
             stderr=slave_fd,
+            cwd=playbook_dir,  # Start in playbook directory
+            env=env,
             preexec_fn=os.setsid,  # Create new process group
             close_fds=True,
         )
@@ -268,13 +226,23 @@ async def claude_code_terminal(websocket: WebSocket, execution_id: str):
         claude_code_processes = get_claude_code_processes()
         claude_code_processes[execution_id] = process
 
-        logger.info(f"Claude Code process started: PID={process.pid}, playbook={playbook_path}")
+        logger.info(f"Interactive shell started: PID={process.pid}, cwd={playbook_dir}")
 
-        # Send initial welcome message
+        # Send initial welcome message with context
+        welcome_msg = (
+            f"Terminal session started for {playbook_name}\n"
+            f"Working directory: {playbook_dir}\n"
+            f"Playbook file: {os.path.basename(playbook_path)}\n"
+            f"\n{context_message}\n"
+            f"\nYou can now run commands interactively. To launch Claude Code:\n"
+            f"  claude-code -p {os.path.basename(playbook_path)}\n"
+            f"\n"
+        )
+
         await websocket.send_json(
             {
                 "type": "connected",
-                "message": f"Claude Code session started for {playbook_name}",
+                "message": welcome_msg,
                 "pid": process.pid,
             }
         )
