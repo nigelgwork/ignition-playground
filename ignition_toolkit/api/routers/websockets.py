@@ -442,6 +442,147 @@ async def broadcast_execution_state(state: ExecutionState):
             websocket_connections.remove(ws)
 
 
+@router.websocket("/ws/shell")
+async def shell_terminal(websocket: WebSocket):
+    """
+    WebSocket endpoint for embedded bash shell terminal.
+    Spawns a bash shell with PTY in the specified directory (default: playbooks).
+    """
+    # Get working directory from query params
+    working_dir = websocket.query_params.get("path", str(get_playbooks_dir().resolve()))
+
+    await websocket.accept()
+    logger.info(f"Shell WebSocket connected, working directory: {working_dir}")
+
+    master_fd = None
+    process = None
+
+    try:
+        # Validate working directory exists
+        if not os.path.isdir(working_dir):
+            await websocket.send_json({
+                "type": "error",
+                "message": f"Directory does not exist: {working_dir}"
+            })
+            await websocket.close(code=1008, reason="Invalid directory")
+            return
+
+        # Spawn bash with PTY
+        master_fd, slave_fd = pty.openpty()
+
+        # Start bash in the specified directory
+        process = subprocess.Popen(
+            ["/bin/bash"],
+            stdin=slave_fd,
+            stdout=slave_fd,
+            stderr=slave_fd,
+            cwd=working_dir,
+            preexec_fn=os.setsid,  # Create new process group
+            close_fds=True,
+            env={**os.environ, "PS1": "$ "}  # Simple prompt
+        )
+
+        os.close(slave_fd)  # Parent doesn't need slave_fd
+
+        logger.info(f"Bash shell started: PID={process.pid}, cwd={working_dir}")
+
+        # Create tasks for bidirectional I/O
+        async def read_from_pty():
+            """Read output from PTY and send to WebSocket"""
+            while True:
+                try:
+                    # Check if process is still alive
+                    if process.poll() is not None:
+                        logger.info(f"Shell process exited: {process.pid}")
+                        await websocket.send_json({
+                            "type": "exit",
+                            "code": process.returncode
+                        })
+                        break
+
+                    # Use select to check if data is available (non-blocking)
+                    readable, _, _ = select.select([master_fd], [], [], 0.1)
+                    if readable:
+                        data = os.read(master_fd, 1024)
+                        if not data:
+                            break
+                        # Send as JSON with output field
+                        try:
+                            decoded = data.decode('utf-8', errors='replace')
+                            await websocket.send_json({"output": decoded})
+                        except Exception as e:
+                            logger.error(f"Error decoding output: {e}")
+                    else:
+                        # Small sleep to prevent busy loop
+                        await asyncio.sleep(0.01)
+
+                except OSError:
+                    break
+                except Exception as e:
+                    logger.error(f"Error reading from PTY: {e}")
+                    break
+
+        async def write_to_pty():
+            """Receive data from WebSocket and write to PTY"""
+            while True:
+                try:
+                    message = await websocket.receive_json()
+
+                    if "input" in message:
+                        # Text input from terminal
+                        data = message["input"]
+                        os.write(master_fd, data.encode('utf-8'))
+
+                except WebSocketDisconnect:
+                    break
+                except Exception as e:
+                    logger.error(f"Error writing to PTY: {e}")
+                    break
+
+        # Run both tasks concurrently
+        await asyncio.gather(
+            read_from_pty(),
+            write_to_pty(),
+            return_exceptions=True
+        )
+
+    except Exception as e:
+        logger.exception(f"Shell WebSocket error: {e}")
+        try:
+            await websocket.send_json({"type": "error", "message": str(e)})
+        except:
+            pass
+
+    finally:
+        # Cleanup
+        logger.info(f"Cleaning up shell session, PID: {process.pid if process else 'N/A'}")
+
+        if process:
+            try:
+                # Try graceful termination first
+                if process.poll() is None:
+                    os.killpg(os.getpgid(process.pid), signal.SIGTERM)
+                    try:
+                        process.wait(timeout=2)
+                    except subprocess.TimeoutExpired:
+                        # Force kill if still running
+                        os.killpg(os.getpgid(process.pid), signal.SIGKILL)
+                        process.wait()
+            except Exception as e:
+                logger.error(f"Error terminating shell process: {e}")
+
+        if master_fd is not None:
+            try:
+                os.close(master_fd)
+            except Exception:
+                pass
+
+        try:
+            await websocket.close()
+        except Exception:
+            pass
+
+
 async def broadcast_screenshot_frame(execution_id: str, screenshot_b64: str):
     """
     Broadcast screenshot frame to all connected WebSocket clients

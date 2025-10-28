@@ -43,7 +43,7 @@ import { LiveBrowserView } from '../components/LiveBrowserView';
 import { ExecutionControls } from '../components/ExecutionControls';
 import { DebugPanel } from '../components/DebugPanel';
 import { AIAssistDialog } from '../components/AIAssistDialog';
-import { TerminalOpener } from '../components/TerminalOpener';
+import { EmbeddedShellTerminal } from '../components/EmbeddedShellTerminal';
 import { PlaybookCodeViewer } from '../components/PlaybookCodeViewer';
 import { useStore } from '../store';
 import type { ExecutionStatusResponse } from '../types/api';
@@ -449,8 +449,8 @@ export function ExecutionDetail() {
         }
       />
 
-      {/* Terminal Opener for Claude Code */}
-      <TerminalOpener
+      {/* Embedded Shell Terminal for Claude Code */}
+      <EmbeddedShellTerminal
         open={terminalOpenerOpen}
         onClose={() => setTerminalOpenerOpen(false)}
         executionId={executionId}
