@@ -174,6 +174,38 @@ export function Playbooks() {
     setGatewayPlaybooks(categories.gateway);
     setDesignerPlaybooks(categories.designer);
     setPerspectivePlaybooks(categories.perspective);
+
+    // Clean up saved configurations for deleted playbooks
+    if (playbooks.length > 0) {
+      const validPaths = new Set(playbooks.map(p => p.path));
+      const keysToRemove: string[] = [];
+
+      // Find all localStorage keys for playbook configurations
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key?.startsWith('playbook_config_') || key?.startsWith('playbook_debug_') || key?.startsWith('playbook_order_')) {
+          // Extract playbook path from key
+          if (key.startsWith('playbook_config_')) {
+            const playbookPath = key.replace('playbook_config_', '');
+            if (!validPaths.has(playbookPath)) {
+              keysToRemove.push(key);
+              // Also remove associated debug mode setting
+              keysToRemove.push(`playbook_debug_${playbookPath}`);
+            }
+          }
+        }
+      }
+
+      // Remove invalid configurations
+      keysToRemove.forEach(key => {
+        localStorage.removeItem(key);
+        console.log(`Removed stale configuration: ${key}`);
+      });
+
+      if (keysToRemove.length > 0) {
+        console.log(`Cleaned up ${keysToRemove.length} stale playbook configurations`);
+      }
+    }
   }, [playbooks]);
 
   // Configure drag sensors
@@ -203,6 +235,13 @@ export function Playbooks() {
     // If global credential is selected, execute directly with it
     if (selectedCredential && !savedConfigStr) {
       try {
+        console.log('Executing playbook with credential:', {
+          playbook_path: playbook.path,
+          credential_name: selectedCredential.name,
+          gateway_url: selectedCredential.gateway_url,
+          debug_mode,
+        });
+
         const response = await api.executions.start({
           playbook_path: playbook.path,
           parameters: {}, // Backend will auto-fill from credential
@@ -211,12 +250,18 @@ export function Playbooks() {
           debug_mode,
         });
 
+        console.log('Execution started successfully:', response);
+
         // Navigate to execution detail page
         window.location.href = `/executions/${response.execution_id}`;
         return;
       } catch (error) {
         console.error('Failed to execute playbook:', error);
-        alert('Failed to start execution. Please check the console for details.');
+        console.error('Error details:', error instanceof Error ? error.message : String(error));
+        if (error && typeof error === 'object' && 'data' in error) {
+          console.error('Error data:', (error as any).data);
+        }
+        alert(`Failed to start execution: ${error instanceof Error ? error.message : String(error)}\n\nCheck console for details.`);
         return;
       }
     }

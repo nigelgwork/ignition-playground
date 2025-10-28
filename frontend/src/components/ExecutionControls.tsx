@@ -114,7 +114,7 @@ export function ExecutionControls({
             size="small"
             startIcon={<AIIcon />}
           >
-            Ask AI
+            AI
           </Button>
         </Tooltip>
       )}
@@ -129,7 +129,7 @@ export function ExecutionControls({
             size="small"
             startIcon={<TerminalIcon />}
           >
-            Claude Code
+            Claude
           </Button>
         </Tooltip>
       )}

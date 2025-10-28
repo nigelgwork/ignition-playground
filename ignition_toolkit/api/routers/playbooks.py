@@ -175,7 +175,7 @@ async def list_playbooks():
             playbooks.append(
                 PlaybookInfo(
                     name=playbook.name,
-                    path=str(yaml_file),
+                    path=relative_path,  # Use relative path instead of absolute
                     version=playbook.version,
                     description=playbook.description,
                     parameter_count=len(playbook.parameters),

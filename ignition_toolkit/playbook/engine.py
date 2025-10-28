@@ -79,6 +79,8 @@ class PlaybookEngine:
         self.state_manager = state_manager or StateManager()
         self.screenshot_callback = screenshot_callback
         self._current_execution: Optional[ExecutionState] = None
+        self._current_playbook: Optional[Playbook] = None
+        self._playbook_path: Optional[Path] = None
         self._update_callback: Optional[Callable[[ExecutionState], None]] = None
         self._browser_manager: Optional[BrowserManager] = None
 
@@ -106,6 +108,7 @@ class PlaybookEngine:
         parameters: Dict[str, Any],
         base_path: Optional[Path] = None,
         execution_id: Optional[str] = None,
+        playbook_path: Optional[Path] = None,
     ) -> ExecutionState:
         """
         Execute playbook with parameters
@@ -148,13 +151,19 @@ class PlaybookEngine:
             step_results=initial_step_results,
         )
         self._current_execution = execution_state
+        self._current_playbook = playbook  # Store playbook for API access
+        self._playbook_path = playbook_path  # Store path for code editing
 
         # Reset state manager
         self.state_manager.reset()
 
         # Save to database IMMEDIATELY (before validation)
+        logger.info(f"Database object: {self.database}, Type: {type(self.database)}")
         if self.database:
+            logger.info("Database exists, calling _save_execution_start")
             await self._save_execution_start(execution_state, playbook, parameters)
+        else:
+            logger.warning("No database configured - execution will not be saved")
 
         # Initialize browser_manager to None BEFORE try block (scope issue)
         browser_manager = None
@@ -384,6 +393,7 @@ class PlaybookEngine:
     ) -> None:
         """Save execution start to database"""
         try:
+            logger.info(f"Saving execution start to database: {execution_state.execution_id}")
             with self.database.session_scope() as session:
                 execution_model = ExecutionModel(
                     execution_id=execution_state.execution_id,  # Save UUID
@@ -398,15 +408,17 @@ class PlaybookEngine:
                 session.flush()  # Get the auto-generated ID
                 # Store the database ID for later queries
                 execution_state.db_execution_id = execution_model.id
+                logger.info(f"Execution saved to database with ID: {execution_model.id}")
         except Exception as e:
             logger.exception(f"Error saving execution to database: {e}")
 
     async def _save_execution_end(self, execution_state: ExecutionState) -> None:
         """Save execution end to database"""
         try:
+            logger.info(f"Saving execution end to database: {execution_state.execution_id}")
             with self.database.session_scope() as session:
                 if not hasattr(execution_state, 'db_execution_id'):
-                    logger.warning("No database execution ID found, skipping save")
+                    logger.warning(f"No database execution ID found for {execution_state.execution_id}, skipping save")
                     return
                 execution_model = (
                     session.query(ExecutionModel)
@@ -417,6 +429,9 @@ class PlaybookEngine:
                     execution_model.status = execution_state.status.value
                     execution_model.completed_at = execution_state.completed_at
                     execution_model.error_message = execution_state.error
+                    logger.info(f"Execution end saved: {execution_state.execution_id} - Status: {execution_state.status.value}")
+                else:
+                    logger.warning(f"Execution model not found in database for ID: {execution_state.db_execution_id}")
         except Exception as e:
             logger.exception(f"Error updating execution in database: {e}")
 

@@ -1,6 +1,6 @@
 name: "Gateway Login"
-version: "1.2"
-description: "Visual login test: Open gateway webpage, login with credentials (two-step with Continue button), verify successful authentication"
+version: "2.0"
+description: "Base building block playbook: Login to Ignition Gateway and verify authentication. Use this as a foundation for other playbooks that require authenticated access."
 
 parameters:
   - name: gateway_url
@@ -88,34 +88,15 @@ steps:
     timeout: 15
 
   - id: step10
-    name: "Step 10: Check License Status (Optional)"
-    type: browser.click
+    name: "Step 10: Verify Login Success - Navigate to Config Page"
+    type: browser.navigate
     parameters:
-      selector: "a[href*='license'], a:has-text('Licensing'), nav a:has-text('Config'), .ia-navList a[href='/web/config/system.license']"
+      url: "{{ gateway_url }}/web/config"
     timeout: 10
-    on_failure: continue
 
   - id: step11
-    name: "Step 11: Wait for License Page (Optional)"
+    name: "Step 11: Verify Authenticated - Check for Config Navigation"
     type: browser.wait
     parameters:
-      selector: ".license-info, [data-page='license'], .ia-licenseStatus, h2:has-text('License')"
+      selector: "nav, .ia-navList, [class*='nav'], a[href*='config']"
     timeout: 10
-    on_failure: continue
-
-  - id: step12
-    name: "Step 12: Check for Trial Reset Warning (Optional)"
-    type: browser.verify
-    parameters:
-      selector: "text=/trial.*reset/i, .warning:has-text('trial'), .alert:has-text('trial'), [class*='trial']"
-      exists: false
-    timeout: 5
-    on_failure: continue
-
-  - id: step13
-    name: "Step 13: Capture License Screenshot (Optional)"
-    type: browser.screenshot
-    parameters:
-      path: "gateway_license_status.png"
-    timeout: 10
-    on_failure: continue

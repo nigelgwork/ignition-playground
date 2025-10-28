@@ -78,7 +78,7 @@ export function PlaybookExecutionDialog({
 
   // Execute playbook mutation
   const executeMutation = useMutation({
-    mutationFn: (params: { playbook_path: string; parameters: Record<string, string>; gateway_url?: string; debug_mode?: boolean }) =>
+    mutationFn: (params: { playbook_path: string; parameters: Record<string, string>; gateway_url?: string; credential_name?: string; debug_mode?: boolean }) =>
       api.executions.start(params),
     onSuccess: (data) => {
       onExecutionStarted?.(data.execution_id);
@@ -173,6 +173,7 @@ export function PlaybookExecutionDialog({
       playbook_path: playbook.path,
       parameters,
       gateway_url: gatewayUrl,
+      credential_name: selectedCredential?.name || undefined,
       debug_mode,
     });
   };
@@ -260,7 +261,10 @@ export function PlaybookExecutionDialog({
             </Typography>
 
             {playbook.parameters
-              .filter(param => param.name !== 'gateway_url')
+              .filter(param =>
+                param.name !== 'gateway_url' &&
+                !['username', 'password', 'user', 'pass', 'gateway_username', 'gateway_password'].includes(param.name.toLowerCase())
+              )
               .map((param) => (
                 <ParameterInput
                   key={param.name}

@@ -34,7 +34,8 @@ import {
   Pending as PendingIcon,
   Cancel as SkippedIcon,
   BugReport as DebugIcon,
-  Code as CodeIcon,
+  Visibility as VisibilityIcon,
+  VisibilityOff as VisibilityOffIcon,
 } from '@mui/icons-material';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../api/client';
@@ -42,7 +43,7 @@ import { LiveBrowserView } from '../components/LiveBrowserView';
 import { ExecutionControls } from '../components/ExecutionControls';
 import { DebugPanel } from '../components/DebugPanel';
 import { AIAssistDialog } from '../components/AIAssistDialog';
-import { ClaudeCodeDialog } from '../components/ClaudeCodeDialog';
+import { TerminalOpener } from '../components/TerminalOpener';
 import { PlaybookCodeViewer } from '../components/PlaybookCodeViewer';
 import { useStore } from '../store';
 import type { ExecutionStatusResponse } from '../types/api';
@@ -53,7 +54,7 @@ export function ExecutionDetail() {
   const executionUpdates = useStore((state) => state.executionUpdates);
   const [debugMode, setDebugMode] = useState(false);
   const [aiDialogOpen, setAiDialogOpen] = useState(false);
-  const [claudeCodeDialogOpen, setClaudeCodeDialogOpen] = useState(false);
+  const [terminalOpenerOpen, setTerminalOpenerOpen] = useState(false);
   const [showDebugPanel, setShowDebugPanel] = useState(false);
   const [showCodeViewer, setShowCodeViewer] = useState(false);
   const [runtime, setRuntime] = useState<string>('0s');
@@ -287,15 +288,15 @@ export function ExecutionDetail() {
 
         {/* View Code Button - Only show when debug mode or paused */}
         {(debugMode || execution.status === 'paused') && (
-          <Tooltip title="View and edit playbook code">
+          <Tooltip title={showCodeViewer ? "Hide playbook code" : "View playbook code"}>
             <Button
               variant="outlined"
               size="small"
-              startIcon={<CodeIcon />}
+              startIcon={showCodeViewer ? <VisibilityOffIcon /> : <VisibilityIcon />}
               onClick={() => setShowCodeViewer(!showCodeViewer)}
               sx={{ ml: 1 }}
             >
-              {showCodeViewer ? 'Hide Code' : 'View Code'}
+              Code
             </Button>
           </Tooltip>
         )}
@@ -305,7 +306,7 @@ export function ExecutionDetail() {
           status={execution.status}
           debugMode={debugMode}
           onAIAssist={() => setAiDialogOpen(true)}
-          onClaudeCode={() => setClaudeCodeDialogOpen(true)}
+          onClaudeCode={() => setTerminalOpenerOpen(true)}
         />
       </Paper>
 
@@ -448,10 +449,10 @@ export function ExecutionDetail() {
         }
       />
 
-      {/* Claude Code Dialog */}
-      <ClaudeCodeDialog
-        open={claudeCodeDialogOpen}
-        onClose={() => setClaudeCodeDialogOpen(false)}
+      {/* Terminal Opener for Claude Code */}
+      <TerminalOpener
+        open={terminalOpenerOpen}
+        onClose={() => setTerminalOpenerOpen(false)}
         executionId={executionId}
       />
     </Box>

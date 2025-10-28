@@ -105,6 +105,7 @@ class ExecutionResponse(BaseModel):
     """Response with execution ID"""
 
     execution_id: str
+    playbook_name: str
     status: str
     message: str
 
