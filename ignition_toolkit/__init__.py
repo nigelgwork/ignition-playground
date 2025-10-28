@@ -5,9 +5,9 @@ Lightweight, transferable automation platform for Ignition SCADA Gateway operati
 """
 
 __version__ = (
-    "3.0.0"  # Updated: 2025-10-27 - Major Release: Claude Code Phase 2 + npm xterm integration
+    "3.1.0"  # Updated: 2025-10-28 - UX Fixes: Code viewer pop-out buttons + Interactive terminal + Gateway v8.3
 )
-__build_date__ = "2025-10-27"
+__build_date__ = "2025-10-28"
 __phases_complete__ = "8/8 (100%)"
 __author__ = "Nigel G"
 __license__ = "MIT"
