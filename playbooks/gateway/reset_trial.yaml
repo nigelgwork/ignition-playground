@@ -20,10 +20,11 @@ parameters:
 
 steps:
   - id: login
-    name: "Login to Gateway"
-    type: gateway.login
+    name: "Execute Gateway Login Playbook"
+    type: playbook.run
     parameters:
-      url: "{{ parameter.gateway_url }}"
+      playbook_path: "playbooks/gateway/gateway_login.yaml"
+      gateway_url: "{{ parameter.gateway_url }}"
       username: "{{ parameter.username }}"
       password: "{{ parameter.password }}"
     on_failure: abort

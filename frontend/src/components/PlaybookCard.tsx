@@ -72,12 +72,12 @@ function getSavedConfigPreview(playbookPath: string): SavedConfig | null {
   return stored ? JSON.parse(stored) : null;
 }
 
-// Determine test status based on playbook path
-function getTestStatus(path: string): 'tested' | 'untested' | 'example' {
+// Determine verification status based on playbook path
+function getVerificationStatus(path: string): 'verified' | 'unverified' | 'example' {
   if (path.includes('/examples/')) return 'example';
-  // Only Reset Gateway Trial is tested
-  if (path.includes('/gateway/reset_gateway_trial')) return 'tested';
-  return 'untested'; // Default to untested for safety
+  // Gateway Login is verified
+  if (path.includes('/gateway/gateway_login')) return 'verified';
+  return 'unverified'; // Default to unverified for safety
 }
 
 export function PlaybookCard({ playbook, onConfigure, onExecute, onExport, onViewSteps }: PlaybookCardProps) {
@@ -96,7 +96,7 @@ export function PlaybookCard({ playbook, onConfigure, onExecute, onExport, onVie
   const [editedDescription, setEditedDescription] = useState(playbook.description);
   const selectedCredential = useStore((state) => state.selectedCredential);
 
-  const testStatus = getTestStatus(playbook.path);
+  const verificationStatus = getVerificationStatus(playbook.path);
   const isDisabled = !playbook.enabled;
 
   // Check for saved config updates periodically
@@ -268,16 +268,16 @@ export function PlaybookCard({ playbook, onConfigure, onExecute, onExport, onVie
             </IconButton>
           )}
 
-          {/* Test Status Icon */}
-          {(testStatus === 'tested' || testStatus === 'untested') && (
+          {/* Verification Status Icon */}
+          {(verificationStatus === 'verified' || verificationStatus === 'unverified') && !playbook.verified && (
             <Tooltip
               title={
-                testStatus === 'tested'
-                  ? 'Tested and verified'
-                  : 'Not yet tested - use with caution'
+                verificationStatus === 'verified'
+                  ? 'Verified playbook'
+                  : 'Unverified - use with caution'
               }
             >
-              {testStatus === 'tested' ? (
+              {verificationStatus === 'verified' ? (
                 <CheckIcon color="success" fontSize="small" />
               ) : (
                 <WarningIcon color="warning" fontSize="small" />
