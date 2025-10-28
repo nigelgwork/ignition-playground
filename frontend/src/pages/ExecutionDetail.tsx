@@ -325,7 +325,7 @@ export function ExecutionDetail() {
         sx={{
           flexGrow: 1,
           display: 'grid',
-          gridTemplateColumns: showCodeViewer ? '1fr 2fr 1.5fr' : '1fr 2fr',
+          gridTemplateColumns: '1fr 2fr',
           gap: 2,
           p: 2,
           overflow: 'hidden',
@@ -419,20 +419,17 @@ export function ExecutionDetail() {
         ) : (
           <LiveBrowserView executionId={executionId} />
         )}
-
-        {/* Right: Playbook Code Viewer (when enabled) */}
-        {showCodeViewer && (
-          <Box sx={{ height: '100%', overflow: 'hidden' }}>
-            <PlaybookCodeViewer
-              executionId={executionId}
-              playbookName={execution.playbook_name}
-              isDebugMode={debugMode}
-              isPaused={execution.status === 'paused'}
-              onClose={() => setShowCodeViewer(false)}
-            />
-          </Box>
-        )}
       </Box>
+
+      {/* Playbook Code Viewer Dialog */}
+      <PlaybookCodeViewer
+        open={showCodeViewer}
+        executionId={executionId}
+        playbookName={execution.playbook_name}
+        isDebugMode={debugMode}
+        isPaused={execution.status === 'paused'}
+        onClose={() => setShowCodeViewer(false)}
+      />
 
       {/* AI Assist Dialog */}
       <AIAssistDialog
