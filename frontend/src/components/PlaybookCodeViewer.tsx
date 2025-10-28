@@ -174,10 +174,70 @@ export function PlaybookCodeViewer({
           <body>
             <h1>Playbook Code - ${playbookName}</h1>
             <div class="controls">
+              ${canEdit ? '<button id="saveBtn" disabled>Save</button>' : ''}
+              ${canEdit ? '<button id="revertBtn" disabled>Revert</button>' : ''}
               <button id="closeBtn">Close Window</button>
             </div>
-            <textarea id="code" readonly>${code.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</textarea>
+            <textarea id="code" ${canEdit ? '' : 'readonly'}>${code.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</textarea>
             <script>
+              const originalCode = \`${code.replace(/`/g, '\\`').replace(/\$/g, '\\$')}\`;
+              const codeTextarea = document.getElementById('code');
+              const saveBtn = document.getElementById('saveBtn');
+              const revertBtn = document.getElementById('revertBtn');
+
+              // Track changes to enable/disable buttons
+              ${canEdit ? `
+              codeTextarea.addEventListener('input', () => {
+                const hasChanges = codeTextarea.value !== originalCode;
+                saveBtn.disabled = !hasChanges;
+                revertBtn.disabled = !hasChanges;
+              });
+
+              // Save button handler
+              saveBtn.addEventListener('click', async () => {
+                saveBtn.disabled = true;
+                saveBtn.textContent = 'Saving...';
+
+                try {
+                  const response = await fetch('http://localhost:5000/api/playbooks/${encodeURIComponent(playbookName)}', {
+                    method: 'PUT',
+                    headers: {
+                      'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ code: codeTextarea.value }),
+                  });
+
+                  if (response.ok) {
+                    saveBtn.textContent = 'Saved!';
+                    setTimeout(() => {
+                      saveBtn.textContent = 'Save';
+                      saveBtn.disabled = true;
+                      revertBtn.disabled = true;
+                    }, 2000);
+                  } else {
+                    const errorData = await response.json();
+                    alert('Failed to save: ' + (errorData.detail || 'Unknown error'));
+                    saveBtn.textContent = 'Save';
+                    saveBtn.disabled = false;
+                  }
+                } catch (error) {
+                  alert('Failed to save: ' + error.message);
+                  saveBtn.textContent = 'Save';
+                  saveBtn.disabled = false;
+                }
+              });
+
+              // Revert button handler
+              revertBtn.addEventListener('click', () => {
+                if (confirm('Revert all changes to the original code?')) {
+                  codeTextarea.value = originalCode;
+                  saveBtn.disabled = true;
+                  revertBtn.disabled = true;
+                }
+              });
+              ` : ''}
+
+              // Close button handler
               document.getElementById('closeBtn').addEventListener('click', () => window.close());
             </script>
           </body>
