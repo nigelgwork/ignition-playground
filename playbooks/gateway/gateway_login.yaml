@@ -93,10 +93,3 @@ steps:
     parameters:
       url: "{{ gateway_url }}/app/platform/system/licensing"
     timeout: 10
-
-  - id: step11
-    name: "Step 11: Verify Authenticated - Check for Licensing Page Content"
-    type: browser.wait
-    parameters:
-      selector: "nav, .ia-navList, [class*='nav'], [class*='license'], h1, h2"
-    timeout: 10

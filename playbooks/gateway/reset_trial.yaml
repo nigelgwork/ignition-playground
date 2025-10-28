@@ -1,6 +1,6 @@
 name: "Reset Gateway Trial"
-version: "1.0"
-description: "Login to Ignition Gateway and reset the trial period (requires Gateway restart)"
+version: "2.0"
+description: "Login to Ignition Gateway and reset the trial license by clicking the reset button if needed"
 
 parameters:
   - name: gateway_url
@@ -19,95 +19,70 @@ parameters:
     description: "Gateway admin password"
 
 steps:
-  - id: login
-    name: "Execute Gateway Login Playbook"
+  - id: step1
+    name: "Step 1: Execute Gateway Login Playbook"
     type: playbook.run
     parameters:
-      playbook_path: "playbooks/gateway/gateway_login.yaml"
+      playbook: "gateway/gateway_login.yaml"
       gateway_url: "{{ parameter.gateway_url }}"
       username: "{{ parameter.username }}"
       password: "{{ parameter.password }}"
     on_failure: abort
 
-  - id: check_health_before
-    name: "Check Gateway Health (Before)"
-    type: gateway.get_health
+  - id: step2
+    name: "Step 2: Navigate to Licensing Page"
+    type: browser.navigate
     parameters:
-      url: "{{ parameter.gateway_url }}"
+      url: "{{ parameter.gateway_url }}/app/platform/system/licensing"
+    timeout: 10
+
+  - id: step3
+    name: "Step 3: Wait for Licensing Page to Load"
+    type: browser.wait
+    parameters:
+      selector: "h1, h2, .trial, [class*='license'], [class*='trial']"
+    timeout: 10
+
+  - id: step4
+    name: "Step 4: Check Trial Status Box"
+    type: browser.screenshot
+    parameters:
+      path: "trial_status_check.png"
+    timeout: 10
+
+  - id: step5
+    name: "Step 5: Look for Reset Button (Yellow Box)"
+    type: browser.wait
+    parameters:
+      selector: "button:has-text('Reset'), button:has-text('reset'), [class*='reset'], button[onclick*='reset']"
+    timeout: 5
     on_failure: continue
 
-  - id: get_info
-    name: "Get Gateway Info"
-    type: gateway.get_info
+  - id: step6
+    name: "Step 6: Click Reset Activation Time Button"
+    type: browser.click
     parameters:
-      url: "{{ parameter.gateway_url }}"
+      selector: "button:has-text('Reset'), button:has-text('reset'), [class*='reset']"
+    timeout: 10
     on_failure: continue
 
-  - id: log_current_state
-    name: "Log Current Gateway State"
+  - id: step7
+    name: "Step 7: Wait for Blue Box with Activate Ignition Button"
+    type: browser.wait
+    parameters:
+      selector: "button:has-text('Activate'), button:has-text('activate'), [class*='activate']"
+    timeout: 10
+
+  - id: step8
+    name: "Step 8: Verify Trial Mode Active (Blue Box)"
+    type: browser.screenshot
+    parameters:
+      path: "trial_mode_active.png"
+    timeout: 10
+
+  - id: step9
+    name: "Step 9: Confirm Trial Reset Complete"
     type: utility.log
     parameters:
-      message: "Gateway Edition: {{ variable.get_info.edition }}, Version: {{ variable.get_info.version }}"
+      message: "Trial reset complete. Blue Activate Ignition button is visible, indicating trial mode is active."
       level: "info"
-
-  # Note: The actual trial reset requires file system access or database manipulation
-  # This playbook demonstrates the workflow - actual reset would need custom step type
-  - id: warn_manual_reset
-    name: "Manual Trial Reset Required"
-    type: utility.log
-    parameters:
-      message: |
-        Trial reset requires manual intervention:
-        1. Stop the Gateway service
-        2. Delete or modify the .trial file in the Gateway data directory
-        3. For Docker: Delete .uuid files in /usr/local/bin/ignition/data/
-        4. Restart the Gateway
-
-        Alternative: Use Gateway API if available in your version
-      level: "warning"
-
-  - id: prompt_restart
-    name: "Prepare for Gateway Restart"
-    type: utility.log
-    parameters:
-      message: "After manual trial reset, Gateway restart will be initiated..."
-      level: "info"
-
-  - id: restart_gateway
-    name: "Restart Gateway"
-    type: gateway.restart
-    parameters:
-      url: "{{ parameter.gateway_url }}"
-      wait_for_ready: true
-    retry:
-      max_attempts: 3
-      delay_seconds: 5
-
-  - id: wait_for_ready
-    name: "Wait for Gateway Ready"
-    type: gateway.wait_for_ready
-    parameters:
-      url: "{{ parameter.gateway_url }}"
-      timeout_seconds: 300
-      check_interval: 5
-
-  - id: verify_health
-    name: "Verify Gateway Health (After)"
-    type: gateway.get_health
-    parameters:
-      url: "{{ parameter.gateway_url }}"
-    on_failure: abort
-
-  - id: confirm_ready
-    name: "Confirm Gateway Ready"
-    type: utility.log
-    parameters:
-      message: "Gateway restarted successfully. Trial reset complete (if manual steps were performed)."
-      level: "info"
-
-  - id: logout
-    name: "Logout from Gateway"
-    type: gateway.logout
-    parameters:
-      url: "{{ parameter.gateway_url }}"
-    on_failure: continue

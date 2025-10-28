@@ -5,7 +5,7 @@ Lightweight, transferable automation platform for Ignition SCADA Gateway operati
 """
 
 __version__ = (
-    "3.6.0"  # Updated: 2025-10-28 - Terminology fix (unverified), nested playbook execution (gateway_login in reset_trial)
+    "3.7.0"  # Updated: 2025-10-28 - Fixed gateway_login (removed step 11), fixed playbook.run param, rewrote reset_trial
 )
 __build_date__ = "2025-10-28"
 __phases_complete__ = "8/8 (100%)"
