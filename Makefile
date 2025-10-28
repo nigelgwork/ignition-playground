@@ -136,24 +136,64 @@ lint: ## Run all linters (ruff, mypy)
 	./venv/bin/mypy ignition_toolkit/
 
 .PHONY: format
-format: ## Format code with ruff
+format: ## Format code with black and ruff
 	@echo "Formatting code..."
-	./venv/bin/ruff format ignition_toolkit/ tests/
+	./venv/bin/black ignition_toolkit/ tests/
+	./venv/bin/ruff check ignition_toolkit/ tests/ --fix
 
 .PHONY: format-check
 format-check: ## Check code formatting
 	@echo "Checking code formatting..."
-	./venv/bin/ruff format --check ignition_toolkit/ tests/
+	./venv/bin/black --check ignition_toolkit/ tests/
+	./venv/bin/ruff check ignition_toolkit/ tests/
 
 .PHONY: complexity
 complexity: ## Check code complexity with radon
 	@echo "Checking code complexity..."
-	radon cc ignition_toolkit/ -a -s
+	./venv/bin/radon cc ignition_toolkit/ -a -s
 
 .PHONY: security
 security: ## Run security checks with bandit
 	@echo "Running security checks..."
 	./venv/bin/bandit -r ignition_toolkit/ -ll
+
+# ========================================
+# CI/CD Pipeline
+# ========================================
+
+.PHONY: ci
+ci: ## Run full CI/CD pipeline locally (all stages)
+	@echo "Running full CI/CD pipeline..."
+	./ci_test_local.sh all
+
+.PHONY: ci-lint
+ci-lint: ## Run CI/CD lint stage only
+	@echo "Running CI/CD lint stage..."
+	./ci_test_local.sh lint
+
+.PHONY: ci-test
+ci-test: ## Run CI/CD test stage only
+	@echo "Running CI/CD test stage..."
+	./ci_test_local.sh test
+
+.PHONY: ci-build
+ci-build: ## Run CI/CD build stage only
+	@echo "Running CI/CD build stage..."
+	./ci_test_local.sh build
+
+.PHONY: ci-security
+ci-security: ## Run CI/CD security stage only
+	@echo "Running CI/CD security stage..."
+	./ci_test_local.sh security
+
+.PHONY: pre-release
+pre-release: format ci ## Run before release (format + full CI/CD)
+	@echo "✅ Pre-release checks complete!"
+	@echo "If all passed, you're ready to:"
+	@echo "  1. Run: make bump-patch (or bump-minor/bump-major)"
+	@echo "  2. Commit changes"
+	@echo "  3. Tag release: git tag v\$$(cat VERSION)"
+	@echo "  4. Push: git push && git push --tags"
 
 # ========================================
 # Docker

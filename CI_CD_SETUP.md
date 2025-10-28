@@ -55,7 +55,7 @@ Multi-stage pipeline with caching:
 
 Bash script that mimics the CI/CD pipeline locally without requiring GitHub/GitLab runners.
 
-**Usage**:
+**Usage (Direct)**:
 ```bash
 # Run entire pipeline
 ./ci_test_local.sh all
@@ -67,6 +67,21 @@ Bash script that mimics the CI/CD pipeline locally without requiring GitHub/GitL
 ./ci_test_local.sh build
 ./ci_test_local.sh security
 ./ci_test_local.sh integration
+```
+
+**Usage (via Makefile - Recommended)**:
+```bash
+# Run full CI/CD pipeline
+make ci
+
+# Run specific stages
+make ci-lint        # Lint stage only
+make ci-test        # Test stage only
+make ci-build       # Build stage only
+make ci-security    # Security stage only
+
+# Pre-release workflow (format code + full pipeline)
+make pre-release
 ```
 
 **Features**:
@@ -405,22 +420,83 @@ ci_summary.log
 - [pytest Documentation](https://docs.pytest.org/)
 - [Trivy Documentation](https://aquasecurity.github.io/trivy/)
 
-## ✅ Checklist
+## 🔄 Periodic Quality Checks (Pre-Release Workflow)
+
+### When to Run CI/CD Checks
+
+Run the full CI/CD pipeline periodically to maintain code quality:
+
+**Before Every Release**:
+```bash
+# Recommended: Use the pre-release target
+make pre-release
+```
+
+This will:
+1. Auto-format all code with Black and Ruff
+2. Run the full CI/CD pipeline (all 13 stages)
+3. Report any issues that need fixing
+4. Provide next steps for versioning and tagging
+
+**During Development** (optional but recommended):
+- Before committing significant changes: `make ci-lint`
+- After adding new features: `make ci-test`
+- Before creating pull requests: `make ci`
+
+### Pre-Release Workflow
+
+**Complete workflow for creating a new release**:
+
+```bash
+# 1. Ensure all code is formatted and tests pass
+make pre-release
+
+# 2. If all passed, bump the version
+make bump-patch    # For bug fixes (x.x.X)
+make bump-minor    # For new features (x.X.0)
+make bump-major    # For breaking changes (X.0.0)
+
+# 3. Commit version bump and changes
+git add .
+git commit -m "Release vX.X.X - Brief description"
+
+# 4. Tag the release
+git tag v$(cat VERSION)
+
+# 5. Push to remote (optional - not required if local only)
+git push origin master
+git push --tags
+```
+
+### Quick Reference: Release Checklist
+
+- [ ] Run `make pre-release` (formats code + runs full CI/CD)
+- [ ] Fix any errors reported by the pipeline
+- [ ] Bump version with `make bump-patch/minor/major`
+- [ ] Update CHANGELOG.md with changes
+- [ ] Commit with descriptive message
+- [ ] Tag release: `git tag v$(cat VERSION)`
+- [ ] Push changes and tags (optional)
+
+## ✅ Development Checklist
 
 Before committing changes, run:
 
 ```bash
-# Run full CI pipeline locally
-./ci_test_local.sh all
+# Option 1: Quick check (lint only)
+make ci-lint
 
-# Fix any formatting issues
-black ignition_toolkit/ tests/
+# Option 2: Full pipeline
+make ci
 
-# Fix any linting issues
-ruff check ignition_toolkit/ tests/ --fix
+# Option 3: Pre-release workflow (includes formatting)
+make pre-release
+
+# Fix any formatting issues (if not using pre-release)
+make format
 
 # Ensure tests pass
-pytest tests/ -v
+make test
 ```
 
 ## 📝 Notes
