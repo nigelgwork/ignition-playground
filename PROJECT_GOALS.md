@@ -759,6 +759,6 @@ To prevent future confusion, this is the single source of truth for project goal
 
 **Last Updated:** 2025-10-25
 **Maintainer:** Nigel G
-**Status:** Production Ready (v1.0.27)
+**Status:** Production Ready (v3.0.0)
 
 **Next Steps:** See [ROADMAP.md](/docs/ROADMAP.md) for planned features.
