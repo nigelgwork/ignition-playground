@@ -88,15 +88,15 @@ steps:
     timeout: 15
 
   - id: step10
-    name: "Step 10: Verify Login Success - Navigate to Config Page"
+    name: "Step 10: Verify Login Success - Navigate to Licensing Page"
     type: browser.navigate
     parameters:
-      url: "{{ gateway_url }}/web/config"
+      url: "{{ gateway_url }}/app/platform/system/licensing"
     timeout: 10
 
   - id: step11
-    name: "Step 11: Verify Authenticated - Check for Config Navigation"
+    name: "Step 11: Verify Authenticated - Check for Licensing Page Content"
     type: browser.wait
     parameters:
-      selector: "nav, .ia-navList, [class*='nav'], a[href*='config']"
+      selector: "nav, .ia-navList, [class*='nav'], [class*='license'], h1, h2"
     timeout: 10
