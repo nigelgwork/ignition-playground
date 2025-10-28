@@ -12,6 +12,8 @@ import select
 import shutil
 import signal
 import subprocess
+import termios
+import tty
 from datetime import datetime
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
@@ -200,14 +202,24 @@ async def claude_code_terminal(websocket: WebSocket, execution_id: str):
         # Spawn interactive bash shell in playbook directory with PTY
         master_fd, slave_fd = pty.openpty()
 
+        # Set terminal to raw mode for proper interactivity
+        try:
+            attrs = termios.tcgetattr(slave_fd)
+            attrs[3] = attrs[3] & ~termios.ECHO  # Disable echo (terminal handles it)
+            termios.tcsetattr(slave_fd, termios.TCSANOW, attrs)
+            tty.setraw(master_fd)  # Set master to raw mode
+        except Exception as e:
+            logger.warning(f"Could not set PTY to raw mode: {e}")
+
         # Get playbook directory
         playbook_dir = os.path.dirname(playbook_path)
 
         # Spawn interactive bash shell
-        cmd_args = ["/bin/bash"]
+        cmd_args = ["/bin/bash", "-i"]  # -i for interactive mode
 
         # Set up environment
         env = os.environ.copy()
+        env["TERM"] = "xterm-256color"  # Set terminal type
         env["PS1"] = f"\\[\\033[1;32m\\]{playbook_name}\\[\\033[0m\\]:\\[\\033[1;34m\\]\\w\\[\\033[0m\\]$ "
 
         process = subprocess.Popen(
