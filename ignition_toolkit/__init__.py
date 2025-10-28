@@ -5,7 +5,7 @@ Lightweight, transferable automation platform for Ignition SCADA Gateway operati
 """
 
 __version__ = (
-    "3.4.0"  # Updated: 2025-10-28 - Monaco Editor in code viewer pop-out
+    "3.5.0"  # Updated: 2025-10-28 - UI improvements: fixed execution completion, removed Claude terminal and Back button, renamed Stop to Cancel
 )
 __build_date__ = "2025-10-28"
 __phases_complete__ = "8/8 (100%)"

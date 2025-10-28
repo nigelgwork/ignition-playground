@@ -112,8 +112,9 @@ async def claude_code_terminal(websocket: WebSocket, execution_id: str):
     WebSocket endpoint for embedded Claude Code terminal.
     Spawns a Claude Code process with PTY and proxies stdin/stdout.
     """
+    logger.info(f"[TERMINAL DEBUG] WebSocket connection request for execution: {execution_id}")
     await websocket.accept()
-    logger.info(f"Claude Code WebSocket connected for execution: {execution_id}")
+    logger.info(f"[TERMINAL DEBUG] WebSocket accepted for execution: {execution_id}")
 
     master_fd = None
     process = None
@@ -251,6 +252,7 @@ async def claude_code_terminal(websocket: WebSocket, execution_id: str):
             f"\n"
         )
 
+        logger.info(f"[TERMINAL DEBUG] Sending welcome message to client, PID: {process.pid}")
         await websocket.send_json(
             {
                 "type": "connected",
@@ -258,15 +260,17 @@ async def claude_code_terminal(websocket: WebSocket, execution_id: str):
                 "pid": process.pid,
             }
         )
+        logger.info(f"[TERMINAL DEBUG] Welcome message sent successfully")
 
         # Create tasks for bidirectional I/O
         async def read_from_pty():
             """Read output from PTY and send to WebSocket"""
+            logger.info(f"[TERMINAL DEBUG] read_from_pty task started")
             while True:
                 try:
                     # Check if process is still alive
                     if process.poll() is not None:
-                        logger.info(f"Claude Code process exited: {process.pid}")
+                        logger.info(f"[TERMINAL DEBUG] Process exited: {process.pid}")
                         await websocket.send_json({"type": "exit", "code": process.returncode})
                         break
 
@@ -275,28 +279,35 @@ async def claude_code_terminal(websocket: WebSocket, execution_id: str):
                     if readable:
                         data = os.read(master_fd, 1024)
                         if not data:
+                            logger.info(f"[TERMINAL DEBUG] No data from PTY, breaking")
                             break
                         # Send binary data as bytes WebSocket frame
+                        logger.debug(f"[TERMINAL DEBUG] Sending {len(data)} bytes to client")
                         await websocket.send_bytes(data)
                     else:
                         # Small sleep to prevent busy loop
                         await asyncio.sleep(0.01)
 
-                except OSError:
+                except OSError as e:
+                    logger.error(f"[TERMINAL DEBUG] OSError in read_from_pty: {e}")
                     break
                 except Exception as e:
-                    logger.error(f"Error reading from PTY: {e}")
+                    logger.error(f"[TERMINAL DEBUG] Error reading from PTY: {e}")
                     break
+            logger.info(f"[TERMINAL DEBUG] read_from_pty task ended")
 
         async def write_to_pty():
             """Receive data from WebSocket and write to PTY"""
+            logger.info(f"[TERMINAL DEBUG] write_to_pty task started")
             while True:
                 try:
                     message = await websocket.receive()
+                    logger.debug(f"[TERMINAL DEBUG] Received message from client: {message.keys()}")
 
                     if "bytes" in message:
                         # Binary data from terminal
                         data = message["bytes"]
+                        logger.debug(f"[TERMINAL DEBUG] Writing {len(data)} bytes to PTY")
                         os.write(master_fd, data)
                     elif "text" in message:
                         # Text message (e.g., resize events)
@@ -304,6 +315,7 @@ async def claude_code_terminal(websocket: WebSocket, execution_id: str):
 
                         try:
                             msg = json.loads(message["text"])
+                            logger.debug(f"[TERMINAL DEBUG] Text message: {msg.get('type')}")
                             if msg.get("type") == "resize":
                                 # Handle terminal resize (optional)
                                 pass
@@ -311,10 +323,12 @@ async def claude_code_terminal(websocket: WebSocket, execution_id: str):
                             pass
 
                 except WebSocketDisconnect:
+                    logger.info(f"[TERMINAL DEBUG] WebSocket disconnected in write_to_pty")
                     break
                 except Exception as e:
-                    logger.error(f"Error writing to PTY: {e}")
+                    logger.error(f"[TERMINAL DEBUG] Error writing to PTY: {e}")
                     break
+            logger.info(f"[TERMINAL DEBUG] write_to_pty task ended")
 
         # Run both tasks concurrently
         await asyncio.gather(read_from_pty(), write_to_pty(), return_exceptions=True)

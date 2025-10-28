@@ -16,10 +16,8 @@ import {
   Pause as PauseIcon,
   PlayArrow as ResumeIcon,
   SkipNext as SkipIcon,
-  SkipPrevious as SkipBackIcon,
-  Stop as StopIcon,
+  Cancel as CancelIcon,
   Psychology as AIIcon,
-  Terminal as TerminalIcon,
 } from '@mui/icons-material';
 import { api } from '../api/client';
 
@@ -29,7 +27,6 @@ interface ExecutionControlsProps {
   disabled?: boolean;
   debugMode?: boolean;
   onAIAssist?: () => void;
-  onClaudeCode?: () => void;
 }
 
 export function ExecutionControls({
@@ -38,7 +35,6 @@ export function ExecutionControls({
   disabled = false,
   debugMode = false,
   onAIAssist,
-  onClaudeCode,
 }: ExecutionControlsProps) {
   const [loading, setLoading] = useState<string | null>(null);
 
@@ -75,23 +71,13 @@ export function ExecutionControls({
     }
   };
 
-  const handleSkipBack = async () => {
-    try {
-      setLoading('skip_back');
-      await api.executions.skipBack(executionId);
-    } catch (error) {
-      console.error('Failed to skip back:', error);
-    } finally {
-      setLoading(null);
-    }
-  };
 
-  const handleStop = async () => {
+  const handleCancel = async () => {
     try {
-      setLoading('stop');
+      setLoading('cancel');
       await api.executions.cancel(executionId);
     } catch (error) {
-      console.error('Failed to stop execution:', error);
+      console.error('Failed to cancel execution:', error);
     } finally {
       setLoading(null);
     }
@@ -119,41 +105,7 @@ export function ExecutionControls({
         </Tooltip>
       )}
 
-      {/* Claude Code Button (show when paused OR in debug mode) */}
-      {(isPaused || debugMode) && onClaudeCode && (
-        <Tooltip title="Open playbook in Claude Code with execution context">
-          <Button
-            onClick={onClaudeCode}
-            variant="outlined"
-            color="primary"
-            size="small"
-            startIcon={<TerminalIcon />}
-          >
-            Claude
-          </Button>
-        </Tooltip>
-      )}
-
       <ButtonGroup variant="outlined" size="small">
-        {/* Skip Back Button */}
-        <Tooltip title="Skip back to previous step">
-          <span>
-            <Button
-              onClick={handleSkipBack}
-              disabled={isDisabled || loading !== null}
-              startIcon={
-                loading === 'skip_back' ? (
-                  <CircularProgress size={16} />
-                ) : (
-                  <SkipBackIcon />
-                )
-              }
-            >
-              Back
-            </Button>
-          </span>
-        </Tooltip>
-
         {/* Pause Button */}
         <Tooltip title="Pause execution after current step">
           <span>
@@ -211,22 +163,22 @@ export function ExecutionControls({
           </span>
         </Tooltip>
 
-        {/* Stop Button */}
-        <Tooltip title="Stop execution">
+        {/* Cancel Button */}
+        <Tooltip title="Cancel execution">
           <span>
             <Button
-              onClick={handleStop}
+              onClick={handleCancel}
               disabled={isDisabled || loading !== null}
               color="error"
               startIcon={
-                loading === 'stop' ? (
+                loading === 'cancel' ? (
                   <CircularProgress size={16} />
                 ) : (
-                  <StopIcon />
+                  <CancelIcon />
                 )
               }
             >
-              Stop
+              Cancel
             </Button>
           </span>
         </Tooltip>

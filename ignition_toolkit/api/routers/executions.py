@@ -348,33 +348,32 @@ async def get_execution_status(execution_id: str):
         engine = active_engines[execution_id]
         state = engine.get_current_execution()
 
-        if not state:
-            raise HTTPException(status_code=404, detail=f"Execution {execution_id} has no state")
+        if state:
+            # Engine has active state, return it
+            step_results = [
+                StepResultResponse(
+                    step_id=result.step_id,
+                    step_name=result.step_name,
+                    status=result.status.value,
+                    error=result.error,
+                    started_at=result.started_at,
+                    completed_at=result.completed_at,
+                )
+                for result in state.step_results
+            ]
 
-        step_results = [
-            StepResultResponse(
-                step_id=result.step_id,
-                step_name=result.step_name,
-                status=result.status.value,
-                error=result.error,
-                started_at=result.started_at,
-                completed_at=result.completed_at,
+            return ExecutionStatusResponse(
+                execution_id=execution_id,
+                playbook_name=state.playbook_name,
+                status=state.status.value,
+                started_at=state.started_at,
+                completed_at=state.completed_at,
+                current_step_index=state.current_step_index,
+                total_steps=len(engine._current_playbook.steps) if engine._current_playbook else 0,
+                error=state.error,
+                debug_mode=engine.state_manager.is_debug_mode_enabled(),
+                step_results=step_results,
             )
-            for result in state.step_results
-        ]
-
-        return ExecutionStatusResponse(
-            execution_id=execution_id,
-            playbook_name=state.playbook_name,
-            status=state.status.value,
-            started_at=state.started_at,
-            completed_at=state.completed_at,
-            current_step_index=state.current_step_index,
-            total_steps=len(engine._current_playbook.steps) if engine._current_playbook else 0,
-            error=state.error,
-            debug_mode=engine.state_manager.is_debug_mode_enabled(),
-            step_results=step_results,
-        )
 
     # Try to load from database
     db = get_database()

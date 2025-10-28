@@ -8,7 +8,7 @@
  */
 
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import {
   Box,
   Paper,
@@ -30,7 +30,6 @@ import {
   CheckCircle as CompletedIcon,
   Error as ErrorIcon,
   PlayArrow as RunningIcon,
-  ArrowBack as BackIcon,
   Pending as PendingIcon,
   Cancel as SkippedIcon,
   BugReport as DebugIcon,
@@ -43,18 +42,15 @@ import { LiveBrowserView } from '../components/LiveBrowserView';
 import { ExecutionControls } from '../components/ExecutionControls';
 import { DebugPanel } from '../components/DebugPanel';
 import { AIAssistDialog } from '../components/AIAssistDialog';
-import { EmbeddedShellTerminal } from '../components/EmbeddedShellTerminal';
 import { PlaybookCodeViewer } from '../components/PlaybookCodeViewer';
 import { useStore } from '../store';
 import type { ExecutionStatusResponse } from '../types/api';
 
 export function ExecutionDetail() {
   const { executionId } = useParams<{ executionId: string }>();
-  const navigate = useNavigate();
   const executionUpdates = useStore((state) => state.executionUpdates);
   const [debugMode, setDebugMode] = useState(false);
   const [aiDialogOpen, setAiDialogOpen] = useState(false);
-  const [terminalOpenerOpen, setTerminalOpenerOpen] = useState(false);
   const [showDebugPanel, setShowDebugPanel] = useState(false);
   const [showCodeViewer, setShowCodeViewer] = useState(false);
   const [runtime, setRuntime] = useState<string>('0s');
@@ -228,16 +224,6 @@ export function ExecutionDetail() {
           flexShrink: 0,
         }}
       >
-        <Button
-          startIcon={<BackIcon />}
-          onClick={() => navigate('/executions')}
-          variant="outlined"
-          size="small"
-          sx={{ minWidth: 'auto', px: 1.5 }}
-        >
-          Back
-        </Button>
-
         <Box sx={{ flexGrow: 1 }}>
           <Typography variant="subtitle1" sx={{ fontSize: '0.95rem', fontWeight: 600, lineHeight: 1.3 }}>
             {execution.playbook_name}
@@ -306,7 +292,6 @@ export function ExecutionDetail() {
           status={execution.status}
           debugMode={debugMode}
           onAIAssist={() => setAiDialogOpen(true)}
-          onClaudeCode={() => setTerminalOpenerOpen(true)}
         />
       </Paper>
 
@@ -444,13 +429,6 @@ export function ExecutionDetail() {
             ? execution.step_results[execution.current_step_index].step_name
             : undefined
         }
-      />
-
-      {/* Embedded Shell Terminal for Claude Code */}
-      <EmbeddedShellTerminal
-        open={terminalOpenerOpen}
-        onClose={() => setTerminalOpenerOpen(false)}
-        executionId={executionId}
       />
     </Box>
   );
