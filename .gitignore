@@ -77,3 +77,10 @@ frontend/build/
 
 # Playbook exports (user-generated)
 exports/
+
+# CI/CD workflows (local testing only - DO NOT PUSH TO GITHUB)
+.github/workflows/
+.gitlab-ci.yml
+ci_test_local.log
+ci_summary.log
+bandit-report.json
