@@ -131,23 +131,6 @@ export function PlaybookCodeViewer({
                 margin: 0 0 10px 0;
                 color: #fff;
               }
-              textarea {
-                width: 100%;
-                height: calc(100vh - 100px);
-                font-family: 'Fira Code', 'Monaco', 'Courier New', monospace;
-                font-size: 0.875rem;
-                line-height: 1.6;
-                padding: 16px;
-                border: 1px solid #444;
-                border-radius: 4px;
-                background: #2d2d2d;
-                color: #d4d4d4;
-                resize: none;
-              }
-              textarea:focus {
-                outline: none;
-                border-color: #1976d2;
-              }
               .controls {
                 margin-bottom: 10px;
                 display: flex;
@@ -169,6 +152,12 @@ export function PlaybookCodeViewer({
                 background: #666;
                 cursor: not-allowed;
               }
+              #editor-container {
+                width: 100%;
+                height: calc(100vh - 100px);
+                border: 1px solid #444;
+                border-radius: 4px;
+              }
             </style>
           </head>
           <body>
@@ -178,67 +167,90 @@ export function PlaybookCodeViewer({
               ${canEdit ? '<button id="revertBtn" disabled>Revert</button>' : ''}
               <button id="closeBtn">Close Window</button>
             </div>
-            <textarea id="code" ${canEdit ? '' : 'readonly'}>${code.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</textarea>
+            <div id="editor-container"></div>
+
+            <script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs/loader.js"></script>
             <script>
               const originalCode = \`${code.replace(/`/g, '\\`').replace(/\$/g, '\\$')}\`;
-              const codeTextarea = document.getElementById('code');
               const saveBtn = document.getElementById('saveBtn');
               const revertBtn = document.getElementById('revertBtn');
+              let editor;
 
-              // Track changes to enable/disable buttons
-              ${canEdit ? `
-              codeTextarea.addEventListener('input', () => {
-                const hasChanges = codeTextarea.value !== originalCode;
-                saveBtn.disabled = !hasChanges;
-                revertBtn.disabled = !hasChanges;
-              });
+              // Load Monaco Editor
+              require.config({ paths: { vs: 'https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs' } });
 
-              // Save button handler
-              saveBtn.addEventListener('click', async () => {
-                saveBtn.disabled = true;
-                saveBtn.textContent = 'Saving...';
+              require(['vs/editor/editor.main'], function () {
+                editor = monaco.editor.create(document.getElementById('editor-container'), {
+                  value: originalCode,
+                  language: 'yaml',
+                  theme: 'vs-dark',
+                  readOnly: ${!canEdit},
+                  automaticLayout: true,
+                  minimap: { enabled: true },
+                  fontSize: 14,
+                  lineNumbers: 'on',
+                  scrollBeyondLastLine: false,
+                  wordWrap: 'on',
+                  folding: true,
+                  tabSize: 2,
+                });
 
-                try {
-                  const response = await fetch('http://localhost:5000/api/playbooks/${encodeURIComponent(playbookName)}', {
-                    method: 'PUT',
-                    headers: {
-                      'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ code: codeTextarea.value }),
-                  });
+                ${canEdit ? `
+                // Track changes to enable/disable buttons
+                editor.onDidChangeModelContent(() => {
+                  const currentCode = editor.getValue();
+                  const hasChanges = currentCode !== originalCode;
+                  saveBtn.disabled = !hasChanges;
+                  revertBtn.disabled = !hasChanges;
+                });
 
-                  if (response.ok) {
-                    saveBtn.textContent = 'Saved!';
-                    setTimeout(() => {
+                // Save button handler
+                saveBtn.addEventListener('click', async () => {
+                  saveBtn.disabled = true;
+                  saveBtn.textContent = 'Saving...';
+
+                  try {
+                    const response = await fetch('http://localhost:5000/api/playbooks/${encodeURIComponent(playbookName)}', {
+                      method: 'PUT',
+                      headers: {
+                        'Content-Type': 'application/json',
+                      },
+                      body: JSON.stringify({ code: editor.getValue() }),
+                    });
+
+                    if (response.ok) {
+                      saveBtn.textContent = 'Saved!';
+                      setTimeout(() => {
+                        saveBtn.textContent = 'Save';
+                        saveBtn.disabled = true;
+                        revertBtn.disabled = true;
+                      }, 2000);
+                    } else {
+                      const errorData = await response.json();
+                      alert('Failed to save: ' + (errorData.detail || 'Unknown error'));
                       saveBtn.textContent = 'Save';
-                      saveBtn.disabled = true;
-                      revertBtn.disabled = true;
-                    }, 2000);
-                  } else {
-                    const errorData = await response.json();
-                    alert('Failed to save: ' + (errorData.detail || 'Unknown error'));
+                      saveBtn.disabled = false;
+                    }
+                  } catch (error) {
+                    alert('Failed to save: ' + error.message);
                     saveBtn.textContent = 'Save';
                     saveBtn.disabled = false;
                   }
-                } catch (error) {
-                  alert('Failed to save: ' + error.message);
-                  saveBtn.textContent = 'Save';
-                  saveBtn.disabled = false;
-                }
-              });
+                });
 
-              // Revert button handler
-              revertBtn.addEventListener('click', () => {
-                if (confirm('Revert all changes to the original code?')) {
-                  codeTextarea.value = originalCode;
-                  saveBtn.disabled = true;
-                  revertBtn.disabled = true;
-                }
-              });
-              ` : ''}
+                // Revert button handler
+                revertBtn.addEventListener('click', () => {
+                  if (confirm('Revert all changes to the original code?')) {
+                    editor.setValue(originalCode);
+                    saveBtn.disabled = true;
+                    revertBtn.disabled = true;
+                  }
+                });
+                ` : ''}
 
-              // Close button handler
-              document.getElementById('closeBtn').addEventListener('click', () => window.close());
+                // Close button handler
+                document.getElementById('closeBtn').addEventListener('click', () => window.close());
+              });
             </script>
           </body>
         </html>
