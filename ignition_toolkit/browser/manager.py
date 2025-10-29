@@ -42,6 +42,7 @@ class BrowserManager:
         headless: bool = False,
         slow_mo: int = 0,
         screenshots_dir: Path | None = None,
+        downloads_dir: Path | None = None,
         screenshot_callback: Callable[[str], Awaitable[None]] | None = None,
     ):
         """
@@ -51,12 +52,15 @@ class BrowserManager:
             headless: Run browser in headless mode
             slow_mo: Slow down operations by milliseconds
             screenshots_dir: Directory for saving screenshots
+            downloads_dir: Directory for saving downloads
             screenshot_callback: Async function to call with base64 screenshot data
         """
         self.headless = headless
         self.slow_mo = slow_mo
         self.screenshots_dir = screenshots_dir or Path("./data/screenshots")
         self.screenshots_dir.mkdir(parents=True, exist_ok=True)
+        self.downloads_dir = downloads_dir or Path("./data/downloads")
+        self.downloads_dir.mkdir(parents=True, exist_ok=True)
         self.screenshot_callback = screenshot_callback
 
         self._playwright = None
@@ -97,6 +101,8 @@ class BrowserManager:
         self._context = await self._browser.new_context(
             viewport={"width": 1920, "height": 1080},
             ignore_https_errors=True,
+            accept_downloads=True,
+            downloads_path=str(self.downloads_dir),
         )
 
         # Create page

@@ -18,6 +18,12 @@ parameters:
     required: true
     description: "Gateway admin password"
 
+  - name: download_path
+    type: string
+    required: false
+    default: "./data/downloads"
+    description: "Directory where backup file will be saved (default: ./data/downloads)"
+
 steps:
   - id: step1
     name: "Step 1: Execute Gateway Login Playbook"
@@ -76,7 +82,7 @@ steps:
     name: "Step 8: Confirm Backup Download Initiated"
     type: utility.log
     parameters:
-      message: "Gateway backup download button clicked successfully"
+      message: "Gateway backup download initiated - check {{ parameter.download_path }} for .gwbk file"
       level: "info"
 
 metadata:
