@@ -1,6 +1,6 @@
-name: "Backup Gateway"
-version: "2.0"
-description: "Login to Ignition Gateway and download a configuration backup"
+name: "Backup Gateway (Visual Verification)"
+version: "3.0"
+description: "Visual verification of Ignition Gateway backup interface. NOTE: Gateway backups are created on the Gateway server filesystem, not downloaded to browser. Access backup files directly on the Gateway server or use Gateway REST API (Ignition 8.3+) for programmatic download."
 
 parameters:
   - name: gateway_url
@@ -79,11 +79,11 @@ steps:
     timeout: 10
 
   - id: step8
-    name: "Step 8: Confirm Backup Download Initiated"
+    name: "Step 8: Visual Verification Complete"
     type: utility.log
     parameters:
-      message: "Gateway backup download initiated - check downloads directory for .gwbk file"
-      level: "info"
+      message: "VISUAL VERIFICATION COMPLETE: Successfully accessed backup interface. NOTE: Gateway backups are created on the Gateway SERVER filesystem (typically in /usr/local/ignition/backups/ or C:\\Program Files\\Inductive Automation\\Ignition\\backups\\), not downloaded to browser. To retrieve backup files: (1) Access Gateway server filesystem directly, or (2) Use Ignition 8.3+ REST API /data/api/v1/backups endpoint for programmatic download."
+      level: "warning"
 
 metadata:
   author: "Ignition Toolkit"
