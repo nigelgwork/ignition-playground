@@ -1,6 +1,6 @@
-name: "Backup Gateway (Visual Verification)"
-version: "3.0"
-description: "Visual verification of Ignition Gateway backup interface. NOTE: Gateway backups are created on the Gateway server filesystem, not downloaded to browser. Access backup files directly on the Gateway server or use Gateway REST API (Ignition 8.3+) for programmatic download."
+name: "Backup Gateway"
+version: "4.0"
+description: "Download a backup file from Ignition Gateway. The backup file will be saved to the configured download directory (default: ./data/downloads). Browser download handling is automatic via Playwright."
 
 parameters:
   - name: gateway_url
@@ -17,12 +17,6 @@ parameters:
     type: string
     required: true
     description: "Gateway admin password"
-
-  - name: download_path
-    type: string
-    required: false
-    default: "./data/downloads"
-    description: "Directory where backup file will be saved (default: ./data/downloads)"
 
 steps:
   - id: step1
@@ -50,40 +44,26 @@ steps:
     timeout: 10
 
   - id: step4
-    name: "Step 4: Capture Backup Page Screenshot"
-    type: browser.screenshot
-    parameters:
-      path: "backup_page.png"
-    timeout: 10
-
-  - id: step5
-    name: "Step 5: Click Download Backup Button"
+    name: "Step 4: Click Download Backup Button"
     type: browser.click
     parameters:
       selector: "button:has-text('Download'), button:has-text('Backup'), button[class*='download'], button[class*='backup']"
     timeout: 10
     on_failure: abort
 
-  - id: step6
-    name: "Step 6: Wait for Download to Process"
+  - id: step5
+    name: "Step 5: Wait for Download to Complete"
     type: utility.sleep
     parameters:
-      seconds: 2
-    timeout: 10
+      seconds: 5
+    timeout: 15
 
-  - id: step7
-    name: "Step 7: Capture Post-Download Screenshot"
-    type: browser.screenshot
-    parameters:
-      path: "backup_download_complete.png"
-    timeout: 10
-
-  - id: step8
-    name: "Step 8: Visual Verification Complete"
+  - id: step6
+    name: "Step 6: Backup Download Complete"
     type: utility.log
     parameters:
-      message: "VISUAL VERIFICATION COMPLETE: Successfully accessed backup interface. NOTE: Gateway backups are created on the Gateway SERVER filesystem (typically in /usr/local/ignition/backups/ or C:\\Program Files\\Inductive Automation\\Ignition\\backups\\), not downloaded to browser. To retrieve backup files: (1) Access Gateway server filesystem directly, or (2) Use Ignition 8.3+ REST API /data/api/v1/backups endpoint for programmatic download."
-      level: "warning"
+      message: "Gateway backup download complete. Check ./data/downloads directory for the backup file (.gwbk extension)."
+      level: "info"
 
 metadata:
   author: "Ignition Toolkit"
