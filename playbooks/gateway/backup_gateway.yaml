@@ -60,7 +60,7 @@ steps:
 
   - id: step6
     name: "Step 6: Wait for Download to Process"
-    type: utility.wait
+    type: utility.sleep
     parameters:
       seconds: 2
     timeout: 10
