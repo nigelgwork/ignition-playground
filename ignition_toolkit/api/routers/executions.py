@@ -550,3 +550,75 @@ async def update_playbook_code(execution_id: str, request: PlaybookCodeUpdateReq
         "playbook_path": str(playbook_path),
         "backup_path": str(backup_path.name),
     }
+
+
+@router.delete("/{execution_id}")
+async def delete_execution(execution_id: str):
+    """
+    Delete execution from database and clean up related screenshots
+
+    This removes:
+    - Execution record from database
+    - All step results for the execution
+    - Screenshots captured during the execution
+    """
+    active_engines = get_active_engines()
+    db = get_database()
+
+    # Check if execution is still active
+    if execution_id in active_engines:
+        raise HTTPException(
+            status_code=400,
+            detail="Cannot delete active execution. Cancel or wait for completion first.",
+        )
+
+    # Delete from database
+    try:
+        with db.session_scope() as session:
+            from ignition_toolkit.storage.models import ExecutionModel, StepResultModel
+
+            execution = (
+                session.query(ExecutionModel)
+                .filter(ExecutionModel.execution_id == execution_id)
+                .first()
+            )
+
+            if not execution:
+                raise HTTPException(status_code=404, detail=f"Execution {execution_id} not found")
+
+            # Delete related step results
+            session.query(StepResultModel).filter(
+                StepResultModel.execution_id == execution_id
+            ).delete()
+
+            # Delete execution
+            session.delete(execution)
+            logger.info(f"Deleted execution {execution_id} from database")
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception(f"Error deleting execution from database: {e}")
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+
+    # Clean up screenshots
+    from pathlib import Path
+
+    screenshots_dir = Path("./data/screenshots")
+    deleted_screenshots = 0
+
+    if screenshots_dir.exists():
+        # Look for screenshots with execution_id in filename
+        for screenshot_file in screenshots_dir.glob(f"*{execution_id}*.png"):
+            try:
+                screenshot_file.unlink()
+                deleted_screenshots += 1
+                logger.info(f"Deleted screenshot: {screenshot_file.name}")
+            except Exception as e:
+                logger.warning(f"Failed to delete screenshot {screenshot_file.name}: {e}")
+
+    return {
+        "message": "Execution deleted successfully",
+        "execution_id": execution_id,
+        "screenshots_deleted": deleted_screenshots,
+    }

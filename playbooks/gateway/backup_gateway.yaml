@@ -82,7 +82,7 @@ steps:
     name: "Step 8: Confirm Backup Download Initiated"
     type: utility.log
     parameters:
-      message: "Gateway backup download initiated - check {{ parameter.download_path }} for .gwbk file"
+      message: "Gateway backup download initiated - check downloads directory for .gwbk file"
       level: "info"
 
 metadata:
