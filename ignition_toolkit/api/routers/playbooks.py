@@ -457,8 +457,16 @@ async def delete_playbook(playbook_path: str):
             # Assume relative to project root
             full_path = Path.cwd() / playbook_path
 
+        # Resolve to absolute path
+        full_path = full_path.resolve()
+
         # Safety check - only allow deleting files in playbooks/ directory
-        if "playbooks/" not in str(full_path):
+        playbooks_dir = get_playbooks_dir().resolve()
+        try:
+            # Check if full_path is relative to playbooks_dir
+            full_path.relative_to(playbooks_dir)
+        except ValueError:
+            # Path is not within playbooks directory
             raise HTTPException(
                 status_code=400, detail="Can only delete playbooks from the playbooks/ directory"
             )
