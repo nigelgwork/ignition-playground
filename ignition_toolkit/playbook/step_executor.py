@@ -397,23 +397,23 @@ class StepExecutor:
                 raise StepExecutionError("playbook", "Missing required parameter: playbook")
 
             # Convert to absolute path
+            from ignition_toolkit.core.paths import get_playbooks_dir
             from ignition_toolkit.playbook.loader import PlaybookLoader
             from ignition_toolkit.playbook.metadata import PlaybookMetadataStore
 
             # PlaybookLoader has static methods only, no __init__
             metadata_store = PlaybookMetadataStore()
 
-            # Resolve playbook path (handle both relative and absolute paths)
-            if not playbook_path.startswith("playbooks/"):
-                playbook_path = f"playbooks/{playbook_path}"
-
-            full_path = self.base_path / playbook_path
+            # Resolve playbook path relative to playbooks root directory
+            # (not relative to current playbook's directory)
+            playbooks_root = get_playbooks_dir()
+            full_path = playbooks_root / playbook_path
 
             if not full_path.exists():
                 raise StepExecutionError("playbook", f"Playbook not found: {playbook_path}")
 
-            # Get relative path for metadata lookup
-            relative_path = playbook_path.replace("playbooks/", "")
+            # Get relative path for metadata lookup (relative to playbooks root)
+            relative_path = playbook_path
 
             # Verify that playbook is marked as verified
             metadata = metadata_store.get_metadata(relative_path)
