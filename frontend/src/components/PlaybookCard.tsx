@@ -285,7 +285,19 @@ export function PlaybookCard({ playbook, onConfigure, onExecute, onExport, onVie
           )}
         </Box>
 
-        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+        <Typography
+          variant="body2"
+          color="text.secondary"
+          sx={{
+            mb: 2,
+            display: '-webkit-box',
+            WebkitLineClamp: 3,
+            WebkitBoxOrient: 'vertical',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            lineHeight: 1.5,
+          }}
+        >
           {playbook.description}
         </Typography>
 
@@ -331,24 +343,14 @@ export function PlaybookCard({ playbook, onConfigure, onExecute, onExport, onVie
           {playbook.path.split('/').slice(-2).join('/')}
         </Typography>
 
-        {/* Saved Configuration Preview */}
-        {savedConfig && (
+        {/* Saved Configuration Preview - Only shows extra parameters (not gateway URL) */}
+        {savedConfig && Object.keys(savedConfig.parameters).length > 0 && (
           <Box sx={{ mt: 1, mb: 2, p: 1, bgcolor: 'success.dark', borderRadius: 1, border: '1px solid', borderColor: 'success.main' }}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <Box sx={{ flexGrow: 1 }}>
                 <Typography variant="caption" color="success.light" fontWeight="bold">
-                  ✓ Configured
+                  ✓ {Object.keys(savedConfig.parameters).length} parameter(s) configured
                 </Typography>
-                {selectedCredential?.gateway_url && (
-                  <Typography variant="caption" color="success.light" sx={{ display: 'block' }}>
-                    Gateway: {selectedCredential.gateway_url}
-                  </Typography>
-                )}
-                {Object.keys(savedConfig.parameters).length > 0 && (
-                  <Typography variant="caption" color="success.light" sx={{ display: 'block' }}>
-                    {Object.keys(savedConfig.parameters).length} parameter(s) set
-                  </Typography>
-                )}
               </Box>
               <Tooltip title="Clear saved parameters">
                 <IconButton
