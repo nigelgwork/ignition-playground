@@ -452,16 +452,17 @@ async def delete_playbook(playbook_path: str):
     metadata_store = get_metadata_store()
     try:
         # Get absolute path to playbook
+        playbooks_dir = get_playbooks_dir().resolve()
         full_path = Path(playbook_path)
+
         if not full_path.is_absolute():
-            # Assume relative to project root
-            full_path = Path.cwd() / playbook_path
+            # Resolve relative paths against playbooks directory
+            full_path = playbooks_dir / playbook_path
 
         # Resolve to absolute path
         full_path = full_path.resolve()
 
         # Safety check - only allow deleting files in playbooks/ directory
-        playbooks_dir = get_playbooks_dir().resolve()
         try:
             # Check if full_path is relative to playbooks_dir
             full_path.relative_to(playbooks_dir)
