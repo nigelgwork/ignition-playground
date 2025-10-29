@@ -38,6 +38,7 @@ ALLOWED_BASE_PATHS = [
     Path("./data"),
     Path.home(),
     Path("/tmp"),
+    Path("/mnt"),  # Windows drives mounted in WSL (e.g., /mnt/c, /mnt/d)
 ]
 
 
@@ -85,7 +86,7 @@ async def browse_directory(path: str = "./data/downloads") -> DirectoryContents:
         if not is_path_allowed(target_path):
             raise HTTPException(
                 status_code=403,
-                detail=f"Access denied: Path must be within allowed directories (./data, home directory, or /tmp)",
+                detail=f"Access denied: Path must be within allowed directories (./data, home directory, /tmp, or /mnt for Windows drives)",
             )
 
         # Verify path exists and is a directory

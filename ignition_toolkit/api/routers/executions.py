@@ -1102,9 +1102,16 @@ async def delete_execution(execution_id: str):
 @router.post("/{execution_id}/debug/enable")
 async def enable_debug_mode(execution_id: str, engine: PlaybookEngine = Depends(get_engine_or_404)):
     """Enable debug mode for an active execution"""
+    from ignition_toolkit.api.routers.websockets import broadcast_execution_state
+
     engine.state_manager.enable_debug_mode()
 
     logger.info(f"Debug mode enabled for execution {execution_id}")
+
+    # Broadcast state update to WebSocket clients
+    execution_state = engine.get_current_execution()
+    if execution_state:
+        await broadcast_execution_state(execution_state)
 
     return {
         "status": "success",
@@ -1117,9 +1124,16 @@ async def enable_debug_mode(execution_id: str, engine: PlaybookEngine = Depends(
 @router.post("/{execution_id}/debug/disable")
 async def disable_debug_mode(execution_id: str, engine: PlaybookEngine = Depends(get_engine_or_404)):
     """Disable debug mode for an active execution"""
+    from ignition_toolkit.api.routers.websockets import broadcast_execution_state
+
     engine.state_manager.disable_debug_mode()
 
     logger.info(f"Debug mode disabled for execution {execution_id}")
+
+    # Broadcast state update to WebSocket clients
+    execution_state = engine.get_current_execution()
+    if execution_state:
+        await broadcast_execution_state(execution_state)
 
     return {
         "status": "success",
