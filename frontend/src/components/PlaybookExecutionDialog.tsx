@@ -10,7 +10,6 @@ import {
   DialogContent,
   DialogActions,
   Button,
-  TextField,
   Box,
   Typography,
   Alert,
@@ -234,19 +233,6 @@ export function PlaybookExecutionDialog({
           </Alert>
         )}
 
-        {/* Gateway URL - Read-only, always from global credential */}
-        <TextField
-          label="Gateway URL"
-          fullWidth
-          value={gatewayUrl}
-          placeholder="http://localhost:8088"
-          sx={{ mb: 2 }}
-          helperText={selectedCredential?.gateway_url ? "Auto-filled from global credential (read-only)" : "Set a global credential to specify Gateway URL"}
-          InputProps={{
-            readOnly: true,
-          }}
-          disabled={!selectedCredential}
-        />
 
         {/* Parameter inputs - filter out gateway_url since it's shown above */}
         {playbook.parameters.filter(p => p.name !== 'gateway_url').length > 0 && (

@@ -1,6 +1,6 @@
 name: "Backup Gateway"
 version: "5.0"
-description: "Download a backup file from Ignition Gateway. The backup file will be saved to the configured download directory (default: ./data/downloads). Browser download handling is automatic via Playwright."
+description: "Downloads Gateway backup file to configured directory (default: ./data/downloads)."
 
 parameters:
   - name: gateway_url

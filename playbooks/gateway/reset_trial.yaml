@@ -1,6 +1,6 @@
 name: "Reset Gateway Trial"
 version: "3.0"
-description: "Login to Ignition Gateway and reset the trial license. If trial is already active (blue Activate button visible), the playbook skips the reset steps. If reset is needed (yellow Reset button visible), it clicks the reset button. Handles both scenarios gracefully without failing."
+description: "Resets Gateway trial license. Skips reset if trial already active, clicks reset button if needed."
 
 parameters:
   - name: gateway_url

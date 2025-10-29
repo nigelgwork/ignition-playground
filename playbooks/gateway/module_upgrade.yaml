@@ -1,6 +1,6 @@
 name: "Module Upgrade"
 version: "1.0"
-description: "Upload and install an Ignition module, then restart the Gateway"
+description: "Uploads .modl module file, installs it, and restarts Gateway."
 
 parameters:
   - name: gateway_url
