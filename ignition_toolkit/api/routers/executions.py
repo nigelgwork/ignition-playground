@@ -266,6 +266,18 @@ async def start_execution(request: ExecutionRequest, background_tasks: Backgroun
                             session.commit()
                             logger.info(f"Updated execution {execution_id} status to 'cancelled' in database")
 
+                            # Broadcast cancellation to WebSocket clients
+                            from ignition_toolkit.api.routers.websockets import broadcast_execution_state
+                            from ignition_toolkit.playbook.models import ExecutionStatus
+
+                            # Get current execution state and update status
+                            execution_state = engine.get_current_execution()
+                            if execution_state:
+                                execution_state.status = ExecutionStatus.CANCELLED
+                                execution_state.completed_at = datetime.now()
+                                await broadcast_execution_state(execution_state)
+                                logger.info(f"Broadcasted cancellation status via WebSocket for {execution_id}")
+
                 raise  # Re-raise to properly handle cancellation
             except Exception as e:
                 logger.exception(f"Error in execution {execution_id}: {e}")
