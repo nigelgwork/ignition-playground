@@ -474,7 +474,7 @@ async def cancel_execution(execution_id: str):
         raise HTTPException(status_code=404, detail=f"Execution {execution_id} not found")
 
     engine = active_engines[execution_id]
-    engine.cancel()
+    await engine.cancel()
 
     # Mark completion time for TTL cleanup
     engine_completion_times[execution_id] = datetime.now()
