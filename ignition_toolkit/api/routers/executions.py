@@ -253,6 +253,19 @@ async def start_execution(request: ExecutionRequest, background_tasks: Backgroun
                 # Mark completion time even for cancelled executions
                 engine_completion_times = get_engine_completion_times()
                 engine_completion_times[execution_id] = datetime.now()
+
+                # Update database to mark execution as cancelled
+                db = get_database()
+                if db:
+                    with db.session_scope() as session:
+                        from ignition_toolkit.storage import ExecutionModel
+                        execution = session.query(ExecutionModel).filter_by(execution_id=execution_id).first()
+                        if execution:
+                            execution.status = "cancelled"
+                            execution.completed_at = datetime.now()
+                            session.commit()
+                            logger.info(f"Updated execution {execution_id} status to 'cancelled' in database")
+
                 raise  # Re-raise to properly handle cancellation
             except Exception as e:
                 logger.exception(f"Error in execution {execution_id}: {e}")
