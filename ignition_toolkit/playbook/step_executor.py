@@ -483,17 +483,19 @@ class StepExecutor:
                 for step in nested_playbook.steps:
                     logger.info(f"Executing nested step: {step.name}")
                     step_result = await child_executor.execute_step(step)
+                    # Store only JSON-serializable summary (not the full StepResult object)
                     nested_results.append({
                         "step_id": step.id,
                         "step_name": step.name,
-                        "result": step_result
+                        "status": step_result.status.value if hasattr(step_result.status, 'value') else str(step_result.status),
                     })
 
                 return {
                     "playbook": playbook_path,
                     "status": "completed",
                     "steps_executed": len(nested_results),
-                    "results": nested_results,
+                    # Return summary of nested steps (nested steps are tracked separately in execution log)
+                    "steps": nested_results,
                 }
 
             finally:
