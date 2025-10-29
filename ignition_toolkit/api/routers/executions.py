@@ -434,7 +434,7 @@ async def resume_execution(execution_id: str):
         raise HTTPException(status_code=404, detail=f"Execution {execution_id} not found")
 
     engine = active_engines[execution_id]
-    engine.resume()
+    await engine.resume()
     return {"message": "Execution resumed", "execution_id": execution_id}
 
 
@@ -447,7 +447,7 @@ async def skip_step(execution_id: str):
         raise HTTPException(status_code=404, detail=f"Execution {execution_id} not found")
 
     engine = active_engines[execution_id]
-    engine.skip_step()
+    await engine.skip_current_step()
     return {"message": "Step skipped", "execution_id": execution_id}
 
 
@@ -460,7 +460,7 @@ async def skip_back_step(execution_id: str):
         raise HTTPException(status_code=404, detail=f"Execution {execution_id} not found")
 
     engine = active_engines[execution_id]
-    engine.skip_back()
+    await engine.skip_back_step()
     return {"message": "Skipped back to previous step", "execution_id": execution_id}
 
 
