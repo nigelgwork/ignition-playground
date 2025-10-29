@@ -400,7 +400,7 @@ class StepExecutor:
             from ignition_toolkit.playbook.loader import PlaybookLoader
             from ignition_toolkit.playbook.metadata import PlaybookMetadataStore
 
-            loader = PlaybookLoader(base_path=self.base_path / "playbooks")
+            # PlaybookLoader has static methods only, no __init__
             metadata_store = PlaybookMetadataStore()
 
             # Resolve playbook path (handle both relative and absolute paths)
@@ -449,8 +449,8 @@ class StepExecutor:
                 )
 
             try:
-                # Load nested playbook
-                nested_playbook = loader.load_from_file(full_path)
+                # Load nested playbook using static method
+                nested_playbook = PlaybookLoader.load_from_file(full_path)
 
                 # Extract parameters for child playbook (remove 'playbook' key)
                 child_params = {k: v for k, v in params.items() if k != "playbook"}

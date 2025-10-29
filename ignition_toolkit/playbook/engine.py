@@ -336,6 +336,21 @@ class PlaybookEngine:
             execution_state.completed_at = datetime.now()
 
         finally:
+            # Capture and broadcast final screenshot BEFORE closing browser
+            if browser_manager and self.screenshot_callback:
+                try:
+                    # Get final screenshot in JPEG format (matching streaming format)
+                    import base64
+                    page = await browser_manager.get_page()
+                    final_screenshot_bytes = await page.screenshot(type="jpeg", quality=80)
+                    final_screenshot_b64 = base64.b64encode(final_screenshot_bytes).decode()
+
+                    # Broadcast final screenshot
+                    await self.screenshot_callback(execution_state.execution_id, final_screenshot_b64)
+                    logger.info("Final screenshot captured and broadcast")
+                except Exception as e:
+                    logger.warning(f"Error capturing final screenshot: {e}")
+
             # Stop browser manager if created
             if browser_manager:
                 try:
