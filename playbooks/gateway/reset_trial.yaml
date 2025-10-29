@@ -1,6 +1,6 @@
 name: "Reset Gateway Trial"
-version: "2.0"
-description: "Login to Ignition Gateway and reset the trial license by clicking the reset button if needed"
+version: "3.0"
+description: "Login to Ignition Gateway and reset the trial license. If trial is already active (blue Activate button visible), the playbook skips the reset steps. If reset is needed (yellow Reset button visible), it clicks the reset button. Handles both scenarios gracefully without failing."
 
 parameters:
   - name: gateway_url
@@ -44,45 +44,54 @@ steps:
     timeout: 10
 
   - id: step4
-    name: "Step 4: Check Trial Status Box"
+    name: "Step 4: Check if Trial is Already Active (Blue Box)"
+    type: browser.verify
+    parameters:
+      selector: "button:has-text('activate'), [class*='activate']"
+      condition: exists
+    timeout: 3
+    on_failure: continue
+
+  - id: step5
+    name: "Step 5: Take Screenshot of Current State"
     type: browser.screenshot
     parameters:
       path: "trial_status_check.png"
     timeout: 10
 
-  - id: step5
-    name: "Step 5: Look for Reset Button (Yellow Box)"
+  - id: step6
+    name: "Step 6: Look for Reset Button (Yellow Box - Needs Reset)"
     type: browser.wait
     parameters:
-      selector: "button:has-text('Reset'), button:has-text('reset'), [class*='reset'], button[onclick*='reset']"
+      selector: "button:has-text('reset'), [class*='reset']"
     timeout: 5
     on_failure: continue
 
-  - id: step6
-    name: "Step 6: Click Reset Activation Time Button"
+  - id: step7
+    name: "Step 7: Click Reset Activation Time Button"
     type: browser.click
     parameters:
-      selector: "button:has-text('Reset'), button:has-text('reset'), [class*='reset']"
+      selector: "button:has-text('reset'), [class*='reset']"
     timeout: 10
     on_failure: continue
 
-  - id: step7
-    name: "Step 7: Wait for Blue Box with Activate Ignition Button"
+  - id: step8
+    name: "Step 8: Wait for Blue Box with Activate Button After Reset"
     type: browser.wait
     parameters:
-      selector: "button:has-text('Activate'), button:has-text('activate'), [class*='activate']"
+      selector: "button:has-text('activate'), [class*='activate']"
     timeout: 10
 
-  - id: step8
-    name: "Step 8: Verify Trial Mode Active (Blue Box)"
+  - id: step9
+    name: "Step 9: Take Final Screenshot of Trial State"
     type: browser.screenshot
     parameters:
       path: "trial_mode_active.png"
     timeout: 10
 
-  - id: step9
-    name: "Step 9: Confirm Trial Reset Complete"
+  - id: step10
+    name: "Step 10: Log Trial Status"
     type: utility.log
     parameters:
-      message: "Trial reset complete. Blue Activate Ignition button is visible, indicating trial mode is active."
+      message: "Gateway trial is now active. The blue Activate Ignition button is visible. If a reset was needed (yellow Reset button was present), it has been completed. If trial was already active, the reset steps were skipped gracefully."
       level: "info"

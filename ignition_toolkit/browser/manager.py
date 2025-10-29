@@ -73,6 +73,9 @@ class BrowserManager:
         self._streaming_active = False
         self._streaming_paused = False
 
+        # Download tracking
+        self._active_downloads: list[asyncio.Task] = []
+
     async def __aenter__(self):
         """Async context manager entry"""
         await self.start()
@@ -108,12 +111,15 @@ class BrowserManager:
         self._page = await self._context.new_page()
 
         # Set up download handler to save to custom location
-        self._page.on("download", lambda download: asyncio.create_task(self._handle_download(download)))
+        self._page.on("download", self._download_started)
 
         logger.info("Browser started successfully")
 
     async def stop(self) -> None:
         """Stop browser instance"""
+        # Wait for any pending downloads to complete before closing browser
+        await self.await_downloads()
+
         if self._page:
             await self._page.close()
             self._page = None
@@ -371,6 +377,41 @@ class BrowserManager:
                 logger.error(f"Error in screenshot streaming: {e}")
                 # Continue streaming despite errors
                 await asyncio.sleep(frame_interval)
+
+    def _download_started(self, download) -> None:
+        """
+        Called when download event is fired - creates tracked async task
+
+        Args:
+            download: Playwright Download object
+        """
+        task = asyncio.create_task(self._handle_download(download))
+        self._active_downloads.append(task)
+        logger.info(f"Download started: {download.suggested_filename}")
+
+    async def await_downloads(self, timeout: float = 30.0) -> None:
+        """
+        Wait for all active downloads to complete
+
+        Args:
+            timeout: Maximum time to wait for downloads in seconds
+        """
+        if not self._active_downloads:
+            return
+
+        logger.info(f"Waiting for {len(self._active_downloads)} download(s) to complete...")
+
+        try:
+            await asyncio.wait_for(
+                asyncio.gather(*self._active_downloads, return_exceptions=True),
+                timeout=timeout
+            )
+            logger.info(f"All downloads completed")
+        except asyncio.TimeoutError:
+            logger.warning(f"Download timeout after {timeout}s - some downloads may not have completed")
+        finally:
+            # Clear completed tasks
+            self._active_downloads.clear()
 
     async def _handle_download(self, download) -> None:
         """

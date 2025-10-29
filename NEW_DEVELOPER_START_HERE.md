@@ -104,12 +104,23 @@ Open your browser to http://localhost:5000 and you should see:
    - Architecture patterns
    - Security best practices
 
-4. **ARCHITECTURE.md** (15 min)
+4. **ARCHITECTURE.md** (20 min)
+   - System architecture overview with diagrams
    - Architecture Decision Records (ADRs)
-   - Why we made certain design choices
    - Technology stack rationale
+   - Data flow and security architecture
 
-5. **docs/ROADMAP.md** (10 min)
+5. **PACKAGES.md** (10 min)
+   - Complete dependency tracking
+   - Version compatibility matrix
+   - How to update dependencies
+
+6. **docs/PLAYBOOK_BEST_PRACTICES.md** (15 min)
+   - How to write good playbooks
+   - Common pitfalls and solutions
+   - Example patterns and templates
+
+7. **docs/ROADMAP.md** (10 min)
    - Future plans and priorities
    - Feature backlog
    - What's next for the project

@@ -4,10 +4,13 @@ Execution management routes
 Handles playbook execution control, status tracking, and lifecycle management.
 """
 
+import asyncio
 import logging
+from dataclasses import dataclass
 from datetime import datetime, timedelta
+from pathlib import Path
 
-from fastapi import APIRouter, BackgroundTasks, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Path as PathParam
 from pydantic import BaseModel
 
 from ignition_toolkit.api.routers.models import (
@@ -17,42 +20,207 @@ from ignition_toolkit.api.routers.models import (
     StepResultResponse,
 )
 from ignition_toolkit.playbook.engine import PlaybookEngine
-from ignition_toolkit.playbook.models import ExecutionState
+from ignition_toolkit.playbook.models import ExecutionState, StepResult
 from ignition_toolkit.storage import get_database
+from ignition_toolkit.storage.models import ExecutionModel
 
 logger = logging.getLogger(__name__)
 
 # Create router
 router = APIRouter(prefix="/api/executions", tags=["executions"])
 
+# Execution Configuration Constants
+DEFAULT_EXECUTION_TIMEOUT_SECONDS = 3600  # 1 hour
+DEFAULT_EXECUTION_LIST_LIMIT = 50
+
+
+# Execution Context Dataclass
+@dataclass
+class ExecutionContext:
+    """Encapsulates all execution-related global state"""
+
+    active_engines: dict[str, PlaybookEngine]
+    active_tasks: dict[str, asyncio.Task]
+    completion_times: dict[str, datetime]
+    ttl_minutes: int
+
+    def get_engine(self, execution_id: str) -> PlaybookEngine | None:
+        """Get engine by execution ID"""
+        return self.active_engines.get(execution_id)
+
+    def add_engine(self, execution_id: str, engine: PlaybookEngine, task: asyncio.Task) -> None:
+        """Register new execution"""
+        self.active_engines[execution_id] = engine
+        self.active_tasks[execution_id] = task
+
+    def remove_engine(self, execution_id: str) -> None:
+        """Remove completed execution"""
+        self.active_engines.pop(execution_id, None)
+        self.active_tasks.pop(execution_id, None)
+        self.completion_times[execution_id] = datetime.now()
+
+    def is_expired(self, execution_id: str) -> bool:
+        """Check if execution has exceeded TTL"""
+        if completion_time := self.completion_times.get(execution_id):
+            elapsed_minutes = (datetime.now() - completion_time).total_seconds() / 60
+            return elapsed_minutes > self.ttl_minutes
+        return False
+
 
 # Dependency injection for global state
+def get_execution_context() -> ExecutionContext:
+    """Get execution context from app state"""
+    from ignition_toolkit.api.app import (
+        EXECUTION_TTL_MINUTES,
+        active_engines,
+        active_tasks,
+        engine_completion_times,
+    )
+
+    return ExecutionContext(
+        active_engines=active_engines,
+        active_tasks=active_tasks,
+        completion_times=engine_completion_times,
+        ttl_minutes=EXECUTION_TTL_MINUTES,
+    )
+
+
+# Legacy getter functions (to be replaced gradually)
 def get_active_engines():
     """Get shared active engines dict from app"""
-    from ignition_toolkit.api.app import active_engines
-
-    return active_engines
+    return get_execution_context().active_engines
 
 
 def get_active_tasks():
     """Get shared active tasks dict from app"""
-    from ignition_toolkit.api.app import active_tasks
-
-    return active_tasks
+    return get_execution_context().active_tasks
 
 
 def get_engine_completion_times():
     """Get shared engine completion times dict from app"""
-    from ignition_toolkit.api.app import engine_completion_times
-
-    return engine_completion_times
+    return get_execution_context().completion_times
 
 
 def get_execution_ttl_minutes():
     """Get execution TTL configuration from app"""
-    from ignition_toolkit.api.app import EXECUTION_TTL_MINUTES
+    return get_execution_context().ttl_minutes
 
-    return EXECUTION_TTL_MINUTES
+
+async def get_engine_or_404(
+    execution_id: str = PathParam(..., description="Execution UUID")
+) -> PlaybookEngine:
+    """
+    FastAPI dependency to retrieve active engine or raise 404
+
+    Args:
+        execution_id: Execution UUID from path parameter
+
+    Returns:
+        Active PlaybookEngine instance
+
+    Raises:
+        HTTPException: 404 if execution not found or not active
+    """
+    active_engines = get_active_engines()
+    engine = active_engines.get(execution_id)
+
+    if engine is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Execution {execution_id} not found or not active"
+        )
+
+    return engine
+
+
+# ============================================================================
+# Helper Functions
+# ============================================================================
+
+
+def _convert_step_results_to_response(
+    step_results: list[StepResult]
+) -> list[StepResultResponse]:
+    """
+    Convert internal StepResult objects to API response format
+
+    Args:
+        step_results: List of StepResult domain objects
+
+    Returns:
+        List of StepResultResponse objects for API serialization
+    """
+    return [
+        StepResultResponse(
+            step_id=result.step_id,
+            step_name=result.step_name,
+            status=result.status.value if hasattr(result.status, 'value') else result.status,
+            error=result.error,
+            started_at=result.started_at,
+            completed_at=result.completed_at,
+        )
+        for result in step_results
+    ]
+
+
+def _create_execution_status_from_engine(
+    execution_id: str,
+    engine: PlaybookEngine,
+    state: ExecutionState,
+) -> ExecutionStatusResponse:
+    """
+    Create ExecutionStatusResponse from live engine state
+
+    Args:
+        execution_id: Unique execution identifier
+        engine: Active PlaybookEngine instance
+        state: Current execution state from engine
+
+    Returns:
+        ExecutionStatusResponse for API serialization
+    """
+    step_results = _convert_step_results_to_response(state.step_results)
+
+    return ExecutionStatusResponse(
+        execution_id=execution_id,
+        playbook_name=state.playbook_name,
+        status=state.status.value,
+        started_at=state.started_at,
+        completed_at=state.completed_at,
+        current_step_index=state.current_step_index,
+        total_steps=len(engine._current_playbook.steps) if engine._current_playbook else 0,
+        error=state.error,
+        debug_mode=engine.state_manager.is_debug_mode_enabled(),
+        step_results=step_results,
+    )
+
+
+def _create_execution_status_from_db(
+    db_exec: ExecutionModel,
+    step_results: list[StepResultResponse],
+) -> ExecutionStatusResponse:
+    """
+    Create ExecutionStatusResponse from database model
+
+    Args:
+        db_exec: ExecutionModel from database
+        step_results: Pre-converted step results
+
+    Returns:
+        ExecutionStatusResponse for API serialization
+    """
+    return ExecutionStatusResponse(
+        execution_id=db_exec.execution_id,
+        playbook_name=db_exec.playbook_name,
+        status=db_exec.status,
+        started_at=db_exec.started_at,
+        completed_at=db_exec.completed_at,
+        current_step_index=len(step_results),
+        total_steps=len(step_results),
+        error=db_exec.error_message,
+        debug_mode=db_exec.execution_metadata.get("debug_mode", False) if db_exec.execution_metadata else False,
+        step_results=step_results,
+    )
 
 
 # ============================================================================
@@ -64,6 +232,428 @@ class PlaybookCodeUpdateRequest(BaseModel):
     """Request to update playbook code during execution"""
 
     code: str
+
+
+# ============================================================================
+# Helper Functions for start_execution
+# ============================================================================
+
+
+def validate_and_resolve_playbook_path(playbook_relative_path_str: str) -> tuple[Path, Path]:
+    """
+    Validate playbook path and resolve to absolute path
+
+    Args:
+        playbook_relative_path_str: Relative path to playbook file
+
+    Returns:
+        Tuple of (playbooks_dir, full_playbook_path)
+
+    Raises:
+        HTTPException: If path is invalid or file not found
+    """
+    from ignition_toolkit.core.paths import get_playbooks_dir
+
+    playbook_relative_path = Path(playbook_relative_path_str)
+
+    # Security check - prevent directory traversal
+    if ".." in str(playbook_relative_path) or playbook_relative_path.is_absolute():
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid playbook path - relative paths only, no directory traversal",
+        )
+
+    # Resolve full path relative to playbooks directory
+    playbooks_dir = get_playbooks_dir()
+    playbook_path = playbooks_dir / playbook_relative_path
+
+    if not playbook_path.exists():
+        raise HTTPException(
+            status_code=404, detail=f"Playbook file not found: {playbook_relative_path_str}"
+        )
+
+    return playbooks_dir, playbook_path
+
+
+def _retrieve_credential(credential_name: str):
+    """
+    Retrieve credential from vault
+
+    Args:
+        credential_name: Name of credential to retrieve
+
+    Returns:
+        Credential object
+
+    Raises:
+        HTTPException: If credential not found
+    """
+    from ignition_toolkit.credentials import CredentialVault
+
+    vault = CredentialVault()
+    credential = vault.get_credential(credential_name)
+    if not credential:
+        raise HTTPException(
+            status_code=404, detail=f"Credential '{credential_name}' not found"
+        )
+    return credential
+
+
+def _autofill_credential_type_parameters(
+    playbook: "Playbook", credential_name: str, parameters: dict
+) -> None:
+    """
+    Auto-fill credential-type parameters with credential name
+
+    Args:
+        playbook: Loaded playbook object
+        credential_name: Name of credential to use
+        parameters: Parameters dict to modify (modified in-place)
+    """
+    for param in playbook.parameters:
+        if param.type == "credential" and param.name not in parameters:
+            parameters[param.name] = credential_name
+
+
+def _autofill_gateway_url_parameter(playbook: "Playbook", credential, parameters: dict) -> None:
+    """
+    Auto-fill gateway_url parameter if it exists in playbook
+
+    Args:
+        playbook: Loaded playbook object
+        credential: Credential object with gateway_url
+        parameters: Parameters dict to modify (modified in-place)
+    """
+    if not credential.gateway_url:
+        return
+
+    for param in playbook.parameters:
+        if param.name.lower() in ["gateway_url", "url"] and param.name not in parameters:
+            parameters[param.name] = credential.gateway_url
+
+
+def _autofill_username_password_parameters(playbook: "Playbook", credential, parameters: dict) -> None:
+    """
+    Auto-fill username/password parameters if they exist in playbook
+
+    Args:
+        playbook: Loaded playbook object
+        credential: Credential object with username/password
+        parameters: Parameters dict to modify (modified in-place)
+    """
+    for param in playbook.parameters:
+        if param.name.lower() in ["username", "user", "gateway_username"] and param.name not in parameters:
+            parameters[param.name] = credential.username
+        elif param.name.lower() in ["password", "pass", "gateway_password"] and param.name not in parameters:
+            parameters[param.name] = credential.password
+
+
+def apply_credential_autofill(
+    playbook: "Playbook",
+    credential_name: str | None,
+    gateway_url: str | None,
+    parameters: dict,
+) -> tuple[str | None, dict]:
+    """
+    Auto-fill parameters from credential if provided
+
+    Args:
+        playbook: Loaded playbook object
+        credential_name: Name of credential to use
+        gateway_url: Optional gateway URL from request
+        parameters: Parameters dict to modify
+
+    Returns:
+        Tuple of (gateway_url, parameters) with auto-filled values
+
+    Raises:
+        HTTPException: If credential not found
+    """
+    if not credential_name:
+        return gateway_url, parameters
+
+    # Retrieve credential from vault
+    credential = _retrieve_credential(credential_name)
+
+    # Auto-fill gateway_url if not provided in request
+    if not gateway_url and credential.gateway_url:
+        gateway_url = credential.gateway_url
+
+    # Auto-fill all parameter types
+    _autofill_credential_type_parameters(playbook, credential_name, parameters)
+    _autofill_gateway_url_parameter(playbook, credential, parameters)
+    _autofill_username_password_parameters(playbook, credential, parameters)
+
+    logger.info(
+        f"Execution parameters after credential auto-fill: gateway_url={gateway_url}, params={parameters}"
+    )
+
+    return gateway_url, parameters
+
+
+def create_playbook_engine_with_callbacks(
+    gateway_url: str | None,
+) -> tuple[PlaybookEngine, "GatewayClient | None"]:
+    """
+    Create PlaybookEngine with all necessary dependencies and callbacks
+
+    Args:
+        gateway_url: Optional Gateway URL for client
+
+    Returns:
+        Tuple of (engine, gateway_client)
+    """
+    from ignition_toolkit.api.routers.websockets import (
+        broadcast_execution_state,
+        broadcast_screenshot_frame,
+    )
+    from ignition_toolkit.credentials import CredentialVault
+    from ignition_toolkit.gateway import GatewayClient
+
+    vault = CredentialVault()
+    database = get_database()
+
+    gateway_client = None
+    if gateway_url:
+        gateway_client = GatewayClient(gateway_url)
+
+    # Create screenshot callback for browser streaming
+    async def screenshot_callback(execution_id: str, screenshot_b64: str):
+        await broadcast_screenshot_frame(execution_id, screenshot_b64)
+
+    # Create engine with proper dependencies
+    engine = PlaybookEngine(
+        gateway_client=gateway_client,
+        credential_vault=vault,
+        database=database,
+        screenshot_callback=screenshot_callback,
+    )
+
+    # Set up WebSocket broadcast callback
+    async def broadcast_update(state: "ExecutionState"):
+        await broadcast_execution_state(state)
+
+    engine.set_update_callback(broadcast_update)
+
+    return engine, gateway_client
+
+
+async def broadcast_initial_execution_state(execution_id: str, playbook_name: str) -> None:
+    """
+    Broadcast initial execution state to WebSocket clients
+
+    Args:
+        execution_id: Execution UUID
+        playbook_name: Name of the playbook
+    """
+    from ignition_toolkit.api.routers.websockets import broadcast_execution_state
+    from ignition_toolkit.playbook.models import ExecutionState, ExecutionStatus
+
+    initial_state = ExecutionState(
+        execution_id=execution_id,
+        playbook_name=playbook_name,
+        status=ExecutionStatus.RUNNING,
+        current_step_index=None,
+        started_at=datetime.now(),
+        step_results=[],
+    )
+    await broadcast_execution_state(initial_state)
+    logger.info(f"Broadcasted initial state for execution {execution_id}")
+
+
+def create_execution_runner(
+    engine: PlaybookEngine,
+    playbook: "Playbook",
+    parameters: dict,
+    playbook_path: Path,
+    execution_id: str,
+    gateway_client: "GatewayClient | None",
+) -> "Callable[[], Awaitable[None]]":
+    """
+    Create async function that runs the playbook execution
+
+    Args:
+        engine: PlaybookEngine instance
+        playbook: Loaded playbook object
+        parameters: Execution parameters
+        playbook_path: Path to playbook file
+        execution_id: Execution UUID
+        gateway_client: Optional Gateway client
+
+    Returns:
+        Async function that executes the playbook
+    """
+
+    async def run_execution():
+        """Execute playbook in background"""
+        start_time = datetime.now()
+        try:
+            if gateway_client:
+                await gateway_client.__aenter__()
+
+            execution_state = await engine.execute_playbook(
+                playbook,
+                parameters,
+                base_path=playbook_path.parent,
+                execution_id=execution_id,
+                playbook_path=playbook_path,
+            )
+
+            logger.info(
+                f"Execution {execution_state.execution_id} completed with status: {execution_state.status}"
+            )
+
+            # Mark completion time for TTL cleanup
+            engine_completion_times = get_engine_completion_times()
+            engine_completion_times[execution_id] = datetime.now()
+
+        except asyncio.CancelledError:
+            logger.warning(f"Execution {execution_id} was cancelled")
+            # Mark completion time even for cancelled executions
+            engine_completion_times = get_engine_completion_times()
+            engine_completion_times[execution_id] = datetime.now()
+
+            # Update database to mark execution as cancelled
+            db = get_database()
+            if db:
+                with db.session_scope() as session:
+                    from ignition_toolkit.storage import ExecutionModel
+
+                    execution = (
+                        session.query(ExecutionModel)
+                        .filter_by(execution_id=execution_id)
+                        .first()
+                    )
+                    if execution:
+                        execution.status = "cancelled"
+                        execution.completed_at = datetime.now()
+                        session.commit()
+                        logger.info(
+                            f"Updated execution {execution_id} status to 'cancelled' in database"
+                        )
+
+                        # Broadcast cancellation to WebSocket clients
+                        from ignition_toolkit.api.routers.websockets import (
+                            broadcast_execution_state,
+                        )
+                        from ignition_toolkit.playbook.models import ExecutionStatus
+
+                        # Get current execution state and update status
+                        execution_state = engine.get_current_execution()
+                        if execution_state:
+                            execution_state.status = ExecutionStatus.CANCELLED
+                            execution_state.completed_at = datetime.now()
+                            await broadcast_execution_state(execution_state)
+                            logger.info(
+                                f"Broadcasted cancellation status via WebSocket for {execution_id}"
+                            )
+
+            raise  # Re-raise to properly handle cancellation
+        except Exception as e:
+            logger.exception(f"Error in execution {execution_id}: {e}")
+            # Mark completion time for failed executions
+            engine_completion_times = get_engine_completion_times()
+            engine_completion_times[execution_id] = datetime.now()
+        finally:
+            if gateway_client:
+                await gateway_client.__aexit__(None, None, None)
+            # Clean up task reference
+            active_tasks = get_active_tasks()
+            if execution_id in active_tasks:
+                del active_tasks[execution_id]
+
+    return run_execution
+
+
+def create_timeout_watchdog(
+    execution_id: str, task: asyncio.Task, engine: PlaybookEngine
+) -> "Callable[[], Awaitable[None]]":
+    """
+    Create timeout watchdog that auto-cancels long-running executions
+
+    Args:
+        execution_id: Execution UUID
+        task: Asyncio task to monitor
+        engine: PlaybookEngine to cancel
+
+    Returns:
+        Async function that monitors execution timeout
+    """
+
+    async def timeout_watchdog():
+        """Cancel execution if it runs longer than configured timeout"""
+        try:
+            await asyncio.sleep(DEFAULT_EXECUTION_TIMEOUT_SECONDS)
+            if not task.done():
+                logger.warning(
+                    f"Execution {execution_id} exceeded timeout - auto-cancelling"
+                )
+                await engine.cancel()
+                task.cancel()
+        except asyncio.CancelledError:
+            pass  # Watchdog cancelled (normal if execution finishes)
+        except Exception as e:
+            logger.exception(f"Error in timeout watchdog for {execution_id}: {e}")
+
+    return timeout_watchdog
+
+
+def extract_screenshot_paths(step_results: list) -> list[Path]:
+    """
+    Extract screenshot file paths from step results
+
+    Args:
+        step_results: List of StepResultModel objects
+
+    Returns:
+        List of Path objects for screenshots found in step results
+    """
+    screenshot_paths = []
+
+    for step in step_results:
+        # Check output field for single screenshot (browser.screenshot steps)
+        if step.output and isinstance(step.output, dict):
+            screenshot = step.output.get("screenshot")
+            if screenshot and isinstance(screenshot, str):
+                screenshot_paths.append(Path(screenshot))
+
+            # Check for screenshot arrays from nested playbook executions (playbook.run steps)
+            screenshots = step.output.get("screenshots", [])
+            if isinstance(screenshots, list):
+                screenshot_paths.extend([Path(s) for s in screenshots if isinstance(s, str)])
+
+        # Also check artifacts field for screenshot arrays (future use)
+        if step.artifacts and isinstance(step.artifacts, dict):
+            # artifacts may contain: {"screenshots": ["/path/to/file.png", ...]}
+            screenshots = step.artifacts.get("screenshots", [])
+            if isinstance(screenshots, list):
+                screenshot_paths.extend([Path(s) for s in screenshots if isinstance(s, str)])
+
+    return screenshot_paths
+
+
+def delete_screenshot_files(screenshot_paths: list[Path]) -> int:
+    """
+    Delete screenshot files from filesystem
+
+    Args:
+        screenshot_paths: List of Path objects to delete
+
+    Returns:
+        Number of files successfully deleted
+    """
+    deleted_count = 0
+
+    for screenshot_path in screenshot_paths:
+        try:
+            if screenshot_path.exists():
+                screenshot_path.unlink()
+                deleted_count += 1
+                logger.info(f"Deleted screenshot: {screenshot_path.name}")
+        except Exception as e:
+            logger.warning(f"Failed to delete screenshot {screenshot_path}: {e}")
+
+    return deleted_count
 
 
 # ============================================================================
@@ -107,222 +697,57 @@ async def cleanup_old_executions():
 async def start_execution(request: ExecutionRequest, background_tasks: BackgroundTasks):
     """Start playbook execution"""
     import uuid
-    from pathlib import Path
 
-    from ignition_toolkit.core.paths import get_playbooks_dir
-    from ignition_toolkit.credentials import CredentialVault
-    from ignition_toolkit.gateway import GatewayClient
     from ignition_toolkit.playbook.loader import PlaybookLoader
 
     active_engines = get_active_engines()
 
     try:
-        # Validate and load playbook (prevents path traversal)
-        playbook_relative_path = Path(request.playbook_path)
+        # Step 1: Validate and resolve playbook path
+        playbooks_dir, playbook_path = validate_and_resolve_playbook_path(request.playbook_path)
 
-        # Security check - prevent directory traversal
-        if ".." in str(playbook_relative_path) or playbook_relative_path.is_absolute():
-            raise HTTPException(
-                status_code=400,
-                detail="Invalid playbook path - relative paths only, no directory traversal",
-            )
-
-        # Resolve full path relative to playbooks directory
-        playbooks_dir = get_playbooks_dir()
-        playbook_path = playbooks_dir / playbook_relative_path
-
-        if not playbook_path.exists():
-            raise HTTPException(
-                status_code=404, detail=f"Playbook file not found: {request.playbook_path}"
-            )
-
+        # Step 2: Load playbook
         loader = PlaybookLoader()
         playbook = loader.load_from_file(playbook_path)
 
-        # Create components
-        vault = CredentialVault()
-        database = get_database()
-
-        # If credential_name provided, load credential and auto-fill parameters
+        # Step 3: Apply credential auto-fill
         parameters = request.parameters.copy()
-        gateway_url = request.gateway_url
-
-        if request.credential_name:
-            credential = vault.get_credential(request.credential_name)
-            if not credential:
-                raise HTTPException(
-                    status_code=404, detail=f"Credential '{request.credential_name}' not found"
-                )
-
-            # Auto-fill gateway_url if not provided
-            if not gateway_url and credential.gateway_url:
-                gateway_url = credential.gateway_url
-
-            # Auto-fill credential-type parameters with credential name
-            for param in playbook.parameters:
-                if param.type == "credential" and param.name not in parameters:
-                    parameters[param.name] = request.credential_name
-
-            # Auto-fill gateway_url parameter if it exists in playbook
-            for param in playbook.parameters:
-                if param.name.lower() in ["gateway_url", "url"] and param.name not in parameters:
-                    if credential.gateway_url:
-                        parameters[param.name] = credential.gateway_url
-
-            # Auto-fill username/password parameters if they exist
-            for param in playbook.parameters:
-                if (
-                    param.name.lower() in ["username", "user", "gateway_username"]
-                    and param.name not in parameters
-                ):
-                    parameters[param.name] = credential.username
-                elif (
-                    param.name.lower() in ["password", "pass", "gateway_password"]
-                    and param.name not in parameters
-                ):
-                    parameters[param.name] = credential.password
-
-        logger.info(
-            f"Execution parameters after credential auto-fill: gateway_url={gateway_url}, params={parameters}"
+        gateway_url, parameters = apply_credential_autofill(
+            playbook, request.credential_name, request.gateway_url, parameters
         )
 
-        gateway_client = None
-        if gateway_url:
-            gateway_client = GatewayClient(gateway_url)
+        # Step 4: Create engine with all callbacks configured
+        engine, gateway_client = create_playbook_engine_with_callbacks(gateway_url)
 
-        # Create screenshot callback for browser streaming
-        from ignition_toolkit.api.routers.websockets import (
-            broadcast_execution_state,
-            broadcast_screenshot_frame,
-        )
-
-        async def screenshot_callback(execution_id: str, screenshot_b64: str):
-            await broadcast_screenshot_frame(execution_id, screenshot_b64)
-
-        # Create engine with proper dependencies
-        engine = PlaybookEngine(
-            gateway_client=gateway_client,
-            credential_vault=vault,
-            database=database,
-            screenshot_callback=screenshot_callback,
-        )
-
-        # Set up WebSocket broadcast callback
-        async def broadcast_update(state: ExecutionState):
-            await broadcast_execution_state(state)
-
-        engine.set_update_callback(broadcast_update)
-
-        # Generate execution ID upfront
+        # Step 5: Generate execution ID and store engine
         execution_id = str(uuid.uuid4())
         logger.info(f"Starting execution {execution_id} for playbook: {playbook.name}")
-
-        # Store engine with real execution ID immediately
         active_engines[execution_id] = engine
 
-        # Enable debug mode if requested
+        # Step 6: Enable debug mode if requested
         if request.debug_mode:
             engine.enable_debug(execution_id)
             logger.info(f"Debug mode enabled for execution {execution_id}")
 
-        # Start execution in background
-        async def run_execution():
-            start_time = datetime.now()
-            try:
-                if gateway_client:
-                    await gateway_client.__aenter__()
+        # Step 7: Broadcast initial execution state
+        await broadcast_initial_execution_state(execution_id, playbook.name)
 
-                execution_state = await engine.execute_playbook(
-                    playbook,
-                    parameters,
-                    base_path=playbook_path.parent,
-                    execution_id=execution_id,
-                    playbook_path=playbook_path,
-                )
-
-                logger.info(
-                    f"Execution {execution_state.execution_id} completed with status: {execution_state.status}"
-                )
-
-                # Mark completion time for TTL cleanup
-                engine_completion_times = get_engine_completion_times()
-                engine_completion_times[execution_id] = datetime.now()
-
-            except asyncio.CancelledError:
-                logger.warning(f"Execution {execution_id} was cancelled")
-                # Mark completion time even for cancelled executions
-                engine_completion_times = get_engine_completion_times()
-                engine_completion_times[execution_id] = datetime.now()
-
-                # Update database to mark execution as cancelled
-                db = get_database()
-                if db:
-                    with db.session_scope() as session:
-                        from ignition_toolkit.storage import ExecutionModel
-                        execution = session.query(ExecutionModel).filter_by(execution_id=execution_id).first()
-                        if execution:
-                            execution.status = "cancelled"
-                            execution.completed_at = datetime.now()
-                            session.commit()
-                            logger.info(f"Updated execution {execution_id} status to 'cancelled' in database")
-
-                            # Broadcast cancellation to WebSocket clients
-                            from ignition_toolkit.api.routers.websockets import broadcast_execution_state
-                            from ignition_toolkit.playbook.models import ExecutionStatus
-
-                            # Get current execution state and update status
-                            execution_state = engine.get_current_execution()
-                            if execution_state:
-                                execution_state.status = ExecutionStatus.CANCELLED
-                                execution_state.completed_at = datetime.now()
-                                await broadcast_execution_state(execution_state)
-                                logger.info(f"Broadcasted cancellation status via WebSocket for {execution_id}")
-
-                raise  # Re-raise to properly handle cancellation
-            except Exception as e:
-                logger.exception(f"Error in execution {execution_id}: {e}")
-                # Mark completion time for failed executions
-                engine_completion_times = get_engine_completion_times()
-                engine_completion_times[execution_id] = datetime.now()
-            finally:
-                if gateway_client:
-                    await gateway_client.__aexit__(None, None, None)
-                # Clean up task reference
-                active_tasks = get_active_tasks()
-                if execution_id in active_tasks:
-                    del active_tasks[execution_id]
-
-        # Create asyncio Task for proper cancellation support
-        import asyncio
-
+        # Step 8: Create and start background execution task
+        run_execution = create_execution_runner(
+            engine, playbook, parameters, playbook_path, execution_id, gateway_client
+        )
         task = asyncio.create_task(run_execution())
 
-        # Store task for cancellation
+        # Step 9: Store task for cancellation support
         active_tasks = get_active_tasks()
         active_tasks[execution_id] = task
 
-        # Schedule cleanup task in background
+        # Step 10: Schedule cleanup and timeout watchdog
         background_tasks.add_task(cleanup_old_executions)
-
-        # Add timeout watchdog for auto-cancel after 1 hour
-        async def timeout_watchdog():
-            """Cancel execution if it runs longer than 1 hour"""
-            try:
-                await asyncio.sleep(3600)  # 1 hour = 3600 seconds
-                if not task.done():
-                    logger.warning(
-                        f"Execution {execution_id} exceeded 1 hour timeout - auto-cancelling"
-                    )
-                    await engine.cancel()
-                    task.cancel()
-            except asyncio.CancelledError:
-                pass  # Watchdog cancelled (normal if execution finishes)
-            except Exception as e:
-                logger.exception(f"Error in timeout watchdog for {execution_id}: {e}")
-
-        # Start watchdog in background
+        timeout_watchdog = create_timeout_watchdog(execution_id, task, engine)
         asyncio.create_task(timeout_watchdog())
 
+        # Step 11: Return response
         return ExecutionResponse(
             execution_id=execution_id,
             playbook_name=playbook.name,
@@ -337,7 +762,7 @@ async def start_execution(request: ExecutionRequest, background_tasks: Backgroun
 
 
 @router.get("", response_model=list[ExecutionStatusResponse])
-async def list_executions(limit: int = 50, status: str | None = None):
+async def list_executions(limit: int = DEFAULT_EXECUTION_LIST_LIMIT, status: str | None = None):
     """List all executions (active + recent completed from database)"""
     active_engines = get_active_engines()
     db = get_database()
@@ -350,32 +775,7 @@ async def list_executions(limit: int = 50, status: str | None = None):
         if not state:
             continue
 
-        step_results = [
-            StepResultResponse(
-                step_id=result.step_id,
-                step_name=result.step_name,
-                status=result.status.value,
-                error=result.error,
-                started_at=result.started_at,
-                completed_at=result.completed_at,
-            )
-            for result in state.step_results
-        ]
-
-        executions.append(
-            ExecutionStatusResponse(
-                execution_id=exec_id,
-                playbook_name=state.playbook_name,
-                status=state.status.value,
-                started_at=state.started_at,
-                completed_at=state.completed_at,
-                current_step_index=state.current_step_index,
-                total_steps=len(engine._current_playbook.steps) if engine._current_playbook else 0,
-                error=state.error,
-                debug_mode=engine.state_manager.is_debug_mode_enabled(),
-                step_results=step_results,
-            )
-        )
+        executions.append(_create_execution_status_from_engine(exec_id, engine, state))
 
     # Add recent completed executions from database
     try:
@@ -388,28 +788,25 @@ async def list_executions(limit: int = 50, status: str | None = None):
                 query = query.filter(ExecutionModel.status == status)
 
             db_executions = query.limit(limit).all()
+            logger.info(f"Loaded {len(db_executions)} executions from database")
 
             for db_exec in db_executions:
-                # Skip if already in active list
-                if db_exec.execution_id in active_engines:
-                    continue
-
-                executions.append(
-                    ExecutionStatusResponse(
-                        execution_id=db_exec.execution_id,
-                        playbook_name=db_exec.playbook_name,
-                        status=db_exec.status,
-                        started_at=db_exec.started_at,
-                        completed_at=db_exec.completed_at,
-                        current_step_index=0,
-                        total_steps=0,
-                        error=db_exec.error_message,
-                        debug_mode=False,
-                        step_results=[],
+                # Load step results from database relationship
+                step_results = [
+                    StepResultResponse(
+                        step_id=step.step_id,
+                        step_name=step.step_name,
+                        status=step.status,
+                        error=step.error_message,
+                        started_at=step.started_at,
+                        completed_at=step.completed_at,
                     )
-                )
+                    for step in db_exec.step_results
+                ]
+
+                executions.append(_create_execution_status_from_db(db_exec, step_results))
     except Exception as e:
-        logger.warning(f"Error loading executions from database: {e}")
+        logger.exception(f"Error loading executions from database: {e}")
 
     return executions[:limit]
 
@@ -425,30 +822,7 @@ async def get_execution_status(execution_id: str):
 
         if state:
             # Engine has active state, return it
-            step_results = [
-                StepResultResponse(
-                    step_id=result.step_id,
-                    step_name=result.step_name,
-                    status=result.status.value,
-                    error=result.error,
-                    started_at=result.started_at,
-                    completed_at=result.completed_at,
-                )
-                for result in state.step_results
-            ]
-
-            return ExecutionStatusResponse(
-                execution_id=execution_id,
-                playbook_name=state.playbook_name,
-                status=state.status.value,
-                started_at=state.started_at,
-                completed_at=state.completed_at,
-                current_step_index=state.current_step_index,
-                total_steps=len(engine._current_playbook.steps) if engine._current_playbook else 0,
-                error=state.error,
-                debug_mode=engine.state_manager.is_debug_mode_enabled(),
-                step_results=step_results,
-            )
+            return _create_execution_status_from_engine(execution_id, engine, state)
 
     # Try to load from database
     db = get_database()
@@ -463,17 +837,30 @@ async def get_execution_status(execution_id: str):
             )
 
             if execution:
+                # Load step results from database relationship
+                step_results = [
+                    StepResultResponse(
+                        step_id=step.step_id,
+                        step_name=step.step_name,
+                        status=step.status,
+                        error=step.error_message,
+                        started_at=step.started_at,
+                        completed_at=step.completed_at,
+                    )
+                    for step in execution.step_results
+                ]
+
                 return ExecutionStatusResponse(
                     execution_id=execution.execution_id,
                     playbook_name=execution.playbook_name,
                     status=execution.status,
                     started_at=execution.started_at,
                     completed_at=execution.completed_at,
-                    current_step_index=0,
-                    total_steps=0,
+                    current_step_index=len(step_results),
+                    total_steps=len(step_results),
                     error=execution.error_message,
-                    debug_mode=False,
-                    step_results=[],
+                    debug_mode=execution.execution_metadata.get("debug_mode", False) if execution.execution_metadata else False,
+                    step_results=step_results,
                 )
     except Exception as e:
         logger.error(f"Error loading execution from database: {e}")
@@ -488,55 +875,31 @@ async def get_execution_status_with_path(execution_id: str):
 
 
 @router.post("/{execution_id}/pause")
-async def pause_execution(execution_id: str):
+async def pause_execution(engine: PlaybookEngine = Depends(get_engine_or_404)):
     """Pause execution"""
-    active_engines = get_active_engines()
-
-    if execution_id not in active_engines:
-        raise HTTPException(status_code=404, detail=f"Execution {execution_id} not found")
-
-    engine = active_engines[execution_id]
     engine.pause()
-    return {"message": "Execution paused", "execution_id": execution_id}
+    return {"message": "Execution paused", "execution_id": engine.state_manager.execution_id}
 
 
 @router.post("/{execution_id}/resume")
-async def resume_execution(execution_id: str):
+async def resume_execution(engine: PlaybookEngine = Depends(get_engine_or_404)):
     """Resume paused execution"""
-    active_engines = get_active_engines()
-
-    if execution_id not in active_engines:
-        raise HTTPException(status_code=404, detail=f"Execution {execution_id} not found")
-
-    engine = active_engines[execution_id]
     await engine.resume()
-    return {"message": "Execution resumed", "execution_id": execution_id}
+    return {"message": "Execution resumed", "execution_id": engine.state_manager.execution_id}
 
 
 @router.post("/{execution_id}/skip")
-async def skip_step(execution_id: str):
+async def skip_step(engine: PlaybookEngine = Depends(get_engine_or_404)):
     """Skip current step and move to next"""
-    active_engines = get_active_engines()
-
-    if execution_id not in active_engines:
-        raise HTTPException(status_code=404, detail=f"Execution {execution_id} not found")
-
-    engine = active_engines[execution_id]
     await engine.skip_current_step()
-    return {"message": "Step skipped", "execution_id": execution_id}
+    return {"message": "Step skipped", "execution_id": engine.state_manager.execution_id}
 
 
 @router.post("/{execution_id}/skip_back")
-async def skip_back_step(execution_id: str):
+async def skip_back_step(engine: PlaybookEngine = Depends(get_engine_or_404)):
     """Skip back to previous step"""
-    active_engines = get_active_engines()
-
-    if execution_id not in active_engines:
-        raise HTTPException(status_code=404, detail=f"Execution {execution_id} not found")
-
-    engine = active_engines[execution_id]
     await engine.skip_back_step()
-    return {"message": "Skipped back to previous step", "execution_id": execution_id}
+    return {"message": "Skipped back to previous step", "execution_id": engine.state_manager.execution_id}
 
 
 @router.post("/{execution_id}/cancel")
@@ -604,15 +967,8 @@ async def cancel_execution(execution_id: str):
 
 
 @router.get("/{execution_id}/playbook/code")
-async def get_playbook_code(execution_id: str):
+async def get_playbook_code(engine: PlaybookEngine = Depends(get_engine_or_404)):
     """Get the YAML code for the playbook being executed"""
-    active_engines = get_active_engines()
-
-    if execution_id not in active_engines:
-        raise HTTPException(status_code=404, detail=f"Execution {execution_id} not found")
-
-    engine = active_engines[execution_id]
-
     # Read the original playbook file
     playbook_path = engine._playbook_path
     if not playbook_path or not playbook_path.exists():
@@ -624,7 +980,7 @@ async def get_playbook_code(execution_id: str):
     playbook_name = state.playbook_name if state else "Unknown"
 
     return {
-        "execution_id": execution_id,
+        "execution_id": engine.state_manager.execution_id,
         "playbook_path": str(playbook_path),
         "playbook_name": playbook_name,
         "code": yaml_content,  # Frontend expects 'code' field
@@ -632,14 +988,11 @@ async def get_playbook_code(execution_id: str):
 
 
 @router.put("/{execution_id}/playbook/code")
-async def update_playbook_code(execution_id: str, request: PlaybookCodeUpdateRequest):
+async def update_playbook_code(
+    request: PlaybookCodeUpdateRequest,
+    engine: PlaybookEngine = Depends(get_engine_or_404)
+):
     """Update the playbook YAML during execution (for AI fixes)"""
-    active_engines = get_active_engines()
-
-    if execution_id not in active_engines:
-        raise HTTPException(status_code=404, detail=f"Execution {execution_id} not found")
-
-    engine = active_engines[execution_id]
 
     # Get playbook path
     playbook_path = engine._playbook_path
@@ -667,7 +1020,7 @@ async def update_playbook_code(execution_id: str, request: PlaybookCodeUpdateReq
 
     return {
         "message": "Playbook code updated",
-        "execution_id": execution_id,
+        "execution_id": engine.state_manager.execution_id,
         "playbook_path": str(playbook_path),
         "backup_path": str(backup_path.name),
     }
@@ -686,12 +1039,15 @@ async def delete_execution(execution_id: str):
     active_engines = get_active_engines()
     db = get_database()
 
-    # Check if execution is still active
+    # Check if execution is still active - only block deletion if execution is actually running/paused
     if execution_id in active_engines:
-        raise HTTPException(
-            status_code=400,
-            detail="Cannot delete active execution. Cancel or wait for completion first.",
-        )
+        engine = active_engines[execution_id]
+        state = engine.get_current_execution()
+        if state and state.status in ["running", "paused"]:
+            raise HTTPException(
+                status_code=400,
+                detail="Cannot delete active execution. Cancel or wait for completion first.",
+            )
 
     # Delete from database
     try:
@@ -707,7 +1063,18 @@ async def delete_execution(execution_id: str):
             if not execution:
                 raise HTTPException(status_code=404, detail=f"Execution {execution_id} not found")
 
-            # Delete related step results
+            # FIRST: Get screenshot paths from step results BEFORE deletion
+            # Use SQLAlchemy relationship instead of query (execution_id is UUID string, not DB integer)
+            step_results = execution.step_results
+            screenshot_paths = extract_screenshot_paths(step_results)
+
+            # NOTE: extract_screenshot_paths now handles nested playbook screenshots automatically
+            # because playbook.run steps include a "screenshots" array in their output containing
+            # all screenshots created during nested execution (supports up to depth 3 nesting)
+
+            logger.info(f"Collected {len(screenshot_paths)} total screenshot paths (including nested playbooks)")
+
+            # THEN: Delete related step results
             session.query(StepResultModel).filter(
                 StepResultModel.execution_id == execution_id
             ).delete()
@@ -722,24 +1089,100 @@ async def delete_execution(execution_id: str):
         logger.exception(f"Error deleting execution from database: {e}")
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
-    # Clean up screenshots
-    from pathlib import Path
-
-    screenshots_dir = Path("./data/screenshots")
-    deleted_screenshots = 0
-
-    if screenshots_dir.exists():
-        # Look for screenshots with execution_id in filename
-        for screenshot_file in screenshots_dir.glob(f"*{execution_id}*.png"):
-            try:
-                screenshot_file.unlink()
-                deleted_screenshots += 1
-                logger.info(f"Deleted screenshot: {screenshot_file.name}")
-            except Exception as e:
-                logger.warning(f"Failed to delete screenshot {screenshot_file.name}: {e}")
+    # Clean up screenshots from step results artifacts
+    deleted_screenshots = delete_screenshot_files(screenshot_paths)
 
     return {
         "message": "Execution deleted successfully",
         "execution_id": execution_id,
         "screenshots_deleted": deleted_screenshots,
     }
+
+
+@router.post("/{execution_id}/debug/enable")
+async def enable_debug_mode(execution_id: str, engine: PlaybookEngine = Depends(get_engine_or_404)):
+    """Enable debug mode for an active execution"""
+    engine.state_manager.enable_debug_mode()
+
+    logger.info(f"Debug mode enabled for execution {execution_id}")
+
+    return {
+        "status": "success",
+        "execution_id": execution_id,
+        "debug_mode": True,
+        "message": "Debug mode enabled - execution will pause on next failure"
+    }
+
+
+@router.post("/{execution_id}/debug/disable")
+async def disable_debug_mode(execution_id: str, engine: PlaybookEngine = Depends(get_engine_or_404)):
+    """Disable debug mode for an active execution"""
+    engine.state_manager.disable_debug_mode()
+
+    logger.info(f"Debug mode disabled for execution {execution_id}")
+
+    return {
+        "status": "success",
+        "execution_id": execution_id,
+        "debug_mode": False,
+        "message": "Debug mode disabled"
+    }
+
+
+class BrowserClickRequest(BaseModel):
+    """Request to click at coordinates in browser"""
+
+    x: int
+    y: int
+
+
+@router.post("/{execution_id}/browser/click")
+async def click_in_browser(
+    request: BrowserClickRequest,
+    engine: PlaybookEngine = Depends(get_engine_or_404)
+):
+    """
+    Click at specific coordinates in the browser during execution
+
+    This allows users to interact with the browser during paused executions
+    to help with debugging or manual intervention.
+
+    Args:
+        request: Browser click request with x and y coordinates
+        engine: Active PlaybookEngine instance (injected)
+
+    Returns:
+        Success response with click coordinates
+
+    Raises:
+        HTTPException: If no browser available or click fails
+    """
+    # Check if browser manager exists
+    if not engine._browser_manager:
+        raise HTTPException(
+            status_code=400, detail="No browser manager available for this execution"
+        )
+
+    try:
+        # Perform click at coordinates
+        await engine._browser_manager.click_at_coordinates(request.x, request.y)
+
+        # Get execution state for execution_id
+        state = engine.get_current_execution()
+        execution_id = state.execution_id if state else "unknown"
+
+        logger.info(
+            f"Browser click executed at ({request.x}, {request.y}) for execution {execution_id}"
+        )
+
+        return {
+            "status": "success",
+            "message": f"Clicked at coordinates ({request.x}, {request.y})",
+            "execution_id": execution_id,
+            "coordinates": {"x": request.x, "y": request.y},
+        }
+    except Exception as e:
+        logger.exception(f"Error clicking in browser: {e}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to click in browser: {str(e)}"
+        )

@@ -50,6 +50,7 @@ export function ExecutionDetail() {
   const { executionId } = useParams<{ executionId: string }>();
   const executionUpdates = useStore((state) => state.executionUpdates);
   const [debugMode, setDebugMode] = useState(false);
+  const [debugModeUserOverride, setDebugModeUserOverride] = useState(false);
   const [aiDialogOpen, setAiDialogOpen] = useState(false);
   const [showDebugPanel, setShowDebugPanel] = useState(false);
   const [showCodeViewer, setShowCodeViewer] = useState(false);
@@ -75,12 +76,12 @@ export function ExecutionDetail() {
   const wsUpdate = executionUpdates.get(executionId);
   const execution = wsUpdate || executionFromAPI;
 
-  // Sync debug mode from execution data
+  // Sync debug mode from execution data (only if user hasn't manually overridden it)
   useEffect(() => {
-    if (execution?.debug_mode !== undefined) {
+    if (execution?.debug_mode !== undefined && !debugModeUserOverride) {
       setDebugMode(execution.debug_mode);
     }
-  }, [execution?.debug_mode]);
+  }, [execution?.debug_mode, debugModeUserOverride]);
 
   // Calculate and update runtime every second
   useEffect(() => {
@@ -248,6 +249,7 @@ export function ExecutionDetail() {
                 onChange={async (e) => {
                   const enabled = e.target.checked;
                   setDebugMode(enabled);
+                  setDebugModeUserOverride(true);
                   try {
                     if (enabled) {
                       await api.executions.enableDebug(executionId);
@@ -258,10 +260,13 @@ export function ExecutionDetail() {
                         await api.executions.resume(executionId);
                       }
                     }
+                    // Clear override after 3 seconds to allow WebSocket sync
+                    setTimeout(() => setDebugModeUserOverride(false), 3000);
                   } catch (error) {
                     console.error('Failed to toggle debug mode:', error);
                     // Revert on error
                     setDebugMode(!enabled);
+                    setDebugModeUserOverride(false);
                   }
                 }}
                 size="small"

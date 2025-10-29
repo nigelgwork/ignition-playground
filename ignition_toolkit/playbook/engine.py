@@ -524,3 +524,12 @@ class PlaybookEngine:
             Current execution state or None
         """
         return self._current_execution
+
+    def get_total_steps(self) -> int:
+        """
+        Get total number of steps in current playbook
+
+        Returns:
+            Number of steps, or 0 if no playbook loaded
+        """
+        return len(self._current_playbook.steps) if self._current_playbook else 0

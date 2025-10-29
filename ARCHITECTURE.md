@@ -1,11 +1,546 @@
-# Architecture Decision Records (ADRs)
+# Architecture Documentation
 
-**Last Updated:** 2025-10-24
-**Version:** 1.0.3
+**Project:** Ignition Automation Toolkit
+**Last Updated:** 2025-10-27
+**Version:** 3.0.0
 
-This document captures key architectural decisions for the Ignition Automation Toolkit. Each decision is documented with context, rationale, and consequences.
+This document provides comprehensive architecture documentation including system design, component interactions, data flow, and key architectural decisions (ADRs).
 
 ---
+
+## Table of Contents
+
+1. [System Architecture Overview](#system-architecture-overview)
+2. [Technology Stack](#technology-stack)
+3. [Component Architecture](#component-architecture)
+4. [Data Flow](#data-flow)
+5. [Security Architecture](#security-architecture)
+6. [Architectural Decision Records (ADRs)](#architectural-decision-records-adrs)
+
+---
+
+## System Architecture Overview
+
+The Ignition Automation Toolkit is a **visual acceptance testing platform** for Ignition SCADA with three main architectural layers:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                     Frontend (React 19 + TypeScript)            │
+│  ┌────────────────┐  ┌────────────────┐  ┌────────────────┐   │
+│  │   Playbooks    │  │  Executions    │  │  Credentials   │   │
+│  │     Page       │  │     Page       │  │     Page       │   │
+│  └────────────────┘  └────────────────┘  └────────────────┘   │
+│         │                    │                    │             │
+│         └────────────────────┼────────────────────┘             │
+│                              │                                   │
+│                    WebSocket + REST API                          │
+└──────────────────────────────┼──────────────────────────────────┘
+                               │
+┌──────────────────────────────┼──────────────────────────────────┐
+│              Backend (Python 3.10+ / FastAPI)                    │
+│  ┌────────────────┐  ┌────────────────┐  ┌────────────────┐   │
+│  │   API Layer    │  │ Execution      │  │   Browser      │   │
+│  │  (6 Routers)   │  │   Engine       │  │   Manager      │   │
+│  └────────────────┘  └────────────────┘  └────────────────┘   │
+│         │                    │                    │             │
+│         │           ┌────────┼────────┐           │             │
+│         │           │                 │           │             │
+│  ┌────────────────┐ │  ┌─────────────────────┐   │             │
+│  │   Gateway      │ │  │   Playbook          │   │             │
+│  │   Client       │ │  │   Loader/Resolver   │   │             │
+│  └────────────────┘ │  └─────────────────────┘   │             │
+│         │           │                             │             │
+└─────────┼───────────┼─────────────────────────────┼─────────────┘
+          │           │                             │
+┌─────────┼───────────┼─────────────────────────────┼─────────────┐
+│                      Storage Layer                               │
+│  ┌────────────────┐  ┌────────────────┐  ┌────────────────┐   │
+│  │    SQLite      │  │  Credential    │  │   Playbook     │   │
+│  │   Database     │  │     Vault      │  │   Library      │   │
+│  │  (Executions)  │  │  (Encrypted)   │  │    (YAML)      │   │
+│  └────────────────┘  └────────────────┘  └────────────────┘   │
+└──────────────────────────────────────────────────────────────────┘
+          │                     │                    │
+┌─────────┼─────────────────────┼────────────────────┼─────────────┐
+│                      External Systems                            │
+│  ┌────────────────┐  ┌────────────────┐  ┌────────────────┐   │
+│  │   Ignition     │  │   Perspective  │  │  Anthropic     │   │
+│  │   Gateway      │  │   Web Client   │  │   Claude API   │   │
+│  │  (REST API)    │  │   (Browser)    │  │  (Optional)    │   │
+│  └────────────────┘  └────────────────┘  └────────────────┘   │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+### Key Architectural Characteristics
+
+1. **Domain Separation** - Gateway, Perspective, and Designer playbooks are kept separate
+2. **Visual Feedback** - Real-time browser streaming (2 FPS) during Perspective tests
+3. **Async-First** - Python asyncio throughout for I/O operations
+4. **Type-Safe** - TypeScript frontend, Python type hints backend
+5. **Modular** - Pluggable step executors, composable playbooks
+6. **Secure** - Fernet-encrypted credentials, never in playbooks or git
+
+---
+
+## Technology Stack
+
+### Backend Stack
+
+| Component | Technology | Version | Purpose |
+|-----------|------------|---------|---------|
+| **Runtime** | Python | 3.10+ | Core language |
+| **Web Framework** | FastAPI | 0.115.0+ | REST API + WebSocket |
+| **HTTP Client** | httpx | 0.27.0+ | Async Gateway API calls |
+| **Browser Automation** | Playwright | 1.49.0+ | Perspective testing |
+| **Database** | SQLite + SQLAlchemy | 2.0.35+ | Execution history |
+| **Encryption** | cryptography (Fernet) | 44.0.0+ | Credential vault |
+| **Playbook Parser** | PyYAML | 6.0.2+ | YAML parsing |
+| **Data Validation** | Pydantic | 2.10.0+ | Type-safe models |
+| **CLI Framework** | Click + Rich | 8.1.7+ / 13.9.0+ | Command-line interface |
+| **WebSocket** | websockets | 14.0+ | Real-time updates |
+| **AI (Optional)** | Anthropic SDK | 0.42.0+ | Claude integration |
+
+### Frontend Stack
+
+| Component | Technology | Version | Purpose |
+|-----------|------------|---------|---------|
+| **UI Framework** | React | 19.1.1 | Component-based UI |
+| **Language** | TypeScript | 5.9.3 | Type-safe JavaScript |
+| **UI Library** | Material-UI (MUI) | 7.3.4 | Professional components |
+| **Routing** | React Router | 7.9.4 | Client-side navigation |
+| **State Management** | Zustand | 5.0.8 | Global state |
+| **Data Fetching** | TanStack Query | 5.90.5 | Server state |
+| **Code Editor** | Monaco Editor | 4.7.0 | YAML editing |
+| **Terminal** | xterm.js | 5.3.0 | Claude Code terminal |
+| **Build Tool** | Vite | 7.1.7 | Fast dev server + bundler |
+| **Drag & Drop** | dnd-kit | 6.3.1 / 10.0.0 | Reordering UI |
+
+### Storage Layer
+
+| Component | Technology | Purpose |
+|-----------|------------|---------|
+| **Execution History** | SQLite (data/toolkit.db) | Step results, execution state |
+| **Credentials** | Encrypted JSON (~/.ignition-toolkit/credentials.vault) | Fernet-encrypted passwords |
+| **Playbooks** | YAML (playbooks/ directory) | Playbook definitions |
+| **UI State** | localStorage (browser) | Theme, saved configs |
+
+---
+
+## Component Architecture
+
+### 1. Frontend Architecture (React 19)
+
+```
+frontend/src/
+├── pages/                    # Top-level pages
+│   ├── Playbooks.tsx         # Playbook library management
+│   ├── Executions.tsx        # Live execution monitoring
+│   └── Credentials.tsx       # Credential management
+│
+├── components/               # Reusable UI components
+│   ├── PlaybookCard.tsx      # Playbook display card
+│   ├── ExecutionStepper.tsx  # Step-by-step progress
+│   ├── BrowserView.tsx       # Live browser feed (2 FPS)
+│   ├── ParameterInput.tsx    # Dynamic parameter forms
+│   └── CredentialForm.tsx    # Credential creation
+│
+├── hooks/                    # Custom React hooks
+│   ├── useWebSocket.ts       # WebSocket connection + events
+│   ├── useExecution.ts       # Execution state management
+│   └── usePlaybooks.ts       # Playbook data fetching
+│
+├── store/                    # Zustand global state
+│   └── store.ts              # Theme, app-wide state
+│
+├── api/                      # API client
+│   └── client.ts             # Fetch wrapper for REST API
+│
+└── App.tsx                   # Root component + routing
+```
+
+**Key Frontend Patterns:**
+
+- **Component Composition** - Nested components (PlaybookCard → ExecutionStepper → StepItem)
+- **Hooks for Logic** - Custom hooks separate concerns (data fetching, WebSocket, execution)
+- **Material-UI Theme** - Custom Warp Terminal-inspired dark theme
+- **Real-Time Updates** - WebSocket hooks trigger React state updates
+- **Type Safety** - TypeScript interfaces for all API responses
+
+### 2. Backend Architecture (FastAPI)
+
+```
+ignition_toolkit/
+├── api/                      # FastAPI application
+│   ├── app.py                # Core FastAPI app (190 lines, 92% reduction)
+│   └── routers/              # Modular routers (ADR-012)
+│       ├── health.py         # Health check endpoints
+│       ├── playbooks.py      # Playbook CRUD operations
+│       ├── executions.py     # Execution control + monitoring
+│       ├── credentials.py    # Credential CRUD operations
+│       ├── ai.py             # AI assistant endpoints
+│       ├── websockets.py     # WebSocket endpoints + broadcast
+│       └── models.py         # Shared Pydantic models
+│
+├── playbook/                 # Playbook execution engine
+│   ├── loader.py             # YAML parser + validation
+│   ├── resolver.py           # Parameter resolution ({{ parameter.x }})
+│   ├── executor.py           # Step execution coordinator
+│   ├── engine.py             # Main execution engine
+│   └── state.py              # Pause/resume/skip state manager
+│
+├── gateway/                  # Gateway REST API client
+│   ├── client.py             # Async httpx client
+│   ├── models.py             # Gateway data models (Module, Project, etc.)
+│   └── operations.py         # Gateway operations (upload, restart, etc.)
+│
+├── browser/                  # Browser automation (Playwright)
+│   ├── manager.py            # Browser lifecycle management
+│   └── recorder.py           # Screenshot capture
+│
+├── credentials/              # Credential management
+│   ├── vault.py              # Fernet encryption/decryption
+│   └── models.py             # Credential data models
+│
+├── storage/                  # SQLite database
+│   ├── database.py           # SQLAlchemy setup + session management
+│   └── models.py             # ORM models (ExecutionModel, StepResultModel)
+│
+├── ai/                       # AI assistant (optional)
+│   ├── assistant.py          # Claude API integration
+│   └── prompts.py            # Prompt templates
+│
+└── cli/                      # Command-line interface
+    └── main.py               # Click CLI commands (init, credential, serve)
+```
+
+**Key Backend Patterns:**
+
+- **Async/Await** - All I/O operations are async (httpx, Playwright, SQLite via aiosqlite)
+- **Dependency Injection** - Functions access global state via `get_X()` factories
+- **Type Hints** - Every function parameter and return type is annotated
+- **Context Managers** - Database sessions, browser contexts use `async with`
+- **Domain Separation** - Step executors organized by domain (gateway/, browser/)
+
+### 3. Execution Engine Architecture
+
+The playbook execution engine is the core of the system:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                      Execution Request                           │
+│  { playbook_path, parameters, debug_mode, paused }               │
+└───────────────────────────────┬─────────────────────────────────┘
+                                │
+                                ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                    Playbook Loader (loader.py)                   │
+│  • Parse YAML                                                    │
+│  • Validate schema                                               │
+│  • Check for syntax errors                                       │
+└───────────────────────────────┬─────────────────────────────────┘
+                                │
+                                ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                 Parameter Resolver (resolver.py)                 │
+│  • Resolve {{ parameter.X }}                                     │
+│  • Resolve {{ credential.Y.password }}                           │
+│  • Substitute environment variables                              │
+└───────────────────────────────┬─────────────────────────────────┘
+                                │
+                                ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                   Execution Engine (engine.py)                   │
+│  • Create execution record in SQLite                             │
+│  • Initialize domain context (Gateway client OR Browser)         │
+│  • Iterate through steps                                         │
+│  • Handle pause/resume/skip via state manager                    │
+│  • Broadcast WebSocket updates after each step                   │
+└───────────────────────────────┬─────────────────────────────────┘
+                                │
+                 ┌──────────────┴──────────────┐
+                 │                             │
+                 ▼                             ▼
+┌────────────────────────────┐  ┌────────────────────────────────┐
+│   Gateway Step Executor    │  │   Browser Step Executor        │
+│  (gateway/ operations)     │  │   (browser/ operations)        │
+│  • gateway.login           │  │   • browser.navigate           │
+│  • gateway.upload_module   │  │   • browser.click              │
+│  • gateway.restart         │  │   • browser.fill               │
+│  • gateway.list_modules    │  │   • browser.verify             │
+└────────────────────────────┘  └────────────────────────────────┘
+                 │                             │
+                 └──────────────┬──────────────┘
+                                │
+                                ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                   Step Result Recording                          │
+│  • Save to SQLite (step_results table)                           │
+│  • Store success/failure, duration, output, error                │
+│  • Capture screenshots (browser steps)                           │
+└───────────────────────────────┬─────────────────────────────────┘
+                                │
+                                ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                   WebSocket Broadcast                            │
+│  • Broadcast step_completed event to all connected clients       │
+│  • Frontend updates UI in real-time                              │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**Key Execution Features:**
+
+1. **Domain Context Management** - Gateway client OR Browser, never both
+2. **State Management** - Pause/resume/skip handled by state manager
+3. **Real-Time Updates** - WebSocket broadcasts after each step
+4. **Error Handling** - on_failure: abort/continue/skip
+5. **Screenshot Capture** - Automatic screenshots for browser steps
+6. **Composability** - playbook.run step type for nested playbooks
+
+---
+
+## Data Flow
+
+### 1. Playbook Execution Flow
+
+```
+User clicks "Run" in UI
+         │
+         ▼
+POST /api/executions/start
+  { playbook_path: "gateway/module_upgrade.yaml",
+    parameters: { gateway_url: "http://localhost:8088", ... },
+    debug_mode: false }
+         │
+         ▼
+Backend creates execution record (SQLite)
+  execution_id: "abc123..."
+  status: "running"
+         │
+         ▼
+Engine starts async task
+  • Load YAML playbook
+  • Resolve parameters ({{ parameter.gateway_url }})
+  • Resolve credentials ({{ credential.admin.password }})
+  • Initialize Gateway client OR Browser
+         │
+         ▼
+For each step in playbook:
+  ┌─────────────────────────────┐
+  │ Execute step                │
+  │  • gateway.login            │
+  │  • gateway.upload_module    │
+  │  • browser.navigate         │
+  │  • etc.                     │
+  └──────────────┬──────────────┘
+                 │
+                 ▼
+  ┌─────────────────────────────┐
+  │ Save step result (SQLite)   │
+  │  • success/failure          │
+  │  • duration                 │
+  │  • output/error             │
+  │  • screenshot (if browser)  │
+  └──────────────┬──────────────┘
+                 │
+                 ▼
+  ┌─────────────────────────────┐
+  │ WebSocket broadcast         │
+  │  event: "step_completed"    │
+  │  data: { step_id,           │
+  │          status,            │
+  │          output }           │
+  └──────────────┬──────────────┘
+                 │
+                 ▼
+  ┌─────────────────────────────┐
+  │ Frontend updates UI         │
+  │  • Update ExecutionStepper  │
+  │  • Show step output         │
+  │  • Display screenshot       │
+  └─────────────────────────────┘
+         │
+         ▼
+Execution completes
+  • Update execution status: "completed"
+  • Broadcast execution_completed event
+  • Clean up resources (close browser, Gateway client)
+```
+
+### 2. Real-Time Browser Streaming Flow
+
+```
+Browser step executes (browser.navigate, browser.click, etc.)
+         │
+         ▼
+Browser Manager captures screenshot (Playwright)
+         │
+         ▼
+Screenshot saved to: data/screenshots/{execution_id}/{step_id}.png
+         │
+         ▼
+WebSocket broadcast: "browser_frame" event
+  { execution_id, screenshot_url }
+         │
+         ▼
+Frontend receives WebSocket event
+         │
+         ▼
+BrowserView component updates <img> src
+         │
+         ▼
+User sees live browser feed (2 FPS)
+```
+
+### 3. Credential Flow
+
+```
+User creates credential (Web UI or CLI)
+         │
+         ▼
+POST /api/credentials
+  { name: "gateway_admin",
+    username: "admin",
+    password: "password123" }
+         │
+         ▼
+Backend encrypts password (Fernet)
+  encrypted_password = fernet.encrypt(b"password123")
+         │
+         ▼
+Save to vault file: ~/.ignition-toolkit/credentials.vault
+  {
+    "gateway_admin": {
+      "username": "admin",
+      "password": "gAAAAABh..." (encrypted)
+    }
+  }
+         │
+         ▼
+During playbook execution:
+  • Resolve {{ credential.gateway_admin.password }}
+  • Decrypt password using Fernet
+  • Use in Gateway API or browser automation
+  • Never logged or stored in plaintext
+```
+
+---
+
+## Security Architecture
+
+### Threat Model
+
+**Assets to Protect:**
+1. Gateway admin credentials
+2. Perspective user credentials
+3. Execution history (may contain sensitive data)
+4. Playbook definitions (may reference sensitive systems)
+
+**Attack Vectors:**
+1. Credential theft from storage
+2. Credential leakage in logs or exports
+3. Unauthorized API access
+4. Code injection via playbook YAML
+
+### Security Controls
+
+#### 1. Credential Encryption (Fernet)
+
+```python
+# Encryption at rest
+from cryptography.fernet import Fernet
+
+key = Fernet.generate_key()  # Stored in ~/.ignition-toolkit/
+fernet = Fernet(key)
+
+# Encrypt
+encrypted = fernet.encrypt(b"password123")
+# Result: b'gAAAAABh...' (AES-128-CBC + HMAC)
+
+# Decrypt (only when needed)
+decrypted = fernet.decrypt(encrypted)
+```
+
+**Security Properties:**
+- **AES-128 in CBC mode** - Industry-standard encryption
+- **HMAC authentication** - Prevents tampering
+- **Key storage** - Separate from vault file (~/.ignition-toolkit/)
+- **No plaintext** - Passwords never stored in plaintext
+
+#### 2. Credential Export Stripping
+
+```python
+# When exporting playbook to JSON
+def export_playbook(playbook_path):
+    playbook = load_playbook(playbook_path)
+
+    # Strip credential references
+    if "credentials" in playbook:
+        playbook["credentials"] = []  # ← Removed
+
+    # Strip credential parameters
+    for step in playbook["steps"]:
+        if "{{ credential." in str(step["parameters"]):
+            # Replace with placeholder
+            step["parameters"]["password"] = "{{ CREDENTIAL_REQUIRED }}"
+
+    return json.dumps(playbook)
+```
+
+#### 3. Input Validation
+
+```python
+# Pydantic models validate all inputs
+class ExecutionRequest(BaseModel):
+    playbook_path: str  # Must be valid path
+    parameters: Dict[str, str]  # Type-checked
+    debug_mode: bool = False
+
+    @validator('playbook_path')
+    def validate_playbook_path(cls, v):
+        # Prevent directory traversal
+        if ".." in v or v.startswith("/"):
+            raise ValueError("Invalid playbook path")
+        return v
+```
+
+#### 4. API Authentication (Future)
+
+Currently, the API has no authentication (single-user local tool). For production deployment:
+
+```python
+# Future: Add API key authentication
+from fastapi import Security, HTTPException
+from fastapi.security.api_key import APIKeyHeader
+
+api_key_header = APIKeyHeader(name="X-API-Key")
+
+async def verify_api_key(api_key: str = Security(api_key_header)):
+    if api_key != os.getenv("API_KEY"):
+        raise HTTPException(status_code=403, detail="Invalid API key")
+    return api_key
+```
+
+#### 5. WebSocket Security
+
+```python
+# WebSocket connections are origin-restricted
+@app.websocket("/ws/{execution_id}")
+async def websocket_endpoint(websocket: WebSocket):
+    # Verify origin (production)
+    origin = websocket.headers.get("origin")
+    if origin not in ALLOWED_ORIGINS:
+        await websocket.close(code=403)
+        return
+
+    await websocket.accept()
+    # ...
+```
+
+---
+
+## Architectural Decision Records (ADRs)
+
+The following sections document key architectural decisions made during the project.
 
 ## ADR-001: Domain-Separated Playbooks
 

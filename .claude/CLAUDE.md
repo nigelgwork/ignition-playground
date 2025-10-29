@@ -331,7 +331,7 @@ git push origin main
 
 **Production Ready (v3.0.0)** - All 8 phases complete
 
-**Recently Completed (v1.0.4 - v2.2.0):**
+**Recently Completed (v1.0 - v3.0):**
 1. ✅ Live browser streaming at 2 FPS (v1.0.4)
 2. ✅ Interactive browser view with click detection (v1.0.26)
 3. ✅ AI chat interface for debugging paused executions (v1.0.26)
@@ -342,8 +342,10 @@ git push origin main
 8. ✅ Nested playbook execution (playbook.run) (v2.2.0)
 9. ✅ Delete playbook functionality (v2.2.0)
 10. ✅ Claude Code integration Phase 1 - Manual Launch (v2.2.0)
+11. ✅ Modular API router architecture - 92% code reduction (v3.0.0)
+12. ✅ React 19 + Material-UI v7 upgrade (v3.0.0)
 
-**Next Priorities (v2.3.0+):**
+**Next Priorities (v3.1.0+):**
 1. Claude Code integration Phase 2 - Embedded Terminal (see docs/CLAUDE_CODE_PHASE2_PLAN.md)
 2. One-click playbook duplication UI
 3. Dedicated YAML playbook editor with syntax highlighting

@@ -1,5 +1,5 @@
 name: "Backup Gateway"
-version: "4.0"
+version: "5.0"
 description: "Download a backup file from Ignition Gateway. The backup file will be saved to the configured download directory (default: ./data/downloads). Browser download handling is automatic via Playwright."
 
 parameters:
@@ -17,6 +17,11 @@ parameters:
     type: string
     required: true
     description: "Gateway admin password"
+
+  - name: download_path
+    type: string
+    required: false
+    description: "Custom download location (default: ./data/downloads)"
 
 steps:
   - id: step1
@@ -47,7 +52,7 @@ steps:
     name: "Step 4: Click Download Backup Button"
     type: browser.click
     parameters:
-      selector: "button:has-text('Download'), button:has-text('Backup'), button[class*='download'], button[class*='backup']"
+      selector: "button >> text=/download/i, button >> text=/backup/i, [role='button'] >> text=/download/i"
     timeout: 10
     on_failure: abort
 
@@ -55,8 +60,8 @@ steps:
     name: "Step 5: Wait for Download to Complete"
     type: utility.sleep
     parameters:
-      seconds: 5
-    timeout: 15
+      seconds: 15
+    timeout: 30
 
   - id: step6
     name: "Step 6: Backup Download Complete"

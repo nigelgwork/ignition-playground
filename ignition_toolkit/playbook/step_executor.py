@@ -480,9 +480,24 @@ class StepExecutor:
 
                 # Execute all steps in the nested playbook
                 nested_results = []
+                nested_screenshots = []  # Track screenshots from nested execution
+
                 for step in nested_playbook.steps:
                     logger.info(f"Executing nested step: {step.name}")
                     step_result = await child_executor.execute_step(step)
+
+                    # Extract screenshot paths from step result output
+                    if step_result.output and isinstance(step_result.output, dict):
+                        # Check for direct screenshot (browser.screenshot steps)
+                        screenshot = step_result.output.get("screenshot")
+                        if screenshot and isinstance(screenshot, str):
+                            nested_screenshots.append(screenshot)
+
+                        # Check for nested playbook screenshots (recursive)
+                        nested_playbook_screenshots = step_result.output.get("screenshots", [])
+                        if isinstance(nested_playbook_screenshots, list):
+                            nested_screenshots.extend(nested_playbook_screenshots)
+
                     # Store only JSON-serializable summary (not the full StepResult object)
                     nested_results.append({
                         "step_id": step.id,
@@ -490,12 +505,16 @@ class StepExecutor:
                         "status": step_result.status.value if hasattr(step_result.status, 'value') else str(step_result.status),
                     })
 
+                logger.info(f"Nested playbook '{playbook_path}' created {len(nested_screenshots)} screenshots")
+
                 return {
                     "playbook": playbook_path,
                     "status": "completed",
                     "steps_executed": len(nested_results),
                     # Return summary of nested steps (nested steps are tracked separately in execution log)
                     "steps": nested_results,
+                    # Track all screenshots created during nested execution (for cleanup on deletion)
+                    "screenshots": nested_screenshots,
                 }
 
             finally:

@@ -32,7 +32,6 @@ interface PlaybookExecutionDialogProps {
 }
 
 interface SavedConfig {
-  gatewayUrl: string;
   parameters: Record<string, string>;
   savedAt: string;
 }
@@ -43,7 +42,7 @@ function getSavedConfig(playbookPath: string): SavedConfig | null {
   return stored ? JSON.parse(stored) : null;
 }
 
-// Save config for a playbook
+// Save config for a playbook (only parameters, NOT gateway_url/username/password)
 function saveConfig(playbookPath: string, config: SavedConfig) {
   localStorage.setItem(`playbook_config_${playbookPath}`, JSON.stringify(config));
 }
@@ -95,9 +94,15 @@ export function PlaybookExecutionDialog({
     if (playbook) {
       const savedConfig = getSavedConfig(playbook.path);
 
+      // Always use global credential for gateway URL (never from saved config)
+      if (selectedCredential?.gateway_url) {
+        setGatewayUrl(selectedCredential.gateway_url);
+      } else {
+        setGatewayUrl('http://localhost:8088');
+      }
+
       if (savedConfig) {
-        // Load saved configuration
-        setGatewayUrl(savedConfig.gatewayUrl);
+        // Load saved configuration (only parameters, not gateway_url)
         setParameters(savedConfig.parameters);
         setConfigSaved(true);
       } else {
@@ -133,14 +138,6 @@ export function PlaybookExecutionDialog({
         }
 
         setParameters(defaultParams);
-
-        // Auto-fill gateway URL from selected credential
-        if (selectedCredential?.gateway_url) {
-          setGatewayUrl(selectedCredential.gateway_url);
-        } else {
-          setGatewayUrl('http://localhost:8088');
-        }
-
         setConfigSaved(false);
       }
     }
@@ -157,7 +154,6 @@ export function PlaybookExecutionDialog({
     if (!playbook) return;
 
     saveConfig(playbook.path, {
-      gatewayUrl,
       parameters,
       savedAt: new Date().toISOString(),
     });
@@ -183,7 +179,6 @@ export function PlaybookExecutionDialog({
 
     // Save config first
     saveConfig(playbook.path, {
-      gatewayUrl,
       parameters,
       savedAt: new Date().toISOString(),
     });
@@ -239,18 +234,18 @@ export function PlaybookExecutionDialog({
           </Alert>
         )}
 
-        {/* Gateway URL */}
+        {/* Gateway URL - Read-only, always from global credential */}
         <TextField
           label="Gateway URL"
           fullWidth
           value={gatewayUrl}
-          onChange={(e) => {
-            setGatewayUrl(e.target.value);
-            setConfigSaved(false);
-          }}
           placeholder="http://localhost:8088"
           sx={{ mb: 2 }}
-          helperText={selectedCredential?.gateway_url ? "Auto-filled from global credential" : "Ignition Gateway base URL"}
+          helperText={selectedCredential?.gateway_url ? "Auto-filled from global credential (read-only)" : "Set a global credential to specify Gateway URL"}
+          InputProps={{
+            readOnly: true,
+          }}
+          disabled={!selectedCredential}
         />
 
         {/* Parameter inputs - filter out gateway_url since it's shown above */}

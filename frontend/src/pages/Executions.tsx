@@ -2,7 +2,7 @@
  * Executions page - View execution history and real-time status
  */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Box,
   Typography,
@@ -46,6 +46,7 @@ import {
   Pending as PendingIcon,
   Cancel as SkippedIcon,
   Delete as DeleteIcon,
+  Refresh as RefreshIcon,
 } from '@mui/icons-material';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
@@ -115,11 +116,32 @@ export function Executions() {
     return new Date(timestamp).toLocaleString();
   };
 
+  // Helper function to calculate duration
+  const calculateDuration = (startedAt?: string | null, completedAt?: string | null): string => {
+    if (!startedAt) return '-';
+
+    const start = new Date(startedAt).getTime();
+    const end = completedAt ? new Date(completedAt).getTime() : Date.now();
+    const durationMs = end - start;
+
+    const seconds = Math.floor(durationMs / 1000);
+    const minutes = Math.floor(seconds / 60);
+    const hours = Math.floor(minutes / 60);
+
+    if (hours > 0) {
+      return `${hours}h ${minutes % 60}m`;
+    } else if (minutes > 0) {
+      return `${minutes}m ${seconds % 60}s`;
+    } else {
+      return `${seconds}s`;
+    }
+  };
+
   // Fetch executions from API
   const { data: executions = [], isLoading, error } = useQuery<ExecutionStatusResponse[]>({
     queryKey: ['executions'],
     queryFn: () => api.executions.list({ limit: 50 }),
-    refetchInterval: 5000, // Refetch every 5 seconds as fallback
+    refetchInterval: 2000, // Refetch every 2 seconds for more responsive updates
   });
 
   // Apply real-time updates from WebSocket to the execution list
@@ -138,6 +160,23 @@ export function Executions() {
     }
     return exec;
   });
+
+  // Trigger refetch when executions complete via WebSocket
+  useEffect(() => {
+    // Check if any WebSocket updates show completed/failed status
+    const shouldRefetch = Array.from(executionUpdates.values()).some(
+      update => update.status === 'completed' || update.status === 'failed'
+    );
+
+    if (shouldRefetch) {
+      // Debounce the refetch to avoid excessive calls
+      const timer = setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: ['executions'] });
+      }, 1000);
+
+      return () => clearTimeout(timer);
+    }
+  }, [executionUpdates, queryClient]);
 
   // Filter executions by status
   const filteredExecutions = statusFilter === 'all'
@@ -255,6 +294,13 @@ export function Executions() {
     deleteMutation.mutate(Array.from(selectedIds));
   };
 
+  // Handle manual refresh
+  const handleManualRefresh = () => {
+    queryClient.invalidateQueries({ queryKey: ['executions'] });
+    setSnackbarMessage('Executions list refreshed');
+    setSnackbarOpen(true);
+  };
+
   return (
     <Box sx={{ width: '100%', maxWidth: '100%' }}>
       <Typography variant="h4" gutterBottom>
@@ -265,31 +311,42 @@ export function Executions() {
         Monitor playbook execution status in real-time
       </Typography>
 
-      {/* Status Filter and Delete Button */}
+      {/* Status Filter, Refresh Button, and Delete Button */}
       <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <ToggleButtonGroup
-          value={statusFilter}
-          exclusive
-          onChange={(_, newFilter) => newFilter && setStatusFilter(newFilter)}
-          aria-label="Filter executions by status"
-          size="small"
-        >
-          <ToggleButton value="all" aria-label="Show all executions">
-            All ({updatedExecutions.length})
-          </ToggleButton>
-          <ToggleButton value="running" aria-label="Show running executions">
-            Running ({updatedExecutions.filter((e) => e.status === 'running').length})
-          </ToggleButton>
-          <ToggleButton value="paused" aria-label="Show paused executions">
-            Paused ({updatedExecutions.filter((e) => e.status === 'paused').length})
-          </ToggleButton>
-          <ToggleButton value="completed" aria-label="Show completed executions">
-            Completed ({updatedExecutions.filter((e) => e.status === 'completed').length})
-          </ToggleButton>
-          <ToggleButton value="failed" aria-label="Show failed executions">
-            Failed ({updatedExecutions.filter((e) => e.status === 'failed').length})
-          </ToggleButton>
-        </ToggleButtonGroup>
+        <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+          <ToggleButtonGroup
+            value={statusFilter}
+            exclusive
+            onChange={(_, newFilter) => newFilter && setStatusFilter(newFilter)}
+            aria-label="Filter executions by status"
+            size="small"
+          >
+            <ToggleButton value="all" aria-label="Show all executions">
+              All ({updatedExecutions.length})
+            </ToggleButton>
+            <ToggleButton value="running" aria-label="Show running executions">
+              Running ({updatedExecutions.filter((e) => e.status === 'running').length})
+            </ToggleButton>
+            <ToggleButton value="paused" aria-label="Show paused executions">
+              Paused ({updatedExecutions.filter((e) => e.status === 'paused').length})
+            </ToggleButton>
+            <ToggleButton value="completed" aria-label="Show completed executions">
+              Completed ({updatedExecutions.filter((e) => e.status === 'completed').length})
+            </ToggleButton>
+            <ToggleButton value="failed" aria-label="Show failed executions">
+              Failed ({updatedExecutions.filter((e) => e.status === 'failed').length})
+            </ToggleButton>
+          </ToggleButtonGroup>
+
+          <Button
+            variant="outlined"
+            startIcon={<RefreshIcon />}
+            onClick={handleManualRefresh}
+            size="small"
+          >
+            Refresh
+          </Button>
+        </Box>
 
         {selectedIds.size > 0 && (
           <Button
@@ -345,12 +402,12 @@ export function Executions() {
                   />
                 </TableCell>
                 <TableCell width="4%"></TableCell>
-                <TableCell width="17%">Playbook</TableCell>
-                <TableCell width="11%">Status</TableCell>
+                <TableCell width="18%">Playbook</TableCell>
+                <TableCell width="12%">Status</TableCell>
                 <TableCell width="12%">Progress</TableCell>
                 <TableCell width="16%">Started</TableCell>
-                <TableCell width="16%">Completed</TableCell>
-                <TableCell width="20%" align="right">Actions</TableCell>
+                <TableCell width="14%">Duration</TableCell>
+                <TableCell width="24%" align="right">Actions</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -404,7 +461,7 @@ export function Executions() {
                   </TableCell>
                   <TableCell>
                     <Typography variant="body2" color="text.secondary">
-                      {formatTimestamp(execution.completed_at)}
+                      {calculateDuration(execution.started_at, execution.completed_at)}
                     </Typography>
                   </TableCell>
                   <TableCell align="right">
@@ -472,9 +529,14 @@ export function Executions() {
                   <TableCell style={{ paddingBottom: 0, paddingTop: 0 }} colSpan={8}>
                     <Collapse in={isExpanded} timeout="auto" unmountOnExit>
                       <Box sx={{ margin: 2 }}>
-                        <Typography variant="h6" gutterBottom component="div">
-                          Step Details
-                        </Typography>
+                        <Box sx={{ mb: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <Typography variant="h6" component="div">
+                            Step Details
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary" sx={{ fontFamily: 'monospace' }}>
+                            ID: {execution.execution_id}
+                          </Typography>
+                        </Box>
                         {execution.step_results && execution.step_results.length > 0 ? (
                           <List dense>
                             {execution.step_results.map((step, index) => (

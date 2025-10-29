@@ -141,11 +141,22 @@ curl http://localhost:5000/health/detailed
 
 ## 📚 Documentation
 
+### Getting Started
 - [Getting Started Guide](docs/getting_started.md) - Installation and first steps
 - [Running Playbooks](docs/RUNNING_PLAYBOOKS.md) - Complete guide with examples
 - [Playbook Syntax](docs/playbook_syntax.md) - YAML reference and step types
+- [Playbook Best Practices](docs/PLAYBOOK_BEST_PRACTICES.md) - How to write good playbooks
+
+### Reference
+- [PACKAGES.md](PACKAGES.md) - Complete dependency tracking and versions
+- [ARCHITECTURE.md](ARCHITECTURE.md) - System architecture, design decisions (ADRs)
+- [PROJECT_GOALS.md](PROJECT_GOALS.md) - Project vision, use cases, goals
+
+### Development
 - [Testing Guide](docs/TESTING_GUIDE.md) - Test suite and coverage
 - [Versioning Guide](docs/VERSIONING_GUIDE.md) - Release management
+- [CI/CD Setup](docs/CI_CD_SETUP.md) - Continuous integration configuration
+- [ROADMAP.md](docs/ROADMAP.md) - Future features and priorities
 
 ## 🏗️ Architecture
 
@@ -218,8 +229,9 @@ ignition-playground/
 │   └── dist/                  # Built frontend (served by FastAPI)
 ├── tests/                     # Test suite (46 tests)
 ├── docs/                      # Documentation
+│   ├── design/                # Future feature designs
+│   └── archive/               # Historical documentation
 ├── .claude/                   # Claude Code instructions
-├── .refactor/                 # Refactoring documentation
 ├── CHANGELOG.md               # Version history
 ├── VERSION                    # Current version (3.0.0)
 └── pyproject.toml             # Package configuration

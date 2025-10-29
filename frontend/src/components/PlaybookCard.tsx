@@ -62,7 +62,6 @@ interface PlaybookCardProps {
 
 // Get saved config for preview
 interface SavedConfig {
-  gatewayUrl: string;
   parameters: Record<string, string>;
   savedAt: string;
 }
@@ -340,16 +339,18 @@ export function PlaybookCard({ playbook, onConfigure, onExecute, onExport, onVie
                 <Typography variant="caption" color="success.light" fontWeight="bold">
                   ✓ Configured
                 </Typography>
-                <Typography variant="caption" color="success.light" sx={{ display: 'block' }}>
-                  Gateway: {savedConfig.gatewayUrl}
-                </Typography>
+                {selectedCredential?.gateway_url && (
+                  <Typography variant="caption" color="success.light" sx={{ display: 'block' }}>
+                    Gateway: {selectedCredential.gateway_url}
+                  </Typography>
+                )}
                 {Object.keys(savedConfig.parameters).length > 0 && (
                   <Typography variant="caption" color="success.light" sx={{ display: 'block' }}>
                     {Object.keys(savedConfig.parameters).length} parameter(s) set
                   </Typography>
                 )}
               </Box>
-              <Tooltip title="Clear manual config (use global credential instead)">
+              <Tooltip title="Clear saved parameters">
                 <IconButton
                   size="small"
                   onClick={() => {

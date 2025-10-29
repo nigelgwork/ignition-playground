@@ -3,6 +3,7 @@
  * Reduces complexity of PlaybookExecutionDialog by extracting parameter rendering logic
  */
 
+import { useState } from 'react';
 import {
   FormControl,
   FormLabel,
@@ -10,8 +11,12 @@ import {
   MenuItem,
   TextField,
   Typography,
+  IconButton,
+  InputAdornment,
 } from '@mui/material';
+import FolderIcon from '@mui/icons-material/Folder';
 import type { ParameterInfo, CredentialInfo } from '../types/api';
+import FolderBrowserDialog from './FolderBrowserDialog';
 
 interface ParameterInputProps {
   parameter: ParameterInfo;
@@ -26,9 +31,17 @@ export function ParameterInput({
   credentials = [],
   onChange,
 }: ParameterInputProps) {
+  const [folderDialogOpen, setFolderDialogOpen] = useState(false);
+
   const handleChange = (newValue: string) => {
     onChange(parameter.name, newValue);
   };
+
+  // Detect if parameter is path-related
+  const isPathParameter = parameter.name.toLowerCase().includes('path') ||
+                          parameter.name.toLowerCase().includes('directory') ||
+                          parameter.name.toLowerCase().includes('folder') ||
+                          parameter.name.toLowerCase().includes('dir');
 
   return (
     <FormControl fullWidth>
@@ -70,17 +83,43 @@ export function ParameterInput({
           }}
         />
       ) : (
-        <TextField
-          id={`param-${parameter.name}`}
-          value={value || ''}
-          onChange={(e) => handleChange(e.target.value)}
-          placeholder={parameter.default || `Enter ${parameter.name}...`}
-          size="small"
-          fullWidth
-          inputProps={{
-            'aria-label': parameter.name,
-          }}
-        />
+        <>
+          <TextField
+            id={`param-${parameter.name}`}
+            value={value || ''}
+            onChange={(e) => handleChange(e.target.value)}
+            placeholder={parameter.default || `Enter ${parameter.name}...`}
+            size="small"
+            fullWidth
+            inputProps={{
+              'aria-label': parameter.name,
+            }}
+            InputProps={isPathParameter ? {
+              endAdornment: (
+                <InputAdornment position="end">
+                  <IconButton
+                    onClick={() => setFolderDialogOpen(true)}
+                    edge="end"
+                    size="small"
+                    sx={{ color: '#00ff00' }}
+                    title="Browse folders"
+                  >
+                    <FolderIcon />
+                  </IconButton>
+                </InputAdornment>
+              ),
+            } : undefined}
+          />
+
+          {isPathParameter && (
+            <FolderBrowserDialog
+              open={folderDialogOpen}
+              onClose={() => setFolderDialogOpen(false)}
+              onSelect={(selectedPath) => handleChange(selectedPath)}
+              initialPath={value || './data/downloads'}
+            />
+          )}
+        </>
       )}
 
       {parameter.description && (
