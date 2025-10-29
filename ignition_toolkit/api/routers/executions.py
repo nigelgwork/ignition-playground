@@ -536,13 +536,8 @@ async def cancel_execution(execution_id: str):
             if not task.done():
                 logger.info(f"Cancelling asyncio Task for execution {execution_id}")
                 task.cancel()
-                try:
-                    # Wait a moment for graceful cancellation
-                    await asyncio.wait_for(asyncio.shield(task), timeout=0.5)
-                except (asyncio.CancelledError, asyncio.TimeoutError):
-                    pass  # Expected - task was cancelled or still running
-                except Exception as e:
-                    logger.warning(f"Error during task cancellation: {e}")
+                # Don't wait for task completion - just cancel and return immediately
+                # The task will handle CancelledError in its exception handler
 
         # Mark completion time for TTL cleanup
         engine_completion_times[execution_id] = datetime.now()
