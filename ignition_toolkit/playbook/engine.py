@@ -178,6 +178,10 @@ class PlaybookEngine:
                 variables=execution_state.variables,
             )
 
+            # Extract download_path parameter if present (supports local/network paths)
+            download_path = parameters.get("download_path")
+            downloads_dir = Path(download_path) if download_path else None
+
             # Create browser manager with screenshot streaming if callback provided
             if self.screenshot_callback:
                 # Create screenshot callback that includes execution_id
@@ -187,6 +191,7 @@ class PlaybookEngine:
                 browser_manager = BrowserManager(
                     headless=True,  # Headless mode with screenshot streaming for embedded view
                     screenshot_callback=screenshot_frame_callback,
+                    downloads_dir=downloads_dir,
                 )
                 await browser_manager.start()
                 await browser_manager.start_screenshot_streaming()

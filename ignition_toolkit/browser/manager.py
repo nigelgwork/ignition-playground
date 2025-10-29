@@ -102,11 +102,13 @@ class BrowserManager:
             viewport={"width": 1920, "height": 1080},
             ignore_https_errors=True,
             accept_downloads=True,
-            downloads_path=str(self.downloads_dir),
         )
 
         # Create page
         self._page = await self._context.new_page()
+
+        # Set up download handler to save to custom location
+        self._page.on("download", lambda download: asyncio.create_task(self._handle_download(download)))
 
         logger.info("Browser started successfully")
 
@@ -369,3 +371,21 @@ class BrowserManager:
                 logger.error(f"Error in screenshot streaming: {e}")
                 # Continue streaming despite errors
                 await asyncio.sleep(frame_interval)
+
+    async def _handle_download(self, download) -> None:
+        """
+        Handle download events and save to custom downloads directory
+
+        Args:
+            download: Playwright Download object
+        """
+        try:
+            # Get suggested filename
+            filename = download.suggested_filename
+            save_path = self.downloads_dir / filename
+
+            # Save download to custom location
+            await download.save_as(str(save_path))
+            logger.info(f"Download saved to: {save_path}")
+        except Exception as e:
+            logger.error(f"Error saving download: {e}")
