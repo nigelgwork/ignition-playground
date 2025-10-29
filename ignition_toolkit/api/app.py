@@ -76,6 +76,7 @@ app.add_middleware(
 
 # Global state
 active_engines: dict[str, PlaybookEngine] = {}
+active_tasks: dict[str, "asyncio.Task"] = {}  # Track asyncio Tasks for proper cancellation
 engine_completion_times: dict[str, datetime] = {}  # Track when engines completed for TTL cleanup
 websocket_connections: list[WebSocket] = []
 claude_code_processes: dict[str, subprocess.Popen] = (

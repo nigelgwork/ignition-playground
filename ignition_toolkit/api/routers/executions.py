@@ -34,6 +34,13 @@ def get_active_engines():
     return active_engines
 
 
+def get_active_tasks():
+    """Get shared active tasks dict from app"""
+    from ignition_toolkit.api.app import active_tasks
+
+    return active_tasks
+
+
 def get_engine_completion_times():
     """Get shared engine completion times dict from app"""
     from ignition_toolkit.api.app import engine_completion_times
@@ -67,6 +74,7 @@ class PlaybookCodeUpdateRequest(BaseModel):
 async def cleanup_old_executions():
     """Remove completed executions older than TTL from memory"""
     active_engines = get_active_engines()
+    active_tasks = get_active_tasks()
     engine_completion_times = get_engine_completion_times()
     ttl_minutes = get_execution_ttl_minutes()
 
@@ -82,6 +90,8 @@ async def cleanup_old_executions():
         if exec_id in active_engines:
             logger.info(f"Removing execution {exec_id} (TTL expired)")
             del active_engines[exec_id]
+        if exec_id in active_tasks:
+            del active_tasks[exec_id]
         del engine_completion_times[exec_id]
 
     if to_remove:
@@ -217,6 +227,7 @@ async def start_execution(request: ExecutionRequest, background_tasks: Backgroun
 
         # Start execution in background
         async def run_execution():
+            start_time = datetime.now()
             try:
                 if gateway_client:
                     await gateway_client.__aenter__()
@@ -237,16 +248,55 @@ async def start_execution(request: ExecutionRequest, background_tasks: Backgroun
                 engine_completion_times = get_engine_completion_times()
                 engine_completion_times[execution_id] = datetime.now()
 
+            except asyncio.CancelledError:
+                logger.warning(f"Execution {execution_id} was cancelled")
+                # Mark completion time even for cancelled executions
+                engine_completion_times = get_engine_completion_times()
+                engine_completion_times[execution_id] = datetime.now()
+                raise  # Re-raise to properly handle cancellation
             except Exception as e:
                 logger.exception(f"Error in execution {execution_id}: {e}")
+                # Mark completion time for failed executions
+                engine_completion_times = get_engine_completion_times()
+                engine_completion_times[execution_id] = datetime.now()
             finally:
                 if gateway_client:
                     await gateway_client.__aexit__(None, None, None)
+                # Clean up task reference
+                active_tasks = get_active_tasks()
+                if execution_id in active_tasks:
+                    del active_tasks[execution_id]
 
-        background_tasks.add_task(run_execution)
+        # Create asyncio Task for proper cancellation support
+        import asyncio
 
-        # Schedule cleanup task
+        task = asyncio.create_task(run_execution())
+
+        # Store task for cancellation
+        active_tasks = get_active_tasks()
+        active_tasks[execution_id] = task
+
+        # Schedule cleanup task in background
         background_tasks.add_task(cleanup_old_executions)
+
+        # Add timeout watchdog for auto-cancel after 1 hour
+        async def timeout_watchdog():
+            """Cancel execution if it runs longer than 1 hour"""
+            try:
+                await asyncio.sleep(3600)  # 1 hour = 3600 seconds
+                if not task.done():
+                    logger.warning(
+                        f"Execution {execution_id} exceeded 1 hour timeout - auto-cancelling"
+                    )
+                    await engine.cancel()
+                    task.cancel()
+            except asyncio.CancelledError:
+                pass  # Watchdog cancelled (normal if execution finishes)
+            except Exception as e:
+                logger.exception(f"Error in timeout watchdog for {execution_id}: {e}")
+
+        # Start watchdog in background
+        asyncio.create_task(timeout_watchdog())
 
         return ExecutionResponse(
             execution_id=execution_id,
@@ -467,18 +517,38 @@ async def skip_back_step(execution_id: str):
 @router.post("/{execution_id}/cancel")
 async def cancel_execution(execution_id: str):
     """Cancel execution"""
+    import asyncio
+
     active_engines = get_active_engines()
+    active_tasks = get_active_tasks()
     engine_completion_times = get_engine_completion_times()
 
     if execution_id not in active_engines:
         raise HTTPException(status_code=404, detail=f"Execution {execution_id} not found")
 
     engine = active_engines[execution_id]
+
+    # Set the cancel signal in the engine
     await engine.cancel()
+
+    # Also cancel the asyncio Task to immediately interrupt execution
+    if execution_id in active_tasks:
+        task = active_tasks[execution_id]
+        if not task.done():
+            logger.info(f"Cancelling asyncio Task for execution {execution_id}")
+            task.cancel()
+            try:
+                # Wait a moment for graceful cancellation
+                await asyncio.wait_for(asyncio.shield(task), timeout=0.5)
+            except (asyncio.CancelledError, asyncio.TimeoutError):
+                pass  # Expected - task was cancelled or still running
+            except Exception as e:
+                logger.warning(f"Error during task cancellation: {e}")
 
     # Mark completion time for TTL cleanup
     engine_completion_times[execution_id] = datetime.now()
 
+    logger.info(f"Execution {execution_id} cancellation requested successfully")
     return {"message": "Execution cancelled", "execution_id": execution_id}
 
 
