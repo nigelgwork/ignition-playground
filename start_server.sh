@@ -29,11 +29,12 @@ export PLAYWRIGHT_BROWSERS_PATH=/git/ignition-playground/data/.playwright-browse
 
 echo "✅ Pre-flight checks passed"
 echo "🚀 Starting server on http://0.0.0.0:5000"
-echo "📝 Auto-reload enabled (--reload flag)"
+echo "📝 Auto-reload DISABLED for stable operation"
 echo ""
 echo "Press CTRL+C to stop the server"
 echo "=========================================="
 echo ""
 
-# Start the server
-exec ./venv/bin/uvicorn ignition_toolkit.api.app:app --host 0.0.0.0 --port 5000 --reload
+# Start the server WITHOUT auto-reload for stable operation during testing
+# Use ./restart_server.sh to apply code changes
+exec ./venv/bin/uvicorn ignition_toolkit.api.app:app --host 0.0.0.0 --port 5000
