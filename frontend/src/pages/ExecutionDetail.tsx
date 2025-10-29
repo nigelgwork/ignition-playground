@@ -227,8 +227,8 @@ export function ExecutionDetail() {
         <Box sx={{ flexGrow: 1 }}>
           <Typography variant="subtitle1" sx={{ fontSize: '0.95rem', fontWeight: 600, lineHeight: 1.3 }}>
             {execution.playbook_name}
-            <Typography component="span" variant="caption" color="text.secondary" sx={{ ml: 1.5, fontSize: '0.7rem' }}>
-              ID: {executionId.slice(0, 8)}...
+            <Typography component="span" variant="caption" color="text.secondary" sx={{ ml: 1.5, fontSize: '0.7rem', fontFamily: 'monospace' }}>
+              ID: {executionId}
             </Typography>
           </Typography>
         </Box>

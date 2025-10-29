@@ -523,33 +523,64 @@ async def cancel_execution(execution_id: str):
     active_tasks = get_active_tasks()
     engine_completion_times = get_engine_completion_times()
 
-    if execution_id not in active_engines:
+    # Check if execution exists in active engines
+    if execution_id in active_engines:
+        engine = active_engines[execution_id]
+
+        # Set the cancel signal in the engine
+        await engine.cancel()
+
+        # Also cancel the asyncio Task to immediately interrupt execution
+        if execution_id in active_tasks:
+            task = active_tasks[execution_id]
+            if not task.done():
+                logger.info(f"Cancelling asyncio Task for execution {execution_id}")
+                task.cancel()
+                try:
+                    # Wait a moment for graceful cancellation
+                    await asyncio.wait_for(asyncio.shield(task), timeout=0.5)
+                except (asyncio.CancelledError, asyncio.TimeoutError):
+                    pass  # Expected - task was cancelled or still running
+                except Exception as e:
+                    logger.warning(f"Error during task cancellation: {e}")
+
+        # Mark completion time for TTL cleanup
+        engine_completion_times[execution_id] = datetime.now()
+
+        logger.info(f"Execution {execution_id} cancellation requested successfully")
+        return {"message": "Execution cancelled", "execution_id": execution_id}
+
+    # Execution not in memory - check if it exists in database (old execution from before server restart)
+    db = get_database()
+    if not db:
         raise HTTPException(status_code=404, detail=f"Execution {execution_id} not found")
 
-    engine = active_engines[execution_id]
+    with db.session_scope() as session:
+        from ignition_toolkit.storage import ExecutionModel
 
-    # Set the cancel signal in the engine
-    await engine.cancel()
+        execution = (
+            session.query(ExecutionModel)
+            .filter_by(execution_id=execution_id)
+            .first()
+        )
 
-    # Also cancel the asyncio Task to immediately interrupt execution
-    if execution_id in active_tasks:
-        task = active_tasks[execution_id]
-        if not task.done():
-            logger.info(f"Cancelling asyncio Task for execution {execution_id}")
-            task.cancel()
-            try:
-                # Wait a moment for graceful cancellation
-                await asyncio.wait_for(asyncio.shield(task), timeout=0.5)
-            except (asyncio.CancelledError, asyncio.TimeoutError):
-                pass  # Expected - task was cancelled or still running
-            except Exception as e:
-                logger.warning(f"Error during task cancellation: {e}")
+        if not execution:
+            raise HTTPException(status_code=404, detail=f"Execution {execution_id} not found")
 
-    # Mark completion time for TTL cleanup
-    engine_completion_times[execution_id] = datetime.now()
-
-    logger.info(f"Execution {execution_id} cancellation requested successfully")
-    return {"message": "Execution cancelled", "execution_id": execution_id}
+        # Mark old execution as cancelled in database
+        if execution.status in ["running", "paused"]:
+            logger.info(f"Cancelling database-only execution {execution_id} (started {execution.started_at})")
+            execution.status = "cancelled"
+            execution.completed_at = datetime.now()
+            execution.error_message = "Cancelled by user (execution was from before server restart)"
+            session.commit()
+            logger.info(f"Database-only execution {execution_id} marked as cancelled")
+            return {"message": "Execution marked as cancelled in database", "execution_id": execution_id}
+        else:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Execution {execution_id} has already completed with status: {execution.status}"
+            )
 
 
 @router.get("/{execution_id}/playbook/code")
