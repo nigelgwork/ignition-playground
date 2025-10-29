@@ -25,6 +25,13 @@ import {
   List,
   ListItem,
   ListItemText,
+  Checkbox,
+  Button,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogContentText,
+  DialogActions,
 } from '@mui/material';
 import {
   PlayArrow as PlayIcon,
@@ -38,6 +45,7 @@ import {
   Error as ErrorIcon,
   Pending as PendingIcon,
   Cancel as SkippedIcon,
+  Delete as DeleteIcon,
 } from '@mui/icons-material';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
@@ -54,6 +62,8 @@ export function Executions() {
   const [snackbarMessage, setSnackbarMessage] = useState('');
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
   const executionUpdates = useStore((state) => state.executionUpdates);
 
@@ -190,6 +200,61 @@ export function Executions() {
     },
   });
 
+  // Delete execution mutation
+  const deleteMutation = useMutation({
+    mutationFn: async (executionIds: string[]) => {
+      // Delete all selected executions in parallel
+      await Promise.all(executionIds.map(id => api.executions.delete(id)));
+      return executionIds.length;
+    },
+    onSuccess: (count) => {
+      queryClient.invalidateQueries({ queryKey: ['executions'] });
+      setSnackbarMessage(`${count} execution${count > 1 ? 's' : ''} deleted successfully`);
+      setSnackbarOpen(true);
+      setSelectedIds(new Set());
+      setDeleteDialogOpen(false);
+    },
+    onError: (error) => {
+      setSnackbarMessage(`Failed to delete: ${(error as Error).message}`);
+      setSnackbarOpen(true);
+      setDeleteDialogOpen(false);
+    },
+  });
+
+  // Toggle individual checkbox
+  const toggleSelection = (executionId: string) => {
+    setSelectedIds((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(executionId)) {
+        newSet.delete(executionId);
+      } else {
+        newSet.add(executionId);
+      }
+      return newSet;
+    });
+  };
+
+  // Toggle select all checkbox
+  const toggleSelectAll = () => {
+    if (selectedIds.size === filteredExecutions.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(filteredExecutions.map((e) => e.execution_id)));
+    }
+  };
+
+  // Handle delete button click
+  const handleDeleteClick = () => {
+    if (selectedIds.size > 0) {
+      setDeleteDialogOpen(true);
+    }
+  };
+
+  // Handle delete confirmation
+  const handleDeleteConfirm = () => {
+    deleteMutation.mutate(Array.from(selectedIds));
+  };
+
   return (
     <Box sx={{ width: '100%', maxWidth: '100%' }}>
       <Typography variant="h4" gutterBottom>
@@ -200,8 +265,8 @@ export function Executions() {
         Monitor playbook execution status in real-time
       </Typography>
 
-      {/* Status Filter */}
-      <Box sx={{ mb: 3 }}>
+      {/* Status Filter and Delete Button */}
+      <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <ToggleButtonGroup
           value={statusFilter}
           exclusive
@@ -225,6 +290,18 @@ export function Executions() {
             Failed ({updatedExecutions.filter((e) => e.status === 'failed').length})
           </ToggleButton>
         </ToggleButtonGroup>
+
+        {selectedIds.size > 0 && (
+          <Button
+            variant="contained"
+            color="error"
+            startIcon={<DeleteIcon />}
+            onClick={handleDeleteClick}
+            disabled={deleteMutation.isPending}
+          >
+            Delete Selected ({selectedIds.size})
+          </Button>
+        )}
       </Box>
 
       {/* Loading state */}
@@ -259,13 +336,21 @@ export function Executions() {
           <Table size="medium" sx={{ tableLayout: 'fixed', width: '100%' }}>
             <TableHead>
               <TableRow>
-                <TableCell width="5%"></TableCell>
-                <TableCell width="18%">Playbook</TableCell>
-                <TableCell width="12%">Status</TableCell>
-                <TableCell width="13%">Progress</TableCell>
-                <TableCell width="17%">Started</TableCell>
-                <TableCell width="17%">Completed</TableCell>
-                <TableCell width="18%" align="right">Actions</TableCell>
+                <TableCell width="4%" padding="checkbox">
+                  <Checkbox
+                    indeterminate={selectedIds.size > 0 && selectedIds.size < filteredExecutions.length}
+                    checked={filteredExecutions.length > 0 && selectedIds.size === filteredExecutions.length}
+                    onChange={toggleSelectAll}
+                    inputProps={{ 'aria-label': 'Select all executions' }}
+                  />
+                </TableCell>
+                <TableCell width="4%"></TableCell>
+                <TableCell width="17%">Playbook</TableCell>
+                <TableCell width="11%">Status</TableCell>
+                <TableCell width="12%">Progress</TableCell>
+                <TableCell width="16%">Started</TableCell>
+                <TableCell width="16%">Completed</TableCell>
+                <TableCell width="20%" align="right">Actions</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -277,6 +362,13 @@ export function Executions() {
                       key={execution.execution_id}
                       sx={{ '&:hover': { backgroundColor: 'action.hover' } }}
                     >
+                      <TableCell padding="checkbox">
+                        <Checkbox
+                          checked={selectedIds.has(execution.execution_id)}
+                          onChange={() => toggleSelection(execution.execution_id)}
+                          inputProps={{ 'aria-label': `Select ${execution.playbook_name}` }}
+                        />
+                      </TableCell>
                       <TableCell>
                         <IconButton
                           size="small"
@@ -377,7 +469,7 @@ export function Executions() {
                   </TableCell>
                 </TableRow>
                 <TableRow>
-                  <TableCell style={{ paddingBottom: 0, paddingTop: 0 }} colSpan={7}>
+                  <TableCell style={{ paddingBottom: 0, paddingTop: 0 }} colSpan={8}>
                     <Collapse in={isExpanded} timeout="auto" unmountOnExit>
                       <Box sx={{ margin: 2 }}>
                         <Typography variant="h6" gutterBottom component="div">
@@ -442,6 +534,32 @@ export function Executions() {
           </Table>
         </TableContainer>
       )}
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog
+        open={deleteDialogOpen}
+        onClose={() => setDeleteDialogOpen(false)}
+        aria-labelledby="delete-dialog-title"
+        aria-describedby="delete-dialog-description"
+      >
+        <DialogTitle id="delete-dialog-title">
+          Delete {selectedIds.size} Execution{selectedIds.size > 1 ? 's' : ''}?
+        </DialogTitle>
+        <DialogContent>
+          <DialogContentText id="delete-dialog-description">
+            This will permanently delete the selected execution{selectedIds.size > 1 ? 's' : ''} and all associated
+            screenshots. This action cannot be undone.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDeleteDialogOpen(false)} color="primary">
+            Cancel
+          </Button>
+          <Button onClick={handleDeleteConfirm} color="error" variant="contained" autoFocus>
+            Delete
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {/* Snackbar for notifications */}
       <Snackbar

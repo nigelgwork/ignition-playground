@@ -163,6 +163,12 @@ export const api = {
         { method: 'POST' }
       ),
 
+    delete: (executionId: string) =>
+      fetchJSON<{ message: string; execution_id: string; screenshots_deleted: number }>(
+        `/api/executions/${executionId}`,
+        { method: 'DELETE' }
+      ),
+
     // Debug mode
     enableDebug: (executionId: string) =>
       fetchJSON<{ status: string; execution_id: string }>(
