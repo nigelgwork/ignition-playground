@@ -455,21 +455,45 @@ class StepExecutor:
                 # Extract parameters for child playbook (remove 'playbook' key)
                 child_params = {k: v for k, v in params.items() if k != "playbook"}
 
-                # Execute nested playbook
-                # NOTE: This is a simplified version - in production we would create
-                # a full PlaybookEngine instance with proper state management
+                # Execute nested playbook using EXISTING browser and gateway from parent
+                # This allows browser context to persist across nested calls
                 logger.info(f"Executing nested playbook: {playbook_path}")
                 logger.info(f"Child parameters: {child_params}")
 
-                # For now, return a placeholder indicating nested execution
-                # Full implementation would require PlaybookEngine integration
+                # Create a child StepExecutor that shares browser and gateway from parent
+                from ignition_toolkit.playbook.resolver import ParameterResolver
+
+                child_resolver = ParameterResolver(
+                    parameters=child_params,
+                    variables={},
+                    credential_vault=self.parameter_resolver.credential_vault if self.parameter_resolver else None
+                )
+
+                child_executor = StepExecutor(
+                    gateway_client=self.gateway_client,  # Share parent's gateway client
+                    browser_manager=self.browser_manager,  # Share parent's browser manager
+                    parameter_resolver=child_resolver,
+                    base_path=self.base_path,
+                    state_manager=self.state_manager,
+                )
+                child_executor._execution_stack = self._execution_stack.copy()
+
+                # Execute all steps in the nested playbook
+                nested_results = []
+                for step in nested_playbook.steps:
+                    logger.info(f"Executing nested step: {step.name}")
+                    step_result = await child_executor.execute_step(step)
+                    nested_results.append({
+                        "step_id": step.id,
+                        "step_name": step.name,
+                        "result": step_result
+                    })
+
                 return {
                     "playbook": playbook_path,
-                    "status": "nested_execution_placeholder",
-                    "message": "Nested playbook execution not fully implemented yet",
-                    "verified": True,
-                    "parameters": child_params,
-                    "steps_count": len(nested_playbook.steps),
+                    "status": "completed",
+                    "steps_executed": len(nested_results),
+                    "results": nested_results,
                 }
 
             finally:
