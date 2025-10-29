@@ -461,7 +461,7 @@ class StepExecutor:
                 logger.info(f"Child parameters: {child_params}")
 
                 # Create a child StepExecutor that shares browser and gateway from parent
-                from ignition_toolkit.playbook.resolver import ParameterResolver
+                from ignition_toolkit.playbook.parameters import ParameterResolver
 
                 child_resolver = ParameterResolver(
                     parameters=child_params,
