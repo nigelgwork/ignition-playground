@@ -173,6 +173,8 @@ export function ExecutionDetail() {
         return <ErrorIcon color="error" />;
       case 'running':
         return <RunningIcon color="primary" />;
+      case 'cancelled':
+        return <SkippedIcon color="warning" />;
       case 'skipped':
         return <SkippedIcon color="warning" />;
       default:
@@ -188,6 +190,8 @@ export function ExecutionDetail() {
         return 'error';
       case 'running':
         return 'primary';
+      case 'cancelled':
+        return 'warning';
       case 'skipped':
         return 'warning';
       default:
