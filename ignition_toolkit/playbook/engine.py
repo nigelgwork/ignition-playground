@@ -299,6 +299,10 @@ class PlaybookEngine:
                         completed_at=datetime.now(),
                     )
                     execution_state.add_step_result(step_result)
+
+                    # Keep current_step_index synchronized - use step_index
+                    execution_state.current_step_index = step_index
+
                     self.state_manager.clear_skip()
                     await self._notify_update(execution_state)
                     if self.database:
@@ -312,6 +316,10 @@ class PlaybookEngine:
                 step_result = await executor.execute_step(step)
                 print(f"[ENGINE DEBUG] Step execution complete: {step.name} - status={step_result.status}", flush=True)
                 execution_state.add_step_result(step_result)
+
+                # Keep current_step_index synchronized - use step_index (0-based)
+                # Frontend displays (current_step_index + 1) to show "Step 1, Step 2" etc
+                execution_state.current_step_index = step_index
 
                 # Store step output for {{ step.step_id.key }} references
                 if step_result.output:
@@ -414,6 +422,8 @@ class PlaybookEngine:
             if browser_manager:
                 try:
                     await browser_manager.stop_screenshot_streaming()
+                    # Small delay to ensure streaming task fully stops before closing browser
+                    await asyncio.sleep(0.2)
                     await browser_manager.stop()
                     logger.info("Browser screenshot streaming stopped")
                 except Exception as e:
@@ -465,14 +475,19 @@ class PlaybookEngine:
         Args:
             execution_state: Current execution state
         """
+        print(f"[ENGINE] _notify_update called: status={execution_state.status.value}, current_step={execution_state.current_step_index}, steps={len(execution_state.step_results)}", flush=True)
         if self._update_callback:
             try:
                 if asyncio.iscoroutinefunction(self._update_callback):
                     await self._update_callback(execution_state)
+                    print(f"[ENGINE] Update callback completed", flush=True)
                 else:
                     self._update_callback(execution_state)
+                    print(f"[ENGINE] Update callback completed (sync)", flush=True)
             except Exception as e:
                 logger.exception(f"Error in update callback: {e}")
+        else:
+            print(f"[ENGINE] No update callback registered!", flush=True)
 
     async def _save_execution_start(
         self, execution_state: ExecutionState, playbook: Playbook, parameters: dict[str, Any]
@@ -488,7 +503,10 @@ class PlaybookEngine:
                     started_at=execution_state.started_at,
                     config_data=parameters,
                     playbook_version=playbook.version,
-                    execution_metadata={"debug_mode": self.state_manager.is_debug_mode_enabled()},
+                    execution_metadata={
+                        "debug_mode": self.state_manager.is_debug_mode_enabled(),
+                        "total_steps": len(playbook.steps),
+                    },
                 )
                 session.add(execution_model)
                 session.flush()  # Get the auto-generated ID

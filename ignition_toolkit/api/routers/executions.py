@@ -106,14 +106,12 @@ def get_execution_ttl_minutes():
     return get_execution_context().ttl_minutes
 
 
-async def get_engine_or_404(
-    execution_id: str = PathParam(..., description="Execution UUID")
-) -> PlaybookEngine:
+async def get_engine_or_404(execution_id: str) -> PlaybookEngine:
     """
     FastAPI dependency to retrieve active engine or raise 404
 
     Args:
-        execution_id: Execution UUID from path parameter
+        execution_id: Execution UUID from path parameter (shared with endpoint)
 
     Returns:
         Active PlaybookEngine instance
@@ -121,8 +119,17 @@ async def get_engine_or_404(
     Raises:
         HTTPException: 404 if execution not found or not active
     """
-    active_engines = get_active_engines()
-    engine = active_engines.get(execution_id)
+    # Lazy import to avoid circular dependency
+    from ignition_toolkit.api.app import app
+
+    # Use the new service layer architecture
+    if not hasattr(app.state, "services"):
+        raise HTTPException(
+            status_code=503,
+            detail="Application services not initialized",
+        )
+
+    engine = app.state.services.execution_manager.get_engine(execution_id)
 
     if engine is None:
         raise HTTPException(
@@ -131,6 +138,16 @@ async def get_engine_or_404(
         )
 
     return engine
+
+
+def get_execution_manager():
+    """Get ExecutionManager from service layer (lazy import to avoid circular dependency)"""
+    from ignition_toolkit.api.app import app
+
+    if not hasattr(app.state, "services"):
+        raise RuntimeError("Application services not initialized")
+
+    return app.state.services.execution_manager
 
 
 # ============================================================================
@@ -210,14 +227,37 @@ def _create_execution_status_from_db(
     Returns:
         ExecutionStatusResponse for API serialization
     """
+    # Get total_steps from metadata (stored when execution starts)
+    total_steps = db_exec.execution_metadata.get("total_steps", len(step_results)) if db_exec.execution_metadata else len(step_results)
+
+    # Calculate current_step_index:
+    # Engine uses 0-based indexing: when executing step 1, current_step_index = 0
+    # After completing N steps, the engine is at step_index = N (executing step N+1)
+    if db_exec.status in ["running", "paused"]:
+        # Currently executing or paused: show the step being executed
+        # If N steps completed, engine is on step_index = N
+        # BUT: if all steps are done (N >= total), cap at total-1 to avoid "Step 11 of 10"
+        completed_count = len(step_results)
+        if completed_count >= total_steps:
+            # All steps done but status not yet updated to completed
+            current_step_index = total_steps - 1 if total_steps > 0 else 0
+        else:
+            current_step_index = completed_count
+    elif db_exec.status == "completed":
+        # All steps completed - current_step_index is the last step (total - 1)
+        current_step_index = total_steps - 1 if total_steps > 0 else 0
+    else:
+        # pending, failed, cancelled - show last completed step or None
+        current_step_index = len(step_results) - 1 if step_results else None
+
     return ExecutionStatusResponse(
         execution_id=db_exec.execution_id,
         playbook_name=db_exec.playbook_name,
         status=db_exec.status,
         started_at=db_exec.started_at,
         completed_at=db_exec.completed_at,
-        current_step_index=len(step_results),
-        total_steps=len(step_results),
+        current_step_index=current_step_index,
+        total_steps=total_steps,
         error=db_exec.error_message,
         debug_mode=db_exec.execution_metadata.get("debug_mode", False) if db_exec.execution_metadata else False,
         step_results=step_results,
@@ -392,76 +432,6 @@ def apply_credential_autofill(
     return gateway_url, parameters
 
 
-def create_playbook_engine_with_callbacks(
-    gateway_url: str | None,
-) -> tuple[PlaybookEngine, "GatewayClient | None"]:
-    """
-    Create PlaybookEngine with all necessary dependencies and callbacks
-
-    Args:
-        gateway_url: Optional Gateway URL for client
-
-    Returns:
-        Tuple of (engine, gateway_client)
-    """
-    from ignition_toolkit.api.routers.websockets import (
-        broadcast_execution_state,
-        broadcast_screenshot_frame,
-    )
-    from ignition_toolkit.credentials import CredentialVault
-    from ignition_toolkit.gateway import GatewayClient
-
-    vault = CredentialVault()
-    database = get_database()
-
-    gateway_client = None
-    if gateway_url:
-        gateway_client = GatewayClient(gateway_url)
-
-    # Create screenshot callback for browser streaming
-    async def screenshot_callback(execution_id: str, screenshot_b64: str):
-        await broadcast_screenshot_frame(execution_id, screenshot_b64)
-
-    # Create engine with proper dependencies
-    engine = PlaybookEngine(
-        gateway_client=gateway_client,
-        credential_vault=vault,
-        database=database,
-        screenshot_callback=screenshot_callback,
-    )
-
-    # Set up WebSocket broadcast callback
-    async def broadcast_update(state: "ExecutionState"):
-        await broadcast_execution_state(state)
-
-    engine.set_update_callback(broadcast_update)
-
-    return engine, gateway_client
-
-
-async def broadcast_initial_execution_state(execution_id: str, playbook_name: str) -> None:
-    """
-    Broadcast initial execution state to WebSocket clients
-
-    Args:
-        execution_id: Execution UUID
-        playbook_name: Name of the playbook
-    """
-    from ignition_toolkit.api.routers.websockets import broadcast_execution_state
-    from ignition_toolkit.playbook.models import ExecutionState, ExecutionStatus
-
-    initial_state = ExecutionState(
-        execution_id=execution_id,
-        playbook_name=playbook_name,
-        status=ExecutionStatus.RUNNING,
-        current_step_index=None,
-        started_at=datetime.now(),
-        step_results=[],
-    )
-    await broadcast_execution_state(initial_state)
-    logger.info(f"Broadcasted initial state for execution {execution_id}")
-
-
 def create_execution_runner(
     engine: PlaybookEngine,
     playbook: "Playbook",
@@ -538,9 +508,6 @@ def create_execution_runner(
                         )
 
                         # Broadcast cancellation to WebSocket clients
-                        from ignition_toolkit.api.routers.websockets import (
-                            broadcast_execution_state,
-                        )
                         from ignition_toolkit.playbook.models import ExecutionStatus
 
                         # Get current execution state and update status
@@ -548,7 +515,10 @@ def create_execution_runner(
                         if execution_state:
                             execution_state.status = ExecutionStatus.CANCELLED
                             execution_state.completed_at = datetime.now()
-                            await broadcast_execution_state(execution_state)
+
+                            # Use WebSocketManager from app services
+                            websocket_manager = app.state.services.websocket_manager
+                            await websocket_manager.broadcast_execution_state(execution_state)
                             logger.info(
                                 f"Broadcasted cancellation status via WebSocket for {execution_id}"
                             )
@@ -1098,8 +1068,6 @@ async def delete_execution(execution_id: str):
 @router.post("/{execution_id}/debug/enable")
 async def enable_debug_mode(execution_id: str, engine: PlaybookEngine = Depends(get_engine_or_404)):
     """Enable debug mode for an active execution"""
-    from ignition_toolkit.api.routers.websockets import broadcast_execution_state
-
     engine.state_manager.enable_debug_mode()
 
     logger.info(f"Debug mode enabled for execution {execution_id}")
@@ -1107,7 +1075,9 @@ async def enable_debug_mode(execution_id: str, engine: PlaybookEngine = Depends(
     # Broadcast state update to WebSocket clients
     execution_state = engine.get_current_execution()
     if execution_state:
-        await broadcast_execution_state(execution_state)
+        # Use WebSocketManager from app services
+        websocket_manager = app.state.services.websocket_manager
+        await websocket_manager.broadcast_execution_state(execution_state)
 
     return {
         "status": "success",
@@ -1120,8 +1090,6 @@ async def enable_debug_mode(execution_id: str, engine: PlaybookEngine = Depends(
 @router.post("/{execution_id}/debug/disable")
 async def disable_debug_mode(execution_id: str, engine: PlaybookEngine = Depends(get_engine_or_404)):
     """Disable debug mode for an active execution"""
-    from ignition_toolkit.api.routers.websockets import broadcast_execution_state
-
     engine.state_manager.disable_debug_mode()
 
     logger.info(f"Debug mode disabled for execution {execution_id}")
@@ -1129,7 +1097,9 @@ async def disable_debug_mode(execution_id: str, engine: PlaybookEngine = Depends
     # Broadcast state update to WebSocket clients
     execution_state = engine.get_current_execution()
     if execution_state:
-        await broadcast_execution_state(execution_state)
+        # Use WebSocketManager from app services
+        websocket_manager = app.state.services.websocket_manager
+        await websocket_manager.broadcast_execution_state(execution_state)
 
     return {
         "status": "success",

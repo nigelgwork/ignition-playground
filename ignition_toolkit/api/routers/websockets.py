@@ -67,11 +67,17 @@ async def websocket_endpoint(websocket: WebSocket):
         await websocket.close(code=1008, reason="Unauthorized")
         return
 
-    await websocket.accept()
-    logger.info(f"WebSocket connection accepted from {websocket.client}")
+    # Get WebSocketManager from app state
+    from starlette.requests import Request
+    from fastapi import Request as FastAPIRequest
 
-    websocket_connections = get_websocket_connections()
-    websocket_connections.append(websocket)
+    # Access app through websocket's scope
+    app = websocket.app
+    websocket_manager = app.state.services.websocket_manager
+
+    # Use WebSocketManager's connect method
+    await websocket_manager.connect(websocket)
+    logger.info(f"WebSocket connection accepted from {websocket.client}")
 
     try:
         while True:
@@ -97,13 +103,11 @@ async def websocket_endpoint(websocket: WebSocket):
                 await websocket.send_json({"type": "pong", "data": data})
 
     except WebSocketDisconnect:
-        if websocket in websocket_connections:
-            websocket_connections.remove(websocket)
+        await websocket_manager.disconnect(websocket)
         logger.info("WebSocket client disconnected")
     except Exception as e:
         logger.error(f"WebSocket error: {e}")
-        if websocket in websocket_connections:
-            websocket_connections.remove(websocket)
+        await websocket_manager.disconnect(websocket)
 
 
 @router.websocket("/ws/claude-code/{execution_id}")
@@ -374,56 +378,6 @@ async def claude_code_terminal(websocket: WebSocket, execution_id: str):
             pass
 
 
-# ============================================================================
-# Broadcast Helper Functions
-# ============================================================================
-
-
-async def broadcast_execution_state(state: ExecutionState):
-    """Broadcast execution state to all connected WebSocket clients"""
-    websocket_connections = get_websocket_connections()
-
-    if not websocket_connections:
-        return
-
-    message = {
-        "type": "execution_update",
-        "data": {
-            "execution_id": state.execution_id,
-            "playbook_name": state.playbook_name,
-            "status": state.status.value,
-            "current_step_index": state.current_step_index,
-            "error": state.error,  # Overall execution error
-            "started_at": state.started_at.isoformat() if state.started_at else None,
-            "completed_at": state.completed_at.isoformat() if state.completed_at else None,
-            "step_results": [
-                {
-                    "step_id": r.step_id,
-                    "step_name": r.step_name,
-                    "status": r.status.value,
-                    "error": r.error,
-                    "started_at": r.started_at.isoformat() if r.started_at else None,
-                    "completed_at": r.completed_at.isoformat() if r.completed_at else None,
-                }
-                for r in state.step_results
-            ],
-        },
-    }
-
-    # Send to all connected clients
-    disconnected = []
-    for websocket in websocket_connections:
-        try:
-            await websocket.send_json(message)
-        except Exception as e:
-            logger.warning(f"Failed to send to WebSocket client: {e}")
-            disconnected.append(websocket)
-
-    # Remove disconnected clients
-    for ws in disconnected:
-        if ws in websocket_connections:
-            websocket_connections.remove(ws)
-
 
 @router.websocket("/ws/shell")
 async def shell_terminal(websocket: WebSocket):
@@ -558,38 +512,3 @@ async def shell_terminal(websocket: WebSocket):
             pass
 
 
-async def broadcast_screenshot_frame(execution_id: str, screenshot_b64: str):
-    """
-    Broadcast screenshot frame to all connected WebSocket clients
-
-    Args:
-        execution_id: Execution ID this screenshot belongs to
-        screenshot_b64: Base64-encoded JPEG screenshot data
-    """
-    websocket_connections = get_websocket_connections()
-
-    if not websocket_connections:
-        return
-
-    message = {
-        "type": "screenshot_frame",
-        "data": {
-            "executionId": execution_id,  # camelCase to match frontend
-            "screenshot": screenshot_b64,
-            "timestamp": datetime.now().isoformat(),
-        },
-    }
-
-    # Send to all connected clients
-    disconnected = []
-    for websocket in websocket_connections:
-        try:
-            await websocket.send_json(message)
-        except Exception as e:
-            logger.warning(f"Failed to send screenshot to WebSocket client: {e}")
-            disconnected.append(websocket)
-
-    # Remove disconnected clients
-    for ws in disconnected:
-        if ws in websocket_connections:
-            websocket_connections.remove(ws)
