@@ -883,15 +883,20 @@ async def cancel_execution(execution_id: str):
 
         # Set the cancel signal in the engine
         await engine.cancel()
+        logger.info(f"Cancel signal set for execution {execution_id}")
 
         # Also cancel the asyncio Task to immediately interrupt execution
         if execution_id in active_tasks:
             task = active_tasks[execution_id]
             if not task.done():
-                logger.info(f"Cancelling asyncio Task for execution {execution_id}")
+                logger.info(f"✅ Cancelling asyncio Task for execution {execution_id}")
                 task.cancel()
                 # Don't wait for task completion - just cancel and return immediately
                 # The task will handle CancelledError in its exception handler
+            else:
+                logger.warning(f"Task for execution {execution_id} already done, cannot cancel")
+        else:
+            logger.warning(f"❌ Execution {execution_id} NOT in active_tasks! Cannot cancel task. Keys: {list(active_tasks.keys())}")
 
         # Mark completion time for TTL cleanup
         engine_completion_times[execution_id] = datetime.now()
