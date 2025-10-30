@@ -5,6 +5,87 @@ All notable changes to the Ignition Automation Toolkit will be documented in thi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.1.0] - 2025-10-30
+
+### Added - Designer Automation
+
+**NEW: Desktop Application Automation for Ignition Designer**
+
+This release adds comprehensive Designer automation capabilities, enabling automated testing and setup of Ignition Designer desktop applications across Windows, Linux, and WSL2 environments.
+
+#### Core Features
+- **DesignerManager Class**: Lifecycle management for Designer desktop applications
+  - Async context manager pattern (mirrors BrowserManager)
+  - Platform-specific automation via hybrid approach
+  - Auto-detection of Designer installation paths
+  - Screenshot capture from Designer window
+
+- **New Step Types** (6 new designer.* steps):
+  - `designer.launch` - Launch Designer from downloaded launcher file
+  - `designer.login` - Automatic credential entry and login
+  - `designer.open_project` - Open specific project or wait for manual selection
+  - `designer.close` - Close Designer application
+  - `designer.screenshot` - Capture Designer window screenshot
+  - `designer.wait` - Wait for Designer window to appear
+
+- **Platform-Specific Automation**:
+  - **Windows**: pywinauto-based window detection and interaction
+  - **Linux**: python-xlib + pyatspi for X11 automation
+  - **WSL2**: Automatic detection with Windows path support
+
+- **Installation Detection**:
+  - Auto-detects Designer installation on Windows, Linux, and WSL2
+  - Manual override via `designer_install_path` parameter
+  - Supports JNLP and native launcher files
+
+#### Example Playbooks
+- `playbooks/designer/launch_designer_simple.yaml` - Basic Designer launch and login
+- `playbooks/designer/launch_designer.yaml` - Full browser-triggered workflow (advanced)
+
+#### Integration
+- Conditional DesignerManager creation in PlaybookEngine (only when designer.* steps present)
+- Seamless integration with existing credential vault (global credentials work automatically)
+- Browser-triggered download workflow (download launcher → launch Designer)
+- Optional project selection (specify project_name or leave empty for manual selection)
+
+#### Dependencies
+- New optional dependency group: `pip install ignition-toolkit[designer]`
+  - `pywinauto>=0.6.8` (Windows only)
+  - `python-xlib>=0.33` (Linux only)
+  - `pyatspi>=2.38.2` (Linux only)
+
+#### Testing
+- Comprehensive unit tests in `tests/test_designer.py`
+- Platform-specific tests (Windows, Linux)
+- Integration test framework (requires Designer installation)
+
+#### Technical Details
+- Files added:
+  - `ignition_toolkit/designer/__init__.py`
+  - `ignition_toolkit/designer/manager.py`
+  - `ignition_toolkit/designer/detector.py`
+  - `ignition_toolkit/designer/platform_windows.py`
+  - `ignition_toolkit/designer/platform_linux.py`
+- Files modified:
+  - `ignition_toolkit/playbook/models.py` (added Designer StepType enums)
+  - `ignition_toolkit/playbook/step_executor.py` (added designer routing)
+  - `ignition_toolkit/playbook/engine.py` (conditional DesignerManager creation)
+  - `pyproject.toml` (version bump + optional dependencies)
+
+### Impact Assessment
+- **Zero Breaking Changes**: Fully backward compatible
+- **Minimal Impact**: New module in isolated directory, optional dependency
+- **Clean Extension**: Follows established BrowserManager pattern
+
+### Use Cases
+- Automated Designer project creation and configuration
+- Designer login testing across different environments
+- Automated project migration/deployment verification
+- Designer UI automation for acceptance testing
+- Cross-platform Designer setup scripts
+
+---
+
 ## [3.0.0] - 2025-10-27
 
 ### Major Release - Claude Code Phase 2 Complete

@@ -1,6 +1,6 @@
 name: "Module Upgrade"
-version: "1.0"
-description: "Uploads .modl module file, installs it, and restarts Gateway."
+version: "3.6"
+description: "Automatically detects .modl file, extracts metadata, uninstalls old version via browser automation, uploads new version, and verifies installation."
 
 parameters:
   - name: gateway_url
@@ -18,70 +18,381 @@ parameters:
     required: true
     description: "Gateway admin password"
 
-  - name: module_file
-    type: file
-    required: true
-    description: "Path to .modl file"
-
-  - name: module_name
+  - name: module_folder
     type: string
     required: true
-    description: "Module name (e.g., Perspective)"
+    description: "Path to folder containing .modl file (will auto-detect)"
+
+  - name: uninstall_old_version
+    type: boolean
+    required: false
+    default: true
+    description: "Uninstall old version before upgrading (default: true)"
 
 steps:
-  - id: login
-    name: "Login to Gateway"
+  # ============================================================================
+  # STEP 0: Detect Module File and Extract Metadata
+  # ============================================================================
+  - id: step0
+    name: "Step 0: Detect Module File and Extract Metadata"
+    type: utility.python
+    parameters:
+      script: |
+        import os
+        import zipfile
+        import xml.etree.ElementTree as ET
+        from pathlib import Path
+
+        # Get folder path from parameter
+        folder_path = """{{ parameter.module_folder }}"""
+        folder = Path(folder_path)
+
+        if not folder.exists():
+            print(f"ERROR: Folder not found: {folder_path}")
+            exit(1)
+
+        # Find .modl files
+        modl_files = list(folder.glob("*.modl"))
+
+        if not modl_files:
+            print(f"ERROR: No .modl files found in {folder_path}")
+            exit(1)
+
+        if len(modl_files) > 1:
+            print(f"WARNING: Multiple .modl files found. Using first one: {modl_files[0].name}")
+
+        selected_file = str(modl_files[0].absolute())
+        print(f"DETECTED_MODULE_FILE={selected_file}")
+
+        # Extract metadata from module.xml inside .modl
+        try:
+            with zipfile.ZipFile(selected_file, 'r') as zip_ref:
+                if 'module.xml' in zip_ref.namelist():
+                    with zip_ref.open('module.xml') as xml_file:
+                        tree = ET.parse(xml_file)
+                        root = tree.getroot()
+
+                        module_name = root.find('.//name')
+                        module_version = root.find('.//version')
+                        module_vendor = root.find('.//vendor')
+
+                        name_text = module_name.text if module_name is not None else "Unknown"
+                        version_text = module_version.text if module_version is not None else "Unknown"
+                        vendor_text = module_vendor.text if module_vendor is not None else "Unknown"
+
+                        print(f"DETECTED_MODULE_NAME={name_text}")
+                        print(f"DETECTED_MODULE_VERSION={version_text}")
+                        print(f"DETECTED_MODULE_VENDOR={vendor_text}")
+
+                        # Determine module type
+                        if "Perspective" in name_text:
+                            module_type = "perspective"
+                        elif "Vision" in name_text:
+                            module_type = "vision"
+                        else:
+                            module_type = "platform"
+
+                        print(f"DETECTED_MODULE_TYPE={module_type}")
+                else:
+                    print("WARNING: module.xml not found in .modl file")
+                    print("DETECTED_MODULE_NAME=Unknown")
+                    print("DETECTED_MODULE_VERSION=Unknown")
+                    print("DETECTED_MODULE_VENDOR=Unknown")
+                    print("DETECTED_MODULE_TYPE=platform")
+        except Exception as e:
+            print(f"ERROR: Failed to extract metadata: {e}")
+            print("DETECTED_MODULE_NAME=Unknown")
+            print("DETECTED_MODULE_VERSION=Unknown")
+            print("DETECTED_MODULE_VENDOR=Unknown")
+            print("DETECTED_MODULE_TYPE=platform")
+    timeout: 10
+    on_failure: abort
+
+  # ============================================================================
+  # STEP 1: Login to Gateway
+  # ============================================================================
+  - id: step1
+    name: "Step 1: Login to Gateway"
     type: gateway.login
     parameters:
       url: "{{ parameter.gateway_url }}"
       username: "{{ parameter.username }}"
       password: "{{ parameter.password }}"
     timeout: 30
+    on_failure: abort
 
-  - id: list_modules_before
-    name: "List Modules Before Upload"
-    type: gateway.list_modules
+  # ============================================================================
+  # STEP 2: Navigate to Config > System > Modules
+  # ============================================================================
+  - id: step2
+    name: "Step 2: Navigate to Modules Page"
+    type: browser.navigate
+    parameters:
+      url: "{{ parameter.gateway_url }}/web/config/system.modules"
     timeout: 30
+    on_failure: abort
+
+  # ============================================================================
+  # STEP 3: Wait for Modules Page to Load
+  # ============================================================================
+  - id: step3
+    name: "Step 3: Wait for Modules Page to Load"
+    type: browser.verify
+    parameters:
+      selector: "input[type='text']"
+      state: "visible"
+    timeout: 10
+    on_failure: abort
+
+  # ============================================================================
+  # STEP 4: Search for Module by Name
+  # ============================================================================
+  - id: step4
+    name: "Step 4: Search for Module by Name"
+    type: browser.fill
+    parameters:
+      selector: "input[type='text']"
+      value: "{{ step.step0.DETECTED_MODULE_NAME }}"
+    timeout: 5
+    on_failure: abort
+
+  # ============================================================================
+  # STEP 5: Wait for Search Results
+  # ============================================================================
+  - id: step5
+    name: "Step 5: Wait for Search Results"
+    type: utility.sleep
+    parameters:
+      seconds: 2
     on_failure: continue
 
-  - id: upload_module
-    name: "Upload Module File"
+  # ============================================================================
+  # STEP 6: Check if Module Exists (capture screenshot for verification)
+  # ============================================================================
+  - id: step6
+    name: "Step 6: Check if Module Row is Visible"
+    type: browser.verify
+    parameters:
+      selector: "input[type='checkbox']"
+      state: "visible"
+    timeout: 5
+    on_failure: continue
+
+  # ============================================================================
+  # STEP 7-15: Uninstall Old Version (CONDITIONAL based on parameter)
+  # ============================================================================
+  - id: step7
+    name: "Step 7: Select Module Checkbox (if uninstall enabled)"
+    type: browser.click
+    parameters:
+      selector: "input[type='checkbox']"
+    timeout: 5
+    condition: "{{ parameter.uninstall_old_version }}"
+    on_failure: continue
+
+  - id: step8
+    name: "Step 8: Click Uninstall Button"
+    type: browser.click
+    parameters:
+      selector: "button:has-text('Uninstall')"
+    timeout: 5
+    condition: "{{ parameter.uninstall_old_version }}"
+    on_failure: continue
+
+  - id: step9
+    name: "Step 9: Confirm Uninstall"
+    type: browser.click
+    parameters:
+      selector: "button:has-text('Yes'), button:has-text('Confirm'), button:has-text('OK')"
+    timeout: 5
+    condition: "{{ parameter.uninstall_old_version }}"
+    on_failure: continue
+
+  - id: step10
+    name: "Step 10: Wait for Uninstall to Process"
+    type: utility.sleep
+    parameters:
+      seconds: 3
+    condition: "{{ parameter.uninstall_old_version }}"
+    on_failure: continue
+
+  - id: step11
+    name: "Step 11: Clear Search Field"
+    type: browser.fill
+    parameters:
+      selector: "input[type='text']"
+      value: ""
+    timeout: 5
+    condition: "{{ parameter.uninstall_old_version }}"
+    on_failure: continue
+
+  - id: step12
+    name: "Step 12: Wait for Module List to Refresh"
+    type: utility.sleep
+    parameters:
+      seconds: 2
+    condition: "{{ parameter.uninstall_old_version }}"
+    on_failure: continue
+
+  - id: step13
+    name: "Step 13: Search Again After Uninstall"
+    type: browser.fill
+    parameters:
+      selector: "input[type='text']"
+      value: "{{ step.step0.DETECTED_MODULE_NAME }}"
+    timeout: 5
+    condition: "{{ parameter.uninstall_old_version }}"
+    on_failure: continue
+
+  - id: step14
+    name: "Step 14: Wait for Search Results After Uninstall"
+    type: utility.sleep
+    parameters:
+      seconds: 2
+    condition: "{{ parameter.uninstall_old_version }}"
+    on_failure: continue
+
+  - id: step15
+    name: "Step 15: Verify Module is Gone"
+    type: browser.verify
+    parameters:
+      selector: "input[type='checkbox']"
+      state: "hidden"
+    timeout: 5
+    condition: "{{ parameter.uninstall_old_version }}"
+    on_failure: continue
+
+  # ============================================================================
+  # STEP 16: Upload New Module via Gateway REST API
+  # ============================================================================
+  - id: step16
+    name: "Step 16: Upload Module File via API"
     type: gateway.upload_module
     parameters:
-      file: "{{ parameter.module_file }}"
+      file: "{{ step.step0.DETECTED_MODULE_FILE }}"
     timeout: 300
     retry_count: 2
     retry_delay: 10
+    on_failure: abort
 
-  - id: wait_installation
-    name: "Wait for Module Installation"
+  # ============================================================================
+  # STEP 17: Wait for Module Installation
+  # ============================================================================
+  - id: step17
+    name: "Step 17: Wait for Module Installation"
     type: gateway.wait_for_module_installation
     parameters:
-      module_name: "{{ parameter.module_name }}"
+      module_name: "{{ step.step0.DETECTED_MODULE_NAME }}"
       timeout: 300
     timeout: 310
+    on_failure: abort
 
-  - id: list_modules_after
-    name: "List Modules After Installation"
-    type: gateway.list_modules
-    timeout: 30
-
-  - id: restart
-    name: "Restart Gateway"
+  # ============================================================================
+  # STEP 18: Restart Gateway
+  # ============================================================================
+  - id: step18
+    name: "Step 18: Restart Gateway"
     type: gateway.restart
     parameters:
       wait_for_ready: true
     timeout: 600
+    on_failure: abort
 
-  - id: verify_health
-    name: "Verify Gateway Health"
+  # ============================================================================
+  # STEP 19-27: Verify Installation via Browser
+  # ============================================================================
+  - id: step19
+    name: "Step 19: Re-login After Restart"
+    type: gateway.login
+    parameters:
+      url: "{{ parameter.gateway_url }}"
+      username: "{{ parameter.username }}"
+      password: "{{ parameter.password }}"
+    timeout: 30
+    on_failure: abort
+
+  - id: step20
+    name: "Step 20: Navigate to Modules Page Again"
+    type: browser.navigate
+    parameters:
+      url: "{{ parameter.gateway_url }}/web/config/system.modules"
+    timeout: 30
+    on_failure: abort
+
+  - id: step21
+    name: "Step 21: Wait for Modules Page to Load"
+    type: browser.verify
+    parameters:
+      selector: "input[type='text']"
+      state: "visible"
+    timeout: 10
+    on_failure: abort
+
+  - id: step22
+    name: "Step 22: Clear Search Field"
+    type: browser.fill
+    parameters:
+      selector: "input[type='text']"
+      value: ""
+    timeout: 5
+    on_failure: continue
+
+  - id: step23
+    name: "Step 23: Wait for Full Module List"
+    type: utility.sleep
+    parameters:
+      seconds: 2
+    on_failure: continue
+
+  - id: step24
+    name: "Step 24: Search for Newly Installed Module"
+    type: browser.fill
+    parameters:
+      selector: "input[type='text']"
+      value: "{{ step.step0.DETECTED_MODULE_NAME }}"
+    timeout: 5
+    on_failure: abort
+
+  - id: step25
+    name: "Step 25: Wait for Search Results"
+    type: utility.sleep
+    parameters:
+      seconds: 2
+    on_failure: continue
+
+  - id: step26
+    name: "Step 26: Verify Module is Visible"
+    type: browser.verify
+    parameters:
+      selector: "input[type='checkbox']"
+      state: "visible"
+    timeout: 10
+    on_failure: abort
+
+  - id: step27
+    name: "Step 27: Take Screenshot of Installed Module"
+    type: browser.screenshot
+    parameters:
+      path: "/tmp/module_installed_{{ step.step0.DETECTED_MODULE_NAME }}.png"
+    timeout: 5
+    on_failure: continue
+
+  # ============================================================================
+  # STEP 28: Verify Gateway Health
+  # ============================================================================
+  - id: step28
+    name: "Step 28: Verify Gateway Health"
     type: gateway.get_health
     timeout: 30
     retry_count: 3
     retry_delay: 5
+    on_failure: abort
 
-  - id: logout
-    name: "Logout"
+  # ============================================================================
+  # STEP 29: Logout
+  # ============================================================================
+  - id: step29
+    name: "Step 29: Logout"
     type: gateway.logout
     timeout: 10
     on_failure: continue
@@ -89,4 +400,4 @@ steps:
 metadata:
   author: "Ignition Toolkit"
   category: "gateway"
-  tags: ["module", "upgrade", "maintenance"]
+  tags: ["module", "upgrade", "automation", "browser"]
