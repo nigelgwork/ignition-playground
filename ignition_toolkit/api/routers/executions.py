@@ -1068,6 +1068,9 @@ async def delete_execution(execution_id: str):
 @router.post("/{execution_id}/debug/enable")
 async def enable_debug_mode(execution_id: str, engine: PlaybookEngine = Depends(get_engine_or_404)):
     """Enable debug mode for an active execution"""
+    # Lazy import to avoid circular dependency
+    from ignition_toolkit.api.app import app
+
     engine.state_manager.enable_debug_mode()
 
     logger.info(f"Debug mode enabled for execution {execution_id}")
@@ -1075,6 +1078,8 @@ async def enable_debug_mode(execution_id: str, engine: PlaybookEngine = Depends(
     # Broadcast state update to WebSocket clients
     execution_state = engine.get_current_execution()
     if execution_state:
+        # Update debug_mode flag in execution state
+        execution_state.debug_mode = True
         # Use WebSocketManager from app services
         websocket_manager = app.state.services.websocket_manager
         await websocket_manager.broadcast_execution_state(execution_state)
@@ -1090,6 +1095,9 @@ async def enable_debug_mode(execution_id: str, engine: PlaybookEngine = Depends(
 @router.post("/{execution_id}/debug/disable")
 async def disable_debug_mode(execution_id: str, engine: PlaybookEngine = Depends(get_engine_or_404)):
     """Disable debug mode for an active execution"""
+    # Lazy import to avoid circular dependency
+    from ignition_toolkit.api.app import app
+
     engine.state_manager.disable_debug_mode()
 
     logger.info(f"Debug mode disabled for execution {execution_id}")
@@ -1097,6 +1105,8 @@ async def disable_debug_mode(execution_id: str, engine: PlaybookEngine = Depends
     # Broadcast state update to WebSocket clients
     execution_state = engine.get_current_execution()
     if execution_state:
+        # Update debug_mode flag in execution state
+        execution_state.debug_mode = False
         # Use WebSocketManager from app services
         websocket_manager = app.state.services.websocket_manager
         await websocket_manager.broadcast_execution_state(execution_state)

@@ -276,6 +276,8 @@ class ExecutionState:
         started_at: Execution start timestamp
         completed_at: Execution completion timestamp
         current_step_index: Index of current step
+        total_steps: Total number of steps in playbook
+        debug_mode: Whether debug mode is enabled
         step_results: Results of completed steps
         variables: Runtime variables
         error: Error message if failed
@@ -287,6 +289,8 @@ class ExecutionState:
     started_at: datetime
     completed_at: datetime | None = None
     current_step_index: int = 0
+    total_steps: int = 0
+    debug_mode: bool = False
     step_results: list[StepResult] = field(default_factory=list)
     variables: dict[str, Any] = field(default_factory=dict)
     error: str | None = None

@@ -155,6 +155,8 @@ class PlaybookEngine:
             playbook_name=playbook.name,
             status=ExecutionStatus.RUNNING,
             started_at=datetime.now(),
+            total_steps=len(playbook.steps),
+            debug_mode=self.state_manager.is_debug_mode_enabled(),
             step_results=initial_step_results,
         )
         self._current_execution = execution_state

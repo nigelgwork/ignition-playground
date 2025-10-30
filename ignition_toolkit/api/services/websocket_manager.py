@@ -64,6 +64,8 @@ class WebSocketManager:
         """
         from ignition_toolkit.api.routers.models import StepResultResponse
 
+        print(f"[WS] Broadcasting execution state: status={state.status.value if hasattr(state.status, 'value') else state.status}, step={state.current_step_index}, steps_count={len(state.step_results)}, connections={len(self._connections)}", flush=True)
+
         # Convert step results to response format
         step_results = [
             StepResultResponse(
@@ -80,30 +82,36 @@ class WebSocketManager:
             for result in state.step_results
         ]
 
+        # Frontend expects data wrapped in a "data" field
         message = {
             "type": "execution_update",
-            "execution_id": state.execution_id,
-            "playbook_name": state.playbook_name,
-            "status": state.status.value if hasattr(state.status, "value") else state.status,
-            "current_step_index": state.current_step_index,
-            "started_at": state.started_at.isoformat() if state.started_at else None,
-            "completed_at": state.completed_at.isoformat() if state.completed_at else None,
-            "error": state.error,
-            "step_results": [
-                {
-                    "step_id": sr.step_id,
-                    "step_name": sr.step_name,
-                    "status": sr.status,
-                    "error": sr.error,
-                    "started_at": sr.started_at.isoformat() if sr.started_at else None,
-                    "completed_at": sr.completed_at.isoformat() if sr.completed_at else None,
-                    "output": sr.output,
-                }
-                for sr in step_results
-            ],
+            "data": {
+                "execution_id": state.execution_id,
+                "playbook_name": state.playbook_name,
+                "status": state.status.value if hasattr(state.status, "value") else state.status,
+                "current_step_index": state.current_step_index,
+                "total_steps": state.total_steps,
+                "debug_mode": state.debug_mode,
+                "started_at": state.started_at.isoformat() if state.started_at else None,
+                "completed_at": state.completed_at.isoformat() if state.completed_at else None,
+                "error": state.error,
+                "step_results": [
+                    {
+                        "step_id": sr.step_id,
+                        "step_name": sr.step_name,
+                        "status": sr.status,
+                        "error": sr.error,
+                        "started_at": sr.started_at.isoformat() if sr.started_at else None,
+                        "completed_at": sr.completed_at.isoformat() if sr.completed_at else None,
+                        "output": sr.output,
+                    }
+                    for sr in step_results
+                ],
+            }
         }
 
         await self._broadcast(message)
+        print(f"[WS] Broadcast complete", flush=True)
 
     async def broadcast_screenshot(self, execution_id: str, screenshot_b64: str) -> None:
         """
@@ -113,10 +121,15 @@ class WebSocketManager:
             execution_id: Execution UUID
             screenshot_b64: Base64-encoded screenshot
         """
+        from datetime import datetime
+
         message = {
             "type": "screenshot_frame",
-            "execution_id": execution_id,
-            "screenshot": screenshot_b64,
+            "data": {
+                "executionId": execution_id,  # ✅ camelCase to match frontend
+                "screenshot": screenshot_b64,
+                "timestamp": datetime.now().isoformat(),  # ✅ Add timestamp
+            },
         }
         await self._broadcast(message)
 
