@@ -77,7 +77,7 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
           if (ws.readyState === WebSocket.OPEN) {
             ws.send(JSON.stringify({ type: 'ping', timestamp: Date.now() }));
           }
-        }, 30000); // Send ping every 30 seconds
+        }, 15000); // Send ping every 15 seconds (matches server keepalive)
       };
 
       ws.onmessage = (event) => {

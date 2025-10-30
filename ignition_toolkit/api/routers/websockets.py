@@ -84,17 +84,22 @@ async def websocket_endpoint(websocket: WebSocket):
             # Keep connection alive and handle heartbeat
             data = await websocket.receive_text()
 
-            # Parse message to check for ping
+            # Parse message to check for ping/pong
             try:
                 import json
 
                 message = json.loads(data)
-                if message.get("type") == "ping":
-                    # Respond to heartbeat ping
+                msg_type = message.get("type")
+
+                if msg_type == "ping":
+                    # Respond to client-initiated heartbeat ping
                     await websocket.send_json(
                         {"type": "pong", "timestamp": message.get("timestamp")}
                     )
-                    logger.debug("Heartbeat ping received and acknowledged")
+                    logger.debug("Client heartbeat ping received and acknowledged")
+                elif msg_type == "pong":
+                    # Client responding to our server keepalive - just acknowledge
+                    logger.debug("Client acknowledged server keepalive")
                 else:
                     # Echo back other messages for compatibility
                     await websocket.send_json({"type": "pong", "data": data})

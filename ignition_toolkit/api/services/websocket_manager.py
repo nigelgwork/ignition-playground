@@ -24,10 +24,17 @@ class WebSocketManager:
     - Handle connection cleanup
     """
 
-    def __init__(self):
-        """Initialize WebSocket manager"""
+    def __init__(self, keepalive_interval: int = 15):
+        """
+        Initialize WebSocket manager
+
+        Args:
+            keepalive_interval: Seconds between server keepalive pings (default: 15)
+        """
         self._connections: list[WebSocket] = []
         self._lock = asyncio.Lock()
+        self._keepalive_tasks: dict[WebSocket, asyncio.Task] = {}
+        self._keepalive_interval = keepalive_interval
 
     async def connect(self, websocket: WebSocket) -> None:
         """
@@ -39,6 +46,9 @@ class WebSocketManager:
         await websocket.accept()
         async with self._lock:
             self._connections.append(websocket)
+            # Start keepalive task for this connection
+            task = asyncio.create_task(self._keepalive_loop(websocket))
+            self._keepalive_tasks[websocket] = task
             logger.info(f"WebSocket connected. Total connections: {len(self._connections)}")
 
     async def disconnect(self, websocket: WebSocket) -> None:
@@ -51,9 +61,46 @@ class WebSocketManager:
         async with self._lock:
             if websocket in self._connections:
                 self._connections.remove(websocket)
+                # Cancel keepalive task for this connection
+                if websocket in self._keepalive_tasks:
+                    self._keepalive_tasks[websocket].cancel()
+                    del self._keepalive_tasks[websocket]
                 logger.info(
                     f"WebSocket disconnected. Total connections: {len(self._connections)}"
                 )
+
+    async def _keepalive_loop(self, websocket: WebSocket) -> None:
+        """
+        Send periodic keepalive pings to prevent connection timeout
+
+        This runs independently of execution state to maintain connection
+        during long-running operations (30-60+ seconds).
+
+        Args:
+            websocket: WebSocket connection to keep alive
+        """
+        from datetime import datetime
+
+        try:
+            while True:
+                await asyncio.sleep(self._keepalive_interval)
+
+                try:
+                    # Send server-initiated keepalive ping
+                    await websocket.send_json({
+                        "type": "keepalive",
+                        "timestamp": datetime.now().isoformat()
+                    })
+                    logger.debug(f"Sent keepalive to {websocket.client}")
+                except Exception as e:
+                    logger.warning(f"Failed to send keepalive to {websocket.client}: {e}")
+                    # Connection is dead, will be cleaned up by disconnect()
+                    break
+
+        except asyncio.CancelledError:
+            logger.debug(f"Keepalive task cancelled for {websocket.client}")
+        except Exception as e:
+            logger.exception(f"Error in keepalive loop for {websocket.client}: {e}")
 
     async def broadcast_execution_state(self, state: "ExecutionState") -> None:
         """
@@ -65,6 +112,14 @@ class WebSocketManager:
         from ignition_toolkit.api.routers.models import StepResultResponse
 
         print(f"[WS] Broadcasting execution state: status={state.status.value if hasattr(state.status, 'value') else state.status}, step={state.current_step_index}, steps_count={len(state.step_results)}, connections={len(self._connections)}", flush=True)
+
+        # Warn if broadcasting critical state with no connections
+        status_value = state.status.value if hasattr(state.status, 'value') else state.status
+        if len(self._connections) == 0 and status_value in ["cancelled", "failed"]:
+            logger.warning(
+                f"⚠️  CRITICAL: Broadcasting {status_value} status but NO WebSocket "
+                f"connections active! Frontend will miss real-time update for execution {state.execution_id}"
+            )
 
         # Convert step results to response format
         step_results = [
