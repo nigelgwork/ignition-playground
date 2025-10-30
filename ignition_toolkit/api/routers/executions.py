@@ -926,14 +926,17 @@ async def cancel_execution(execution_id: str):
             logger.info(f"Database-only execution {execution_id} marked as cancelled")
             return {"message": "Execution marked as cancelled in database", "execution_id": execution_id}
         else:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Execution {execution_id} has already completed with status: {execution.status}"
-            )
+            # Execution already completed - return success instead of error for better UX
+            logger.info(f"Cancel requested for already-completed execution {execution_id} (status: {execution.status})")
+            return {
+                "message": f"Execution already completed with status: {execution.status}",
+                "execution_id": execution_id,
+                "already_completed": True
+            }
 
 
 @router.get("/{execution_id}/playbook/code")
-async def get_playbook_code(engine: PlaybookEngine = Depends(get_engine_or_404)):
+async def get_playbook_code(execution_id: str, engine: PlaybookEngine = Depends(get_engine_or_404)):
     """Get the YAML code for the playbook being executed"""
     # Read the original playbook file
     playbook_path = engine._playbook_path
@@ -946,7 +949,7 @@ async def get_playbook_code(engine: PlaybookEngine = Depends(get_engine_or_404))
     playbook_name = state.playbook_name if state else "Unknown"
 
     return {
-        "execution_id": engine.state_manager.execution_id,
+        "execution_id": execution_id,  # Use execution_id from path parameter
         "playbook_path": str(playbook_path),
         "playbook_name": playbook_name,
         "code": yaml_content,  # Frontend expects 'code' field
@@ -955,6 +958,7 @@ async def get_playbook_code(engine: PlaybookEngine = Depends(get_engine_or_404))
 
 @router.put("/{execution_id}/playbook/code")
 async def update_playbook_code(
+    execution_id: str,
     request: PlaybookCodeUpdateRequest,
     engine: PlaybookEngine = Depends(get_engine_or_404)
 ):
@@ -986,7 +990,7 @@ async def update_playbook_code(
 
     return {
         "message": "Playbook code updated",
-        "execution_id": engine.state_manager.execution_id,
+        "execution_id": execution_id,  # Use execution_id from path parameter
         "playbook_path": str(playbook_path),
         "backup_path": str(backup_path.name),
     }
