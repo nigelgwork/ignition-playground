@@ -73,12 +73,17 @@ export function ExecutionControls({
 
 
   const handleCancel = async () => {
+    console.log('[ExecutionControls] Cancel button clicked, executionId:', executionId);
     try {
       setLoading('cancel');
-      await api.executions.cancel(executionId);
+      console.log('[ExecutionControls] Sending cancel request...');
+      const response = await api.executions.cancel(executionId);
+      console.log('[ExecutionControls] Cancel request succeeded:', response);
     } catch (error) {
-      console.error('Failed to cancel execution:', error);
+      console.error('[ExecutionControls] Failed to cancel execution:', error);
+      alert(`Failed to cancel execution: ${error instanceof Error ? error.message : String(error)}`);
     } finally {
+      console.log('[ExecutionControls] Cancel request complete, clearing loading state');
       setLoading(null);
     }
   };
@@ -87,6 +92,18 @@ export function ExecutionControls({
   const isPaused = status === 'paused';
   const isActive = isRunning || isPaused;  // Execution is active if running or paused
   const isDisabled = disabled || !isActive;  // Only disable if not active at all
+
+  // Debug logging
+  console.log('[ExecutionControls] Render:', {
+    executionId,
+    status,
+    isRunning,
+    isPaused,
+    isActive,
+    isDisabled,
+    disabled,
+    loading
+  });
 
   return (
     <Box sx={{ display: 'flex', gap: 1 }}>
