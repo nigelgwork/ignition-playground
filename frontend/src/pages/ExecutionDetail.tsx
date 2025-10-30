@@ -174,7 +174,7 @@ export function ExecutionDetail() {
       case 'running':
         return <RunningIcon color="primary" />;
       case 'cancelled':
-        return <SkippedIcon color="warning" />;
+        return <SkippedIcon color="disabled" />;
       case 'skipped':
         return <SkippedIcon color="warning" />;
       default:
@@ -191,7 +191,7 @@ export function ExecutionDetail() {
       case 'running':
         return 'primary';
       case 'cancelled':
-        return 'warning';
+        return 'default';
       case 'skipped':
         return 'warning';
       default:

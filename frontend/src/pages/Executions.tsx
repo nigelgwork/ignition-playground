@@ -92,7 +92,7 @@ export function Executions() {
       case 'failed':
         return 'error';
       case 'cancelled':
-        return 'warning';
+        return 'default';
       default:
         return 'default';
     }
@@ -106,7 +106,7 @@ export function Executions() {
       case 'failed':
         return <ErrorIcon color="error" fontSize="small" />;
       case 'cancelled':
-        return <SkippedIcon color="warning" fontSize="small" />;
+        return <SkippedIcon color="disabled" fontSize="small" />;
       case 'skipped':
         return <SkippedIcon color="warning" fontSize="small" />;
       default:
