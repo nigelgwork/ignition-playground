@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ignition-toolkit"
-version = "3.44.8"  # Updated: 2025-10-30 - Added empty name validation + removed corrupt credential
+version = "3.44.9"  # Updated: 2025-10-30 - Fixed cancelled status display + Australian date format + improved table spacing
 description = "Lightweight automation toolkit for Ignition SCADA Gateway operations"
 readme = "README.md"
 requires-python = ">=3.10"

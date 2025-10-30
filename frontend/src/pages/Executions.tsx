@@ -91,6 +91,8 @@ export function Executions() {
         return 'success';
       case 'failed':
         return 'error';
+      case 'cancelled':
+        return 'warning';
       default:
         return 'default';
     }
@@ -103,6 +105,8 @@ export function Executions() {
         return <CompletedIcon color="success" fontSize="small" />;
       case 'failed':
         return <ErrorIcon color="error" fontSize="small" />;
+      case 'cancelled':
+        return <SkippedIcon color="warning" fontSize="small" />;
       case 'skipped':
         return <SkippedIcon color="warning" fontSize="small" />;
       default:
@@ -409,10 +413,10 @@ export function Executions() {
                   />
                 </TableCell>
                 <TableCell width="50px"></TableCell>
-                <TableCell width="250px">Playbook</TableCell>
-                <TableCell width="120px">Status</TableCell>
+                <TableCell width="280px">Playbook</TableCell>
+                <TableCell width="140px">Status</TableCell>
                 <TableCell width="100px">Progress</TableCell>
-                <TableCell width="180px">Started</TableCell>
+                <TableCell width="200px">Started</TableCell>
                 <TableCell width="100px">Duration</TableCell>
                 <TableCell align="right">Actions</TableCell>
               </TableRow>
