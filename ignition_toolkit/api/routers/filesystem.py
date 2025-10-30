@@ -39,6 +39,8 @@ ALLOWED_BASE_PATHS = [
     Path.home(),
     Path("/tmp"),
     Path("/mnt"),  # Windows drives mounted in WSL (e.g., /mnt/c, /mnt/d)
+    Path("/Ubuntu"),  # Ubuntu modules folder
+    Path("/modules"),  # WSL Ubuntu modules directory
 ]
 
 
@@ -86,7 +88,7 @@ async def browse_directory(path: str = "./data/downloads") -> DirectoryContents:
         if not is_path_allowed(target_path):
             raise HTTPException(
                 status_code=403,
-                detail=f"Access denied: Path must be within allowed directories (./data, home directory, /tmp, or /mnt for Windows drives)",
+                detail=f"Access denied: Path must be within allowed directories (./data, /modules, home directory, /tmp, or /mnt for Windows drives)",
             )
 
         # Verify path exists and is a directory
@@ -140,4 +142,85 @@ async def browse_directory(path: str = "./data/downloads") -> DirectoryContents:
         raise HTTPException(
             status_code=500,
             detail=f"Failed to browse directory: {str(e)}",
+        )
+
+
+class ModuleFileInfo(BaseModel):
+    """Information about a module file"""
+
+    filename: str
+    filepath: str
+    is_unsigned: bool
+    module_name: str | None = None
+    module_version: str | None = None
+    module_id: str | None = None
+
+
+class ModuleFilesResponse(BaseModel):
+    """Response containing detected module files"""
+
+    path: str
+    files: List[ModuleFileInfo]
+
+
+@router.get("/list-modules")
+async def list_module_files(path: str = "/Ubuntu/modules") -> ModuleFilesResponse:
+    """
+    List .modl and .unsigned.modl files in a directory and extract metadata
+
+    Args:
+        path: Directory path to search for module files
+
+    Returns:
+        ModuleFilesResponse with detected module files and their metadata
+    """
+    try:
+        from ignition_toolkit.modules import parse_module_metadata
+
+        target_path = Path(path).resolve()
+
+        # Security check
+        if not is_path_allowed(target_path):
+            raise HTTPException(status_code=403, detail="Access denied to this path")
+
+        if not target_path.exists():
+            raise HTTPException(status_code=404, detail=f"Directory not found: {path}")
+
+        if not target_path.is_dir():
+            raise HTTPException(status_code=400, detail=f"Path is not a directory: {path}")
+
+        # Find all .modl and .unsigned.modl files
+        module_files = []
+
+        for file_path in target_path.iterdir():
+            if file_path.is_file() and (
+                file_path.suffix == ".modl" or str(file_path).endswith(".unsigned.modl")
+            ):
+                is_unsigned = str(file_path).endswith(".unsigned.modl")
+
+                # Try to extract metadata
+                metadata = parse_module_metadata(str(file_path))
+
+                module_files.append(
+                    ModuleFileInfo(
+                        filename=file_path.name,
+                        filepath=str(file_path.absolute()),
+                        is_unsigned=is_unsigned,
+                        module_name=metadata.name if metadata else None,
+                        module_version=metadata.version if metadata else None,
+                        module_id=metadata.id if metadata else None,
+                    )
+                )
+
+        logger.info(f"Found {len(module_files)} module files in {path}")
+
+        return ModuleFilesResponse(path=str(target_path), files=module_files)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error listing module files in {path}: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to list module files: {str(e)}",
         )

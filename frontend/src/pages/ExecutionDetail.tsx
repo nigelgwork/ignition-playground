@@ -374,17 +374,43 @@ export function ExecutionDetail() {
                     <ListItemText
                       primary={step.step_name || `Step ${index + 1}`}
                       secondary={
-                        step.error ? (
-                          <Typography variant="caption" color="error" sx={{ fontSize: '0.65rem' }}>
-                            Error: {step.error}
-                          </Typography>
-                        ) : step.completed_at ? (
-                          `Completed at ${new Date(
-                            step.completed_at
-                          ).toLocaleTimeString()}`
-                        ) : (
-                          step.status
-                        )
+                        <>
+                          {step.error ? (
+                            <Typography variant="caption" color="error" sx={{ fontSize: '0.65rem' }}>
+                              Error: {step.error}
+                            </Typography>
+                          ) : step.completed_at ? (
+                            `Completed at ${new Date(
+                              step.completed_at
+                            ).toLocaleTimeString()}`
+                          ) : (
+                            step.status
+                          )}
+                          {/* Display python script output if available */}
+                          {step.output && step.output._output && (
+                            <Typography
+                              variant="caption"
+                              component="pre"
+                              sx={{
+                                fontSize: '0.7rem',
+                                fontFamily: 'monospace',
+                                whiteSpace: 'pre-wrap',
+                                wordBreak: 'break-word',
+                                mt: 1,
+                                p: 1,
+                                bgcolor: 'rgba(0, 255, 0, 0.05)',
+                                borderRadius: 1,
+                                border: '1px solid rgba(0, 255, 0, 0.2)',
+                                color: '#00ff00',
+                                maxHeight: '400px',
+                                overflow: 'auto',
+                                display: 'block',
+                              }}
+                            >
+                              {step.output._output}
+                            </Typography>
+                          )}
+                        </>
                       }
                       primaryTypographyProps={{ variant: 'body2', fontSize: '0.8rem' }}
                       secondaryTypographyProps={{ variant: 'caption', fontSize: '0.7rem' }}

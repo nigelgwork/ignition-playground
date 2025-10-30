@@ -89,10 +89,60 @@ export default function FolderBrowserDialog({
     onClose();
   };
 
+  const handleQuickNavigate = (path: string) => {
+    fetchDirectory(path);
+  };
+
   return (
     <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
       <DialogTitle>Select Download Folder</DialogTitle>
       <DialogContent>
+        {/* Quick Access Buttons for Windows Drives and Common Folders */}
+        <Box sx={{ mb: 2, display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+          <Button
+            size="small"
+            variant="outlined"
+            onClick={() => handleQuickNavigate('/Ubuntu/modules')}
+          >
+            Ubuntu Modules
+          </Button>
+          <Button
+            size="small"
+            variant="outlined"
+            onClick={() => handleQuickNavigate('/mnt/c/Users')}
+          >
+            C:\Users
+          </Button>
+          <Button
+            size="small"
+            variant="outlined"
+            onClick={() => handleQuickNavigate('/mnt/c/temp')}
+          >
+            C:\temp
+          </Button>
+          <Button
+            size="small"
+            variant="outlined"
+            onClick={() => handleQuickNavigate('/mnt/c/')}
+          >
+            C:\
+          </Button>
+          <Button
+            size="small"
+            variant="outlined"
+            onClick={() => handleQuickNavigate('/mnt/d/')}
+          >
+            D:\
+          </Button>
+          <Button
+            size="small"
+            variant="outlined"
+            onClick={() => handleQuickNavigate('./data/downloads')}
+          >
+            Default (./data/downloads)
+          </Button>
+        </Box>
+
         <Box sx={{ mb: 2 }}>
           <Typography
             variant="body2"

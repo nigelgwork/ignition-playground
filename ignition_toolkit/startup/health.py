@@ -66,6 +66,7 @@ class SystemHealth:
         default_factory=lambda: ComponentHealth(HealthStatus.UNKNOWN)
     )
     frontend: ComponentHealth = field(default_factory=lambda: ComponentHealth(HealthStatus.UNKNOWN))
+    scheduler: ComponentHealth = field(default_factory=lambda: ComponentHealth(HealthStatus.UNKNOWN))
 
     # Startup issues
     errors: list[str] = field(default_factory=list)
@@ -82,6 +83,7 @@ class SystemHealth:
                 "vault": self.vault.to_dict(),
                 "playbooks": self.playbooks.to_dict(),
                 "frontend": self.frontend.to_dict(),
+                "scheduler": self.scheduler.to_dict(),
             },
             "errors": self.errors,
             "warnings": self.warnings,

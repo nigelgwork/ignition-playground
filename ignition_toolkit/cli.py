@@ -86,8 +86,9 @@ def credential() -> None:
 @click.argument("name")
 @click.option("--username", prompt=True, help="Username")
 @click.option("--password", prompt=True, hide_input=True, help="Password")
+@click.option("--gateway-url", default=None, help="Gateway URL (e.g., http://localhost:9088)")
 @click.option("--description", default="", help="Credential description")
-def credential_add(name: str, username: str, password: str, description: str) -> None:
+def credential_add(name: str, username: str, password: str, gateway_url: str | None, description: str) -> None:
     """Add a new credential"""
     from ignition_toolkit.credentials.models import Credential
     from ignition_toolkit.credentials.vault import CredentialVault
@@ -97,11 +98,14 @@ def credential_add(name: str, username: str, password: str, description: str) ->
         name=name,
         username=username,
         password=password,
+        gateway_url=gateway_url,
         description=description,
     )
     vault.save_credential(credential)
 
     console.print(f"\n✅ Credential '[cyan]{name}[/cyan]' saved successfully")
+    if gateway_url:
+        console.print(f"   Gateway URL: [green]{gateway_url}[/green]")
     console.print(f"   Use in playbooks: [yellow]{{{{ credential.{name} }}}}[/yellow]\n")
 
 
@@ -123,10 +127,11 @@ def credential_list() -> None:
     table = Table(title="Stored Credentials", show_header=True, header_style="bold cyan")
     table.add_column("Name", style="cyan")
     table.add_column("Username", style="white")
+    table.add_column("Gateway URL", style="green")
     table.add_column("Description", style="dim")
 
     for cred in credentials:
-        table.add_row(cred.name, cred.username, cred.description or "")
+        table.add_row(cred.name, cred.username, cred.gateway_url or "", cred.description or "")
 
     console.print()
     console.print(table)

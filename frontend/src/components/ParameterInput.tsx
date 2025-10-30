@@ -13,6 +13,8 @@ import {
   Typography,
   IconButton,
   InputAdornment,
+  Box,
+  Switch,
 } from '@mui/material';
 import FolderIcon from '@mui/icons-material/Folder';
 import type { ParameterInfo, CredentialInfo } from '../types/api';
@@ -70,6 +72,38 @@ export function ParameterInput({
             </MenuItem>
           ))}
         </Select>
+      ) : parameter.type === 'boolean' ? (
+        (() => {
+          // Determine labels based on parameter name
+          const isModuleTypeParam = parameter.name.toLowerCase().includes('module_type') ||
+                                     parameter.name.toLowerCase().includes('unsigned');
+          const leftLabel = isModuleTypeParam ? 'Signed' : 'False';
+          const rightLabel = isModuleTypeParam ? 'Unsigned' : 'True';
+          const isChecked = value === 'true';
+
+          return (
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mt: 1 }}>
+              <Typography variant="body2" sx={{ minWidth: '80px', color: isChecked ? 'text.secondary' : '#00ff00' }}>
+                {leftLabel}
+              </Typography>
+              <Switch
+                checked={isChecked}
+                onChange={(e) => handleChange(e.target.checked ? 'true' : 'false')}
+                sx={{
+                  '& .MuiSwitch-switchBase.Mui-checked': {
+                    color: '#00ff00',
+                  },
+                  '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': {
+                    backgroundColor: '#00ff00',
+                  },
+                }}
+              />
+              <Typography variant="body2" sx={{ minWidth: '80px', color: isChecked ? '#00ff00' : 'text.secondary' }}>
+                {rightLabel}
+              </Typography>
+            </Box>
+          );
+        })()
       ) : parameter.type === 'file' ? (
         <TextField
           id={`param-${parameter.name}`}
@@ -116,7 +150,7 @@ export function ParameterInput({
               open={folderDialogOpen}
               onClose={() => setFolderDialogOpen(false)}
               onSelect={(selectedPath) => handleChange(selectedPath)}
-              initialPath={value || './data/downloads'}
+              initialPath={value || '/modules'}
             />
           )}
         </>

@@ -176,3 +176,89 @@ def test_whitespace_in_references():
     # With tabs
     result2 = resolver.resolve("{{\tparameter.value\t}}")
     assert result2 == "test"
+
+
+def test_resolve_step_output():
+    """Test resolving step output reference"""
+    step_results = {
+        "step1": {"module_name": "Perspective", "version": "8.1.0"},
+        "step2": {"status": "completed"},
+    }
+    resolver = ParameterResolver(step_results=step_results)
+
+    # Resolve step output with attribute access
+    result = resolver.resolve("{{ step.step1.module_name }}")
+    assert result == "Perspective"
+
+    # Resolve different attribute
+    result2 = resolver.resolve("{{ step.step1.version }}")
+    assert result2 == "8.1.0"
+
+
+def test_resolve_step_output_in_template():
+    """Test resolving step output in template string"""
+    step_results = {
+        "detect": {"module_name": "Perspective", "version": "8.1.0"},
+    }
+    resolver = ParameterResolver(step_results=step_results)
+
+    result = resolver.resolve("Installing {{ step.detect.module_name }} version {{ step.detect.version }}")
+    assert result == "Installing Perspective version 8.1.0"
+
+
+def test_resolve_step_output_missing_step():
+    """Test error when step not found"""
+    resolver = ParameterResolver(step_results={})
+
+    with pytest.raises(ParameterResolutionError, match="Step 'missing_step' not found"):
+        resolver.resolve("{{ step.missing_step.output }}")
+
+
+def test_resolve_step_output_missing_attribute():
+    """Test error when step output attribute not found"""
+    step_results = {"step1": {"module_name": "Perspective"}}
+    resolver = ParameterResolver(step_results=step_results)
+
+    with pytest.raises(ParameterResolutionError, match="Attribute 'missing_attr' not found"):
+        resolver.resolve("{{ step.step1.missing_attr }}")
+
+
+def test_resolve_step_output_empty():
+    """Test error when step has no output"""
+    step_results = {"step1": {}}
+    resolver = ParameterResolver(step_results=step_results)
+
+    with pytest.raises(ParameterResolutionError, match="has no output data"):
+        resolver.resolve("{{ step.step1.value }}")
+
+
+def test_resolve_step_output_in_dict():
+    """Test resolving step references in dictionary"""
+    step_results = {
+        "detect": {"module_file": "/path/to/module.modl", "module_name": "Perspective"}
+    }
+    resolver = ParameterResolver(step_results=step_results)
+
+    data = {
+        "file_path": "{{ step.detect.module_file }}",
+        "name": "{{ step.detect.module_name }}",
+    }
+
+    result = resolver.resolve(data)
+    assert result["file_path"] == "/path/to/module.modl"
+    assert result["name"] == "Perspective"
+
+
+def test_resolve_mixed_references():
+    """Test resolving mix of parameter, variable, and step references"""
+    resolver = ParameterResolver(
+        parameters={"gateway_url": "http://localhost:8088"},
+        variables={"timeout": 30},
+        step_results={"detect": {"module_name": "Perspective"}},
+    )
+
+    result = resolver.resolve(
+        "Connecting to {{ parameter.gateway_url }} with timeout {{ variable.timeout }} "
+        "to install {{ step.detect.module_name }}"
+    )
+    assert result == "Connecting to http://localhost:8088 with timeout 30 to install Perspective"

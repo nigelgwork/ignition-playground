@@ -152,13 +152,18 @@ class PlaybookLoader:
         if len(step_ids) != len(set(step_ids)):
             raise PlaybookValidationError("Step IDs must be unique")
 
+        # Build metadata dict - include domain if present at root level
+        metadata = data.get("metadata", {})
+        if "domain" in data:
+            metadata["domain"] = data["domain"]
+
         return Playbook(
             name=data["name"],
             version=data["version"],
             description=data.get("description", ""),
             parameters=parameters,
             steps=steps,
-            metadata=data.get("metadata", {}),
+            metadata=metadata,
         )
 
     @staticmethod

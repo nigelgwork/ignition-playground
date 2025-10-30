@@ -1,0 +1,92 @@
+name: "Launch Designer"
+version: "3.0"
+description: "Directly launches Ignition Designer and automates login (Linux/WSL2)"
+domain: designer
+
+parameters:
+  - name: project_name
+    type: string
+    required: false
+    description: "Project to open (leave empty to select manually)"
+
+steps:
+  # Step 1: Launch Designer Launcher with Gateway URL
+  - id: launch_designer
+    name: "Launch Designer Launcher"
+    type: utility.python
+    parameters:
+      script: |
+        import subprocess
+        import os
+
+        gateway_url = "{{ credential.localgateway.gateway_url }}"
+
+        # The Designer Launcher expects: designer://host:port
+        # Extract host and port from gateway_url (remove http:// or https://)
+        import re
+        match = re.match(r'https?://([^/]+)', gateway_url)
+        if match:
+            host_port = match.group(1)
+        else:
+            host_port = gateway_url  # Already in host:port format
+
+        protocol_url = f"designer://{host_port}"
+
+        launcher_script = "/root/designerlauncher/designerlauncher.sh"
+
+        print(f"Launching Designer with: {protocol_url}")
+
+        # Launch Designer Launcher with the protocol URL
+        subprocess.Popen(
+            [launcher_script, protocol_url],
+            env=dict(os.environ, DISPLAY=":0"),
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL
+        )
+
+        print(f"LAUNCH_STATUS=initiated")
+        print(f"PROTOCOL_URL={protocol_url}")
+    timeout: 15
+    on_failure: abort
+
+  # Step 2: Wait for Designer window to appear
+  - id: wait_window
+    name: "Wait for Designer window"
+    type: designer.wait
+    parameters:
+      timeout: 90
+    timeout: 120
+    retry_count: 3
+    retry_delay: 10
+    on_failure: abort
+
+  # Step 3: Login to Designer
+  - id: login
+    name: "Login to Designer"
+    type: designer.login
+    parameters:
+      username: "{{ credential.localgateway.username }}"
+      password: "{{ credential.localgateway.password }}"
+      timeout: 45
+    timeout: 60
+    retry_count: 3
+    retry_delay: 5
+    on_failure: abort
+
+  # Step 4: Open project (optional)
+  - id: open_project
+    name: "Open project"
+    type: designer.open_project
+    parameters:
+      project_name: "{{ project_name }}"
+      timeout: 30
+    timeout: 60
+    on_failure: continue
+
+  # Step 5: Log completion
+  - id: log_complete
+    name: "Log success"
+    type: utility.log
+    parameters:
+      message: "Designer launched and logged in successfully. Project: {{ project_name or 'Manual selection' }}"
+    on_failure: continue

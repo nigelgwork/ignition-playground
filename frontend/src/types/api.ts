@@ -30,6 +30,7 @@ export interface PlaybookInfo {
   parameters: ParameterInfo[];
   steps: StepInfo[];
   // Metadata fields
+  domain: string | null;  // Playbook domain (gateway, designer, perspective)
   revision: number;
   verified: boolean;
   enabled: boolean;
@@ -93,6 +94,10 @@ export interface StepResult {
   error: string | null;
   started_at: string | null;
   completed_at: string | null;
+  output?: {
+    _output?: string;
+    [key: string]: any;
+  };
 }
 
 export interface ExecutionUpdate {

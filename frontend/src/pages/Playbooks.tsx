@@ -8,7 +8,6 @@ import {
   Typography,
   Alert,
   CircularProgress,
-  Snackbar,
   Accordion,
   AccordionSummary,
   AccordionDetails,
@@ -120,22 +119,41 @@ function applyOrder(playbooks: PlaybookInfo[], category: string): PlaybookInfo[]
   return ordered;
 }
 
-// Categorize playbooks by path
+// Categorize playbooks by domain field (preferred) or path (fallback)
 function categorizePlaybooks(playbooks: PlaybookInfo[]) {
   const gateway: PlaybookInfo[] = [];
   const designer: PlaybookInfo[] = [];
   const perspective: PlaybookInfo[] = [];
 
   playbooks.forEach((playbook) => {
-    if (playbook.path.includes('/gateway/')) {
-      gateway.push(playbook);
-    } else if (playbook.path.includes('/designer/')) {
-      designer.push(playbook);
-    } else if (playbook.path.includes('/perspective/') || playbook.path.includes('/browser/')) {
-      perspective.push(playbook);
+    // Prefer domain field from YAML metadata
+    if (playbook.domain) {
+      if (playbook.domain === 'gateway') {
+        gateway.push(playbook);
+      } else if (playbook.domain === 'designer') {
+        designer.push(playbook);
+      } else if (playbook.domain === 'perspective') {
+        perspective.push(playbook);
+      } else {
+        // Unknown domain, fall back to path
+        categorizeByPath(playbook);
+      }
     } else {
-      // Default to gateway if unclear
-      gateway.push(playbook);
+      // No domain field, fall back to path
+      categorizeByPath(playbook);
+    }
+
+    function categorizeByPath(pb: PlaybookInfo) {
+      if (pb.path.includes('gateway/')) {
+        gateway.push(pb);
+      } else if (pb.path.includes('designer/')) {
+        designer.push(pb);
+      } else if (pb.path.includes('perspective/') || pb.path.includes('browser/')) {
+        perspective.push(pb);
+      } else {
+        // Default to gateway if unclear
+        gateway.push(pb);
+      }
     }
   });
 
@@ -149,8 +167,6 @@ function categorizePlaybooks(playbooks: PlaybookInfo[]) {
 
 export function Playbooks() {
   const [selectedPlaybook, setSelectedPlaybook] = useState<PlaybookInfo | null>(null);
-  const [executionStarted, setExecutionStarted] = useState(false);
-  const [lastExecutionId, setLastExecutionId] = useState<string>('');
   const [dragEnabled, setDragEnabled] = useState(false);
   const [stepsDialogPlaybook, setStepsDialogPlaybook] = useState<PlaybookInfo | null>(null);
 
@@ -272,14 +288,34 @@ export function Playbooks() {
       return;
     }
 
+    // If we have saved config but no credential, open configure dialog
+    if (!selectedCredential) {
+      setSelectedPlaybook(playbook);
+      return;
+    }
+
     try {
       const savedConfig = JSON.parse(savedConfigStr);
 
-      // Execute directly with saved config
+      // Convert boolean string values to actual booleans
+      const convertedParams: Record<string, any> = {};
+      for (const [key, value] of Object.entries(savedConfig.parameters || {})) {
+        // Find the parameter definition
+        const paramDef = playbook.parameters.find(p => p.name === key);
+        if (paramDef?.type === 'boolean') {
+          // Convert string 'true'/'false' to boolean
+          convertedParams[key] = value === 'true' || value === true;
+        } else {
+          convertedParams[key] = value;
+        }
+      }
+
+      // Execute with saved config parameters + global credential
       const response = await api.executions.start({
         playbook_path: playbook.path,
-        parameters: savedConfig.parameters,
-        gateway_url: savedConfig.gatewayUrl,
+        parameters: convertedParams, // Use converted params (boolean types fixed)
+        gateway_url: selectedCredential.gateway_url, // Always use global credential's gateway_url
+        credential_name: selectedCredential.name, // Always use global credential
         debug_mode,
       });
 
@@ -289,11 +325,6 @@ export function Playbooks() {
       console.error('Failed to execute playbook:', error);
       alert('Failed to start execution. Please check the console for details.');
     }
-  };
-
-  const handleExecutionStarted = (executionId: string) => {
-    setLastExecutionId(executionId);
-    setExecutionStarted(true);
   };
 
   // Drag end handlers for each category
@@ -582,7 +613,6 @@ export function Playbooks() {
         open={selectedPlaybook !== null}
         playbook={selectedPlaybook}
         onClose={() => setSelectedPlaybook(null)}
-        onExecutionStarted={handleExecutionStarted}
       />
 
       {/* Steps dialog */}
@@ -592,23 +622,6 @@ export function Playbooks() {
         onClose={() => setStepsDialogPlaybook(null)}
       />
 
-      {/* Success notification */}
-      <Snackbar
-        open={executionStarted}
-        autoHideDuration={6000}
-        onClose={() => setExecutionStarted(false)}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
-      >
-        <Alert
-          onClose={() => setExecutionStarted(false)}
-          severity="success"
-          sx={{ width: '100%' }}
-        >
-          Execution started! ID: {lastExecutionId.substring(0, 8)}...
-          <br />
-          Check the Executions page for real-time updates.
-        </Alert>
-      </Snackbar>
     </Box>
   );
 }

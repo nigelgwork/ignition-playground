@@ -186,6 +186,7 @@ async def list_playbooks():
                     step_count=len(playbook.steps),
                     parameters=parameters,
                     steps=steps,
+                    domain=playbook.metadata.get("domain"),  # Extract domain from metadata
                     revision=meta.revision,
                     verified=meta.verified,
                     enabled=meta.enabled,
@@ -243,6 +244,7 @@ async def get_playbook(playbook_path: str):
             step_count=len(playbook.steps),
             parameters=parameters,
             steps=steps,
+            domain=playbook.metadata.get("domain"),  # Extract domain from metadata
         )
     except HTTPException:
         raise

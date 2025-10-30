@@ -21,6 +21,7 @@ parameters:
   - name: download_path
     type: string
     required: false
+    default: "./data/downloads"
     description: "Custom download location (default: ./data/downloads)"
 
 steps:
@@ -52,7 +53,7 @@ steps:
     name: "Step 4: Click Download Backup Button"
     type: browser.click
     parameters:
-      selector: "button >> text=/download/i, button >> text=/backup/i, [role='button'] >> text=/download/i"
+      selector: "text=Download Backup"
     timeout: 10
     on_failure: abort
 

@@ -86,34 +86,101 @@ class BrowserManager:
         await self.stop()
 
     async def start(self) -> None:
-        """Start browser instance"""
+        """Start browser instance with timeout protection"""
         if self._browser is not None:
             logger.warning("Browser already started")
             return
 
         logger.info("Starting Playwright browser...")
-        self._playwright = await async_playwright().start()
 
-        # Launch browser
-        self._browser = await self._playwright.chromium.launch(
-            headless=self.headless,
-            slow_mo=self.slow_mo,
-        )
+        # CRITICAL FIX: Add timeout to prevent indefinite hangs from event loop deadlock
+        try:
+            # Initialize Playwright with timeout
+            self._playwright = await asyncio.wait_for(
+                async_playwright().start(),
+                timeout=30.0  # 30 second timeout
+            )
+            logger.info("Playwright driver started successfully")
 
-        # Create context
-        self._context = await self._browser.new_context(
-            viewport={"width": 1920, "height": 1080},
-            ignore_https_errors=True,
-            accept_downloads=True,
-        )
+            # Launch browser with timeout
+            self._browser = await asyncio.wait_for(
+                self._playwright.chromium.launch(
+                    headless=self.headless,
+                    slow_mo=self.slow_mo,
+                ),
+                timeout=30.0  # 30 second timeout
+            )
+            logger.info("Chromium browser launched successfully")
 
-        # Create page
-        self._page = await self._context.new_page()
+            # Create context with timeout
+            self._context = await asyncio.wait_for(
+                self._browser.new_context(
+                    viewport={"width": 1920, "height": 1080},
+                    ignore_https_errors=True,
+                    accept_downloads=True,
+                ),
+                timeout=10.0  # 10 second timeout
+            )
+            logger.info("Browser context created successfully")
 
-        # Set up download handler to save to custom location
-        self._page.on("download", self._download_started)
+            # Create page with timeout
+            self._page = await asyncio.wait_for(
+                self._context.new_page(),
+                timeout=10.0  # 10 second timeout
+            )
+            logger.info("Browser page created successfully")
 
-        logger.info("Browser started successfully")
+            # Set up download handler to save to custom location
+            self._page.on("download", self._download_started)
+
+            logger.info("Browser started successfully")
+
+        except asyncio.TimeoutError as e:
+            logger.error(f"Timeout during browser initialization: {e}")
+            # Cleanup any partial initialization
+            await self._cleanup_partial_init()
+            raise RuntimeError(
+                "Browser initialization timed out. This may indicate an event loop deadlock "
+                "or Playwright driver issue. Check that no other Playwright instances are stuck."
+            ) from e
+        except Exception as e:
+            logger.error(f"Error during browser initialization: {e}")
+            await self._cleanup_partial_init()
+            raise
+
+    async def _cleanup_partial_init(self) -> None:
+        """Clean up partially initialized browser components"""
+        try:
+            if self._page:
+                await self._page.close()
+        except Exception as e:
+            logger.warning(f"Error closing page during cleanup: {e}")
+        finally:
+            self._page = None
+
+        try:
+            if self._context:
+                await self._context.close()
+        except Exception as e:
+            logger.warning(f"Error closing context during cleanup: {e}")
+        finally:
+            self._context = None
+
+        try:
+            if self._browser:
+                await self._browser.close()
+        except Exception as e:
+            logger.warning(f"Error closing browser during cleanup: {e}")
+        finally:
+            self._browser = None
+
+        try:
+            if self._playwright:
+                await self._playwright.stop()
+        except Exception as e:
+            logger.warning(f"Error stopping playwright during cleanup: {e}")
+        finally:
+            self._playwright = None
 
     async def stop(self) -> None:
         """Stop browser instance"""

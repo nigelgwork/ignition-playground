@@ -48,6 +48,14 @@ class StepType(str, Enum):
     BROWSER_WAIT = "browser.wait"
     BROWSER_VERIFY = "browser.verify"
 
+    # Designer operations (desktop application automation)
+    DESIGNER_LAUNCH = "designer.launch"
+    DESIGNER_LOGIN = "designer.login"
+    DESIGNER_OPEN_PROJECT = "designer.open_project"
+    DESIGNER_CLOSE = "designer.close"
+    DESIGNER_SCREENSHOT = "designer.screenshot"
+    DESIGNER_WAIT = "designer.wait"
+
     # Playbook operations (composable playbooks)
     PLAYBOOK_RUN = "playbook.run"
 
@@ -55,6 +63,7 @@ class StepType(str, Enum):
     SLEEP = "utility.sleep"
     LOG = "utility.log"
     SET_VARIABLE = "utility.set_variable"
+    PYTHON = "utility.python"
 
     # AI operations (placeholder for future)
     AI_GENERATE = "ai.generate"

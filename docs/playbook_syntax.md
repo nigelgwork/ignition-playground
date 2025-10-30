@@ -205,17 +205,81 @@ parameters:
 ### Types of References
 
 ```yaml
-# Parameter reference
+# Parameter reference (from playbook parameters)
 "{{ parameter.gateway_url }}"
 
-# Credential reference
+# Credential reference (from credential vault)
 "{{ credential.gateway_admin }}"
 "{{ credential.gateway_admin.username }}"
 "{{ credential.gateway_admin.password }}"
 
-# Variable reference (set during execution)
+# Variable reference (set during execution via utility.set_variable)
 "{{ variable.module_name }}"
+
+# Step output reference (from previous step outputs - NEW in v3.4)
+"{{ step.step_id.output_key }}"
 ```
+
+### Step Output References
+
+**New Feature (v3.4+):** Reference outputs from previous steps using `{{ step.step_id.output_key }}` syntax.
+
+**How it works:**
+1. Steps that produce output (like `utility.python`) store their results
+2. Later steps can reference these outputs using the step ID and output key
+3. Step outputs are only available from **previously completed steps**
+
+**Example:**
+
+```yaml
+steps:
+  # Step 1: Extract data using Python
+  - id: detect_module
+    name: "Detect Module Metadata"
+    type: utility.python
+    parameters:
+      script: |
+        import zipfile
+        # ... extraction logic ...
+        print(f"DETECTED_MODULE_NAME=Perspective")
+        print(f"DETECTED_MODULE_FILE=/path/to/module.modl")
+
+  # Step 2: Store module name as variable (for reuse)
+  - id: store_name
+    name: "Store Module Name"
+    type: utility.set_variable
+    parameters:
+      name: "module_name"
+      value: "{{ step.detect_module.DETECTED_MODULE_NAME }}"
+
+  # Step 3: Use the variable in browser automation
+  - id: search_module
+    name: "Search for Module"
+    type: browser.fill
+    parameters:
+      selector: "input[type='search']"
+      value: "{{ variable.module_name }}"  # Uses stored variable
+
+  # Step 4: Use step output directly
+  - id: upload_module
+    name: "Upload Module File"
+    type: browser.fill
+    parameters:
+      selector: "input[type='file']"
+      value: "{{ step.detect_module.DETECTED_MODULE_FILE }}"
+```
+
+**Key Points:**
+- Step outputs are stored in a dictionary with keys from `print()` statements in `utility.python` steps
+- The pattern `KEY=value` in printed output is automatically parsed
+- You can reference any key from the step's output dictionary
+- Step references can be used in templates, browser.fill, utility.set_variable, and any parameter
+
+**Valid output sources:**
+- `utility.python` - Outputs from print(KEY=value) statements
+- `gateway.*` - Some gateway operations return structured data
+- `browser.screenshot` - Returns screenshot path
+- Any step type that returns a dictionary with string keys
 
 ### Reference in Strings
 
@@ -223,6 +287,7 @@ parameters:
 parameters:
   url: "http://{{ parameter.host }}:{{ parameter.port }}"
   message: "User {{ credential.admin.username }} logged in"
+  status: "Module {{ step.detect.module_name }} version {{ step.detect.version }} detected"
 ```
 
 ## Step Options

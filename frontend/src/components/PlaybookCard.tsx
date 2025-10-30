@@ -46,11 +46,13 @@ import {
   Check as SaveIcon,
   Cancel as CancelIcon,
   Delete as DeleteIcon,
+  Schedule as ScheduleIcon,
 } from '@mui/icons-material';
 import type { PlaybookInfo } from '../types/api';
 import { useStore } from '../store';
 import { api } from '../api/client';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import ScheduleDialog from './ScheduleDialog';
 
 interface PlaybookCardProps {
   playbook: PlaybookInfo;
@@ -90,6 +92,11 @@ export function PlaybookCard({ playbook, onConfigure, onExecute, onExport, onVie
     const stored = localStorage.getItem(`playbook_debug_${playbook.path}`);
     return stored === 'true';
   });
+  const [scheduleMode, setScheduleMode] = useState(() => {
+    const stored = localStorage.getItem(`playbook_schedule_mode_${playbook.path}`);
+    return stored === 'true';
+  });
+  const [scheduleDialogOpen, setScheduleDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editedName, setEditedName] = useState(playbook.name);
   const [editedDescription, setEditedDescription] = useState(playbook.description);
@@ -215,6 +222,12 @@ export function PlaybookCard({ playbook, onConfigure, onExecute, onExport, onVie
     const newDebugMode = event.target.checked;
     setDebugMode(newDebugMode);
     localStorage.setItem(`playbook_debug_${playbook.path}`, newDebugMode.toString());
+  };
+
+  const handleScheduleModeToggle = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const newScheduleMode = event.target.checked;
+    setScheduleMode(newScheduleMode);
+    localStorage.setItem(`playbook_schedule_mode_${playbook.path}`, newScheduleMode.toString());
   };
 
   const handleExecuteClick = () => {
@@ -368,33 +381,57 @@ export function PlaybookCard({ playbook, onConfigure, onExecute, onExport, onVie
           </Box>
         )}
 
-        {/* Debug Mode Toggle */}
-        <Box sx={{ mt: 1, mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
-          <DebugIcon fontSize="small" color={debugMode ? 'primary' : 'disabled'} />
-          <FormControlLabel
-            control={
-              <Switch
-                checked={debugMode}
-                onChange={handleDebugModeToggle}
-                size="small"
-                disabled={isDisabled}
-                color="primary"
-              />
-            }
-            label={
-              <Typography variant="caption" color={debugMode ? 'primary' : 'text.secondary'} fontWeight={debugMode ? 'bold' : 'normal'}>
-                Debug Mode
-              </Typography>
-            }
-          />
+        {/* Mode Toggles - Debug and Schedule */}
+        <Box sx={{ mt: 1, mb: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2 }}>
+          {/* Debug Mode Toggle - Left */}
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <DebugIcon fontSize="small" color={debugMode ? 'primary' : 'disabled'} />
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={debugMode}
+                  onChange={handleDebugModeToggle}
+                  size="small"
+                  disabled={isDisabled}
+                  color="primary"
+                />
+              }
+              label={
+                <Typography variant="caption" color={debugMode ? 'primary' : 'text.secondary'} fontWeight={debugMode ? 'bold' : 'normal'}>
+                  Debug Mode
+                </Typography>
+              }
+            />
+          </Box>
+
+          {/* Schedule Mode Toggle - Right */}
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <ScheduleIcon fontSize="small" color={scheduleMode ? 'secondary' : 'disabled'} />
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={scheduleMode}
+                  onChange={handleScheduleModeToggle}
+                  size="small"
+                  disabled={isDisabled}
+                  color="secondary"
+                />
+              }
+              label={
+                <Typography variant="caption" color={scheduleMode ? 'secondary' : 'text.secondary'} fontWeight={scheduleMode ? 'bold' : 'normal'}>
+                  Schedule Mode
+                </Typography>
+              }
+            />
+          </Box>
         </Box>
 
       </CardContent>
 
-      <CardActions sx={{ pt: 0, gap: 1 }}>
+      <CardActions sx={{ pt: 0, gap: 1, flexWrap: 'wrap' }}>
         {/* Configure Button */}
         <Tooltip title="Configure parameters for this playbook">
-          <span style={{ flex: 1 }}>
+          <span style={{ flex: 1, minWidth: scheduleMode ? '100px' : 'auto' }}>
             <Button
               size="small"
               variant="outlined"
@@ -408,6 +445,26 @@ export function PlaybookCard({ playbook, onConfigure, onExecute, onExport, onVie
             </Button>
           </span>
         </Tooltip>
+
+        {/* Schedule Button - Only visible when Schedule Mode is enabled */}
+        {scheduleMode && (
+          <Tooltip title="Set up a schedule for this playbook">
+            <span style={{ flex: 1, minWidth: '100px' }}>
+              <Button
+                size="small"
+                variant="outlined"
+                color="secondary"
+                startIcon={<ScheduleIcon />}
+                onClick={() => setScheduleDialogOpen(true)}
+                fullWidth
+                disabled={isDisabled}
+                aria-label={`Schedule ${playbook.name} playbook`}
+              >
+                Schedule
+              </Button>
+            </span>
+          </Tooltip>
+        )}
 
         {/* Execute Button */}
         <Tooltip title={
@@ -673,6 +730,14 @@ export function PlaybookCard({ playbook, onConfigure, onExecute, onExport, onVie
           <Button onClick={() => setDetailsDialogOpen(false)}>Close</Button>
         </DialogActions>
       </Dialog>
+
+      {/* Schedule Dialog */}
+      <ScheduleDialog
+        open={scheduleDialogOpen}
+        onClose={() => setScheduleDialogOpen(false)}
+        playbook={playbook}
+        savedConfig={savedConfig}
+      />
 
       {/* Snackbar for notifications */}
       <Snackbar

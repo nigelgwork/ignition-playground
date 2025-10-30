@@ -27,6 +27,7 @@ from ignition_toolkit.api.routers.credentials import router as credentials_route
 from ignition_toolkit.api.routers.executions import router as executions_router
 from ignition_toolkit.api.routers.filesystem import router as filesystem_router
 from ignition_toolkit.api.routers.playbooks import router as playbooks_router
+from ignition_toolkit.api.routers.schedules import router as schedules_router
 from ignition_toolkit.api.routers.websockets import router as websockets_router
 from ignition_toolkit.playbook.engine import PlaybookEngine
 from ignition_toolkit.playbook.metadata import PlaybookMetadataStore
@@ -53,6 +54,9 @@ app.include_router(executions_router)
 
 # Register credentials router
 app.include_router(credentials_router)
+
+# Register schedules router
+app.include_router(schedules_router)
 
 # Register filesystem router
 app.include_router(filesystem_router)

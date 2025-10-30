@@ -33,14 +33,15 @@ class ParameterResolver:
         resolved = resolver.resolve("{{ credential.gateway_admin }}")
     """
 
-    # Pattern to match {{ type.name }} or {{ name }}
-    PATTERN = re.compile(r"\{\{\s*(\w+)(?:\.(\w+))?\s*\}\}")
+    # Pattern to match {{ type.name.attr }} or {{ type.name }} or {{ name }}
+    PATTERN = re.compile(r"\{\{\s*(\w+)(?:\.(\w+))?(?:\.(\w+))?\s*\}\}")
 
     def __init__(
         self,
         credential_vault: CredentialVault | None = None,
         parameters: dict[str, Any] | None = None,
         variables: dict[str, Any] | None = None,
+        step_results: dict[str, dict[str, Any]] | None = None,
     ):
         """
         Initialize parameter resolver
@@ -49,10 +50,12 @@ class ParameterResolver:
             credential_vault: Credential vault for loading credentials
             parameters: Playbook parameters
             variables: Runtime variables
+            step_results: Dictionary mapping step_id to step output (for {{ step.step_id.key }} references)
         """
         self.credential_vault = credential_vault
         self.parameters = parameters or {}
         self.variables = variables or {}
+        self.step_results = step_results or {}
 
     def resolve(self, value: Any) -> Any:
         """
@@ -103,6 +106,7 @@ class ParameterResolver:
         if len(matches) == 1 and matches[0].group(0) == value:
             ref_type = matches[0].group(1)
             ref_name = matches[0].group(2)
+            ref_attr = matches[0].group(3)
 
             # If ref_name is None, it means bare parameter name like {{ gateway_url }}
             if ref_name is None:
@@ -111,9 +115,13 @@ class ParameterResolver:
 
             resolved = self._resolve_reference(ref_type, ref_name)
 
-            # For credentials, return as-is (may be Credential object)
+            # If attribute access is specified, get the attribute
+            if ref_attr:
+                resolved = self._get_attribute(resolved, ref_attr, ref_type, ref_name)
+
+            # For credentials without attribute access, return as-is (may be Credential object)
             # For parameters/variables in template context, convert to string
-            if ref_type == "credential":
+            if ref_type == "credential" and not ref_attr:
                 return resolved
             else:
                 return str(resolved)
@@ -123,13 +131,20 @@ class ParameterResolver:
         for match in reversed(matches):  # Reverse to preserve positions
             ref_type = match.group(1)
             ref_name = match.group(2)
+            ref_attr = match.group(3)
 
             # If ref_name is None, it means bare parameter name like {{ gateway_url }}
             if ref_name is None:
                 ref_name = ref_type
                 ref_type = "parameter"
 
-            replacement = str(self._resolve_reference(ref_type, ref_name))
+            resolved = self._resolve_reference(ref_type, ref_name)
+
+            # If attribute access is specified, get the attribute
+            if ref_attr:
+                resolved = self._get_attribute(resolved, ref_attr, ref_type, ref_name)
+
+            replacement = str(resolved)
             result = result[: match.start()] + replacement + result[match.end() :]
 
         return result
@@ -139,7 +154,7 @@ class ParameterResolver:
         Resolve individual reference
 
         Args:
-            ref_type: Reference type (credential, variable, parameter)
+            ref_type: Reference type (credential, variable, parameter, step)
             ref_name: Reference name
 
         Returns:
@@ -154,9 +169,11 @@ class ParameterResolver:
             return self._resolve_variable(ref_name)
         elif ref_type == "parameter":
             return self._resolve_parameter(ref_name)
+        elif ref_type == "step":
+            return self._resolve_step(ref_name)
         else:
             raise ParameterResolutionError(
-                f"Unknown reference type '{ref_type}' (valid: credential, variable, parameter)"
+                f"Unknown reference type '{ref_type}' (valid: credential, variable, parameter, step)"
             )
 
     def _resolve_credential(self, name: str) -> Any:
@@ -218,6 +235,83 @@ class ParameterResolver:
         if name not in self.parameters:
             raise ParameterResolutionError(f"Parameter '{name}' not found in playbook parameters")
         return self.parameters[name]
+
+    def _resolve_step(self, name: str) -> Any:
+        """
+        Resolve step output reference
+
+        Args:
+            name: Step ID
+
+        Returns:
+            Step output dictionary
+
+        Raises:
+            ParameterResolutionError: If step not found or has no output
+        """
+        if name not in self.step_results:
+            raise ParameterResolutionError(
+                f"Step '{name}' not found or has not been executed yet. "
+                f"Step references can only access outputs from previously completed steps."
+            )
+        output = self.step_results[name]
+        if output is None or (isinstance(output, dict) and not output):
+            raise ParameterResolutionError(
+                f"Step '{name}' has no output data. "
+                f"Only steps that return data (like utility.python) can be referenced."
+            )
+        return output
+
+    def _get_attribute(self, obj: Any, attr_name: str, ref_type: str, ref_name: str) -> Any:
+        """
+        Get attribute from resolved object
+
+        Args:
+            obj: Object to get attribute from
+            attr_name: Attribute name
+            ref_type: Reference type (for error messages)
+            ref_name: Reference name (for error messages)
+
+        Returns:
+            Attribute value
+
+        Raises:
+            ParameterResolutionError: If attribute not found
+        """
+        try:
+            # Handle dictionaries (like step results)
+            if isinstance(obj, dict):
+                if attr_name in obj:
+                    value = obj[attr_name]
+                    # Handle None values
+                    if value is None:
+                        raise ParameterResolutionError(
+                            f"Attribute '{attr_name}' of {ref_type} '{ref_name}' is None"
+                        )
+                    return value
+                else:
+                    raise ParameterResolutionError(
+                        f"Attribute '{attr_name}' not found on {ref_type} '{ref_name}'"
+                    )
+            # Handle objects with attributes
+            elif hasattr(obj, attr_name):
+                value = getattr(obj, attr_name)
+                # Handle None values
+                if value is None:
+                    raise ParameterResolutionError(
+                        f"Attribute '{attr_name}' of {ref_type} '{ref_name}' is None"
+                    )
+                return value
+            else:
+                raise ParameterResolutionError(
+                    f"Attribute '{attr_name}' not found on {ref_type} '{ref_name}'"
+                )
+        except ParameterResolutionError:
+            raise
+        except Exception as e:
+            raise ParameterResolutionError(
+                f"Error accessing attribute '{attr_name}' on {ref_type} '{ref_name}': {e}"
+            )
 
     def resolve_file_path(self, path: str, base_path: Path | None = None) -> Path:
         """

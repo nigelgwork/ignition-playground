@@ -5,6 +5,7 @@ Centralized model definitions to avoid duplication across routers.
 """
 
 from datetime import datetime
+from typing import Any
 
 from pydantic import BaseModel, validator
 
@@ -45,6 +46,7 @@ class PlaybookInfo(BaseModel):
     parameters: list[ParameterInfo] = []
     steps: list[StepInfo] = []
     # Metadata fields
+    domain: str | None = None  # Playbook domain (gateway, designer, perspective)
     revision: int = 0
     verified: bool = False
     enabled: bool = True
@@ -61,7 +63,7 @@ class ExecutionRequest(BaseModel):
     """Request to execute a playbook"""
 
     playbook_path: str
-    parameters: dict[str, str]
+    parameters: dict[str, Any]  # Allow any type (bool, str, int, etc.)
     gateway_url: str | None = None
     credential_name: str | None = None  # Name of saved credential to use
     debug_mode: bool | None = False  # Enable debug mode for this execution
@@ -77,17 +79,20 @@ class ExecutionRequest(BaseModel):
         for key, value in v.items():
             if len(key) > 255:
                 raise ValueError("Parameter name too long (max 255 chars)")
-            if len(value) > 10000:
-                raise ValueError(f'Parameter "{key}" value too long (max 10000 chars)')
 
-            # Check for potentially dangerous characters
-            import logging
+            # Only validate string values for length and dangerous characters
+            if isinstance(value, str):
+                if len(value) > 10000:
+                    raise ValueError(f'Parameter "{key}" value too long (max 10000 chars)')
 
-            logger = logging.getLogger(__name__)
-            dangerous_chars = [";", "--", "/*", "*/", "<?", "?>"]
-            for char in dangerous_chars:
-                if char in value:
-                    logger.warning(f'Potentially dangerous characters in parameter "{key}": {char}')
+                # Check for potentially dangerous characters
+                import logging
+
+                logger = logging.getLogger(__name__)
+                dangerous_chars = [";", "--", "/*", "*/", "<?", "?>"]
+                for char in dangerous_chars:
+                    if char in value:
+                        logger.warning(f'Potentially dangerous characters in parameter "{key}": {char}')
 
         return v
 
@@ -120,6 +125,7 @@ class StepResultResponse(BaseModel):
     error: str | None = None
     started_at: datetime | None = None
     completed_at: datetime | None = None
+    output: dict[str, Any] | None = None
 
 
 class ExecutionStatusResponse(BaseModel):

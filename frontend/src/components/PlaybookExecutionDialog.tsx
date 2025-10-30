@@ -3,7 +3,6 @@
  */
 
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import {
   Dialog,
   DialogTitle,
@@ -13,11 +12,10 @@ import {
   Box,
   Typography,
   Alert,
-  CircularProgress,
   Chip,
 } from '@mui/material';
-import { Save as SaveIcon, PlayArrow as PlayIcon } from '@mui/icons-material';
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { Save as SaveIcon } from '@mui/icons-material';
+import { useQuery } from '@tanstack/react-query';
 import { api } from '../api/client';
 import { ParameterInput } from './ParameterInput';
 import type { PlaybookInfo, CredentialInfo } from '../types/api';
@@ -27,7 +25,6 @@ interface PlaybookExecutionDialogProps {
   open: boolean;
   playbook: PlaybookInfo | null;
   onClose: () => void;
-  onExecutionStarted?: (executionId: string) => void;
 }
 
 interface SavedConfig {
@@ -50,11 +47,8 @@ export function PlaybookExecutionDialog({
   open,
   playbook,
   onClose,
-  onExecutionStarted,
 }: PlaybookExecutionDialogProps) {
-  const navigate = useNavigate();
   const [parameters, setParameters] = useState<Record<string, string>>({});
-  const [gatewayUrl, setGatewayUrl] = useState('http://localhost:8088');
   const [configSaved, setConfigSaved] = useState(false);
 
   // Get global selected credential
@@ -74,31 +68,10 @@ export function PlaybookExecutionDialog({
     ...sessionCredentials,
   ];
 
-  // Execute playbook mutation
-  const executeMutation = useMutation({
-    mutationFn: (params: { playbook_path: string; parameters: Record<string, string>; gateway_url?: string; credential_name?: string; debug_mode?: boolean }) =>
-      api.executions.start(params),
-    onSuccess: (data) => {
-      onExecutionStarted?.(data.execution_id);
-      onClose();
-      // Reset form
-      setParameters({});
-      // Navigate to execution detail page to see live browser streaming
-      navigate(`/executions/${data.execution_id}`);
-    },
-  });
-
   // Load saved config or defaults when playbook changes
   useEffect(() => {
     if (playbook) {
       const savedConfig = getSavedConfig(playbook.path);
-
-      // Always use global credential for gateway URL (never from saved config)
-      if (selectedCredential?.gateway_url) {
-        setGatewayUrl(selectedCredential.gateway_url);
-      } else {
-        setGatewayUrl('http://localhost:8088');
-      }
 
       if (savedConfig) {
         // Load saved configuration (only parameters, not gateway_url)
@@ -152,45 +125,20 @@ export function PlaybookExecutionDialog({
   const handleSaveConfig = () => {
     if (!playbook) return;
 
+    // Filter out sensitive parameters (gateway_url, username, password, etc.)
+    const sensitiveParams = ['gateway_url', 'username', 'password', 'user', 'pass', 'gateway_username', 'gateway_password'];
+    const filteredParameters = Object.fromEntries(
+      Object.entries(parameters).filter(([key]) =>
+        !sensitiveParams.includes(key.toLowerCase())
+      )
+    );
+
     saveConfig(playbook.path, {
-      parameters,
+      parameters: filteredParameters,
       savedAt: new Date().toISOString(),
     });
     setConfigSaved(true);
   };
-
-  const handleExecute = () => {
-    // Get debug mode preference from localStorage
-    const debugModeStr = localStorage.getItem(`playbook_debug_${playbook.path}`);
-    const debug_mode = debugModeStr === 'true';
-
-    executeMutation.mutate({
-      playbook_path: playbook.path,
-      parameters,
-      gateway_url: gatewayUrl,
-      credential_name: selectedCredential?.name || undefined,
-      debug_mode,
-    });
-  };
-
-  const handleSaveAndExecute = () => {
-    if (!playbook) return;
-
-    // Save config first
-    saveConfig(playbook.path, {
-      parameters,
-      savedAt: new Date().toISOString(),
-    });
-    setConfigSaved(true);
-
-    // Then execute
-    handleExecute();
-  };
-
-  const isValid = playbook.parameters.every((param) => {
-    if (!param.required) return true;
-    return parameters[param.name] && parameters[param.name].trim() !== '';
-  });
 
   const savedConfig = playbook ? getSavedConfig(playbook.path) : null;
 
@@ -257,47 +205,22 @@ export function PlaybookExecutionDialog({
               ))}
           </Box>
         )}
-
-        {/* Error display */}
-        {executeMutation.isError && (
-          <Alert severity="error" sx={{ mt: 2 }}>
-            Failed to start execution: {(executeMutation.error as Error).message}
-          </Alert>
-        )}
       </DialogContent>
 
       <DialogActions sx={{ gap: 1, flexWrap: 'wrap' }}>
-        <Button onClick={onClose} disabled={executeMutation.isPending}>
-          {configSaved ? 'Close' : 'Cancel'}
+        <Button onClick={onClose}>
+          Close
         </Button>
 
         <Box sx={{ flexGrow: 1 }} />
 
         <Button
           onClick={handleSaveConfig}
-          variant="outlined"
+          variant="contained"
           disabled={configSaved}
           startIcon={<SaveIcon />}
         >
           Save Config
-        </Button>
-
-        <Button
-          onClick={handleExecute}
-          variant="outlined"
-          disabled={!isValid || executeMutation.isPending}
-          startIcon={executeMutation.isPending ? <CircularProgress size={16} /> : <PlayIcon />}
-        >
-          {executeMutation.isPending ? 'Starting...' : 'Execute'}
-        </Button>
-
-        <Button
-          onClick={handleSaveAndExecute}
-          variant="contained"
-          disabled={!isValid || executeMutation.isPending}
-          startIcon={executeMutation.isPending ? <CircularProgress size={16} /> : <PlayIcon />}
-        >
-          {executeMutation.isPending ? 'Starting...' : 'Save & Execute'}
         </Button>
       </DialogActions>
     </Dialog>
