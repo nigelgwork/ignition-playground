@@ -1,0 +1,44 @@
+name: "Launch Designer via Shortcut"
+version: "1.0"
+description: "Launches Ignition Designer using Windows shortcut command from WSL/PowerShell (all-in-one step)"
+domain: designer
+
+parameters:
+  - name: designer_shortcut
+    type: string
+    required: true
+    description: "Full Designer launcher shortcut command (e.g., 'C:\\Program Files\\Inductive Automation\\Designer Launcher\\designerlauncher.exe -Dapp.home=C:\\Users\\Name\\.ignition\\clientlauncher-data -Dapplication=LocalDocker')"
+
+  - name: project_name
+    type: string
+    required: true
+    description: "Name of the Designer project to open"
+
+  - name: credential_name
+    type: string
+    required: true
+    description: "Name of credential to use for Designer login"
+
+steps:
+  # All-in-one step: Launch Designer, login, and open project
+  - id: launch_designer_shortcut
+    name: "Launch Designer and open project"
+    type: designer.launch_shortcut
+    parameters:
+      designer_shortcut: "{{ designer_shortcut }}"
+      project_name: "{{ project_name }}"
+      username: "{{ credential.[credential_name].username }}"
+      password: "{{ credential.[credential_name].password }}"
+      timeout: 60
+    timeout: 90
+    retry_count: 1
+    retry_delay: 5
+    on_failure: abort
+
+  # Log completion
+  - id: log_complete
+    name: "Log success"
+    type: utility.log
+    parameters:
+      message: "Designer launched successfully for project '{{ project_name }}' using shortcut method"
+    on_failure: continue

@@ -31,6 +31,7 @@ from ignition_toolkit.playbook.executors.browser_executor import (
 from ignition_toolkit.playbook.executors.designer_executor import (
     DesignerCloseHandler,
     DesignerLaunchHandler,
+    DesignerLaunchShortcutHandler,
     DesignerLoginHandler,
     DesignerOpenProjectHandler,
     DesignerScreenshotHandler,
@@ -73,6 +74,7 @@ __all__ = [
     "BrowserVerifyHandler",
     # Designer
     "DesignerLaunchHandler",
+    "DesignerLaunchShortcutHandler",
     "DesignerLoginHandler",
     "DesignerOpenProjectHandler",
     "DesignerCloseHandler",

@@ -24,12 +24,38 @@ A modern, Docker-free automation toolkit for Ignition SCADA with complete playbo
 ### Prerequisites
 
 - Python 3.10+
-- Linux or WSL2 Ubuntu
 - pip
+- Node.js 18+ (for frontend development)
+- **Windows**: PowerShell 5.1+
+- **Linux/macOS**: bash or zsh
 
 ### Installation
 
-#### Option 1: Using Makefile (Recommended)
+#### Option 1: Using Python Task Runner (Cross-Platform, Recommended)
+
+Works on Windows, Linux, and macOS:
+
+```bash
+# Clone repository
+git clone git@github.com:nigelgwork/ignition-playground.git
+cd ignition-playground
+
+# Install and initialize
+python tasks.py install        # Install in development mode
+python tasks.py install-dev    # Install with dev dependencies
+python tasks.py init           # Initialize credential vault
+
+# Start development server
+python tasks.py dev
+
+# Other useful commands
+python tasks.py test           # Run tests
+python tasks.py lint           # Run linters
+python tasks.py build          # Build frontend
+python tasks.py help           # Show all commands
+```
+
+#### Option 2: Using Makefile (Linux/macOS only)
 
 ```bash
 # Clone repository
@@ -39,25 +65,29 @@ cd ignition-playground
 # Install and initialize
 make install          # Install in development mode
 make install-dev      # Install with dev dependencies
-make install-playwright  # Install Playwright browsers
-make init             # Initialize credential vault and .env
+make init             # Initialize credential vault
 
 # Start development server
-make dev              # Start backend + frontend with hot reload
-
-# Or use Docker
-make docker-build     # Build Docker image
-make docker-up        # Start services with docker-compose
+make dev
 ```
 
-#### Option 2: Manual Setup
+#### Option 3: Manual Setup (All Platforms)
 
 ```bash
 # Clone repository
 git clone git@github.com:nigelgwork/ignition-playground.git
 cd ignition-playground
 
-# Install in development mode
+# Create virtual environment
+python -m venv venv
+
+# Activate virtual environment
+# On Windows:
+venv\Scripts\activate
+# On Linux/macOS:
+source venv/bin/activate
+
+# Install package
 pip install -e .
 
 # Install Playwright browsers
@@ -67,10 +97,28 @@ playwright install chromium
 ignition-toolkit init
 
 # Start server
-ignition-toolkit serve --port 8080
+ignition-toolkit server start
 ```
 
-Access the web UI at http://localhost:8080
+#### Option 4: PowerShell Scripts (Windows Convenience)
+
+```powershell
+# Clone repository
+git clone git@github.com:nigelgwork/ignition-playground.git
+cd ignition-playground
+
+# Set up using Python tasks
+python tasks.py install
+python tasks.py install-dev
+python tasks.py init
+
+# Use PowerShell convenience scripts
+.\scripts\start-server.ps1    # Start server
+.\scripts\check-server.ps1    # Check status
+.\scripts\stop-server.ps1     # Stop server
+```
+
+Access the web UI at **http://localhost:5000**
 
 #### Option 3: Docker Deployment
 

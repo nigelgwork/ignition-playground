@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 
 class DesignerLaunchHandler(StepHandler):
-    """Handle designer.launch step"""
+    """Handle designer.launch step (file-based launch)"""
 
     def __init__(self, manager: DesignerManager):
         self.manager = manager
@@ -34,6 +34,51 @@ class DesignerLaunchHandler(StepHandler):
             raise StepExecutionError("designer", "Failed to launch Designer")
 
         return {"status": "launched", "launcher_file": str(launcher_path)}
+
+
+class DesignerLaunchShortcutHandler(StepHandler):
+    """Handle designer.launch_shortcut step (WSL/PowerShell-based launch)"""
+
+    def __init__(self, manager: DesignerManager):
+        self.manager = manager
+
+    async def execute(self, params: dict[str, Any]) -> dict[str, Any]:
+        designer_shortcut = params.get("designer_shortcut")
+        project_name = params.get("project_name")
+        username = params.get("username")
+        password = params.get("password")
+
+        # Validate required parameters
+        if not designer_shortcut:
+            raise StepExecutionError("designer", "designer_shortcut parameter is required")
+        if not project_name:
+            raise StepExecutionError("designer", "project_name parameter is required")
+        if not username:
+            raise StepExecutionError("designer", "username parameter is required")
+        if not password:
+            raise StepExecutionError("designer", "password parameter is required")
+
+        # Handle credential object
+        if hasattr(password, "password"):
+            password = password.password
+
+        timeout = params.get("timeout", 60)
+        success = await self.manager.launch_with_shortcut(
+            designer_shortcut=designer_shortcut,
+            username=username,
+            password=password,
+            project_name=project_name,
+            timeout=timeout
+        )
+
+        if not success:
+            raise StepExecutionError("designer", "Failed to launch Designer with shortcut")
+
+        return {
+            "status": "launched_and_opened",
+            "project": project_name,
+            "username": username
+        }
 
 
 class DesignerLoginHandler(StepHandler):

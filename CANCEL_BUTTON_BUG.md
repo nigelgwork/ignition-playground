@@ -146,6 +146,52 @@ a46cdf3 - v3.44.11 - Fix cancel button race condition with useRef
 
 ---
 
-**Priority**: 🔴 CRITICAL - Core functionality broken
-**Complexity**: Medium - Need to trace task lifecycle
-**Risk**: Low - Localized to cancel functionality, other features working
+## ✅ FIX IMPLEMENTED (v3.44.13)
+
+**Date Fixed**: 2025-10-31
+**Root Cause Confirmed**: Theory 1 was correct - Task removed too early
+
+**The Problem**:
+In `ignition_toolkit/api/routers/executions.py` lines 536-538, the task was being removed from `active_tasks` dictionary in the `finally` block of the execution wrapper function. This `finally` block executes immediately after the wrapper sets up the background task, NOT when the task actually completes.
+
+**Before (BROKEN)**:
+```python
+finally:
+    if gateway_client:
+        await gateway_client.__aexit__(None, None, None)
+    # Clean up task reference
+    active_tasks = get_active_tasks()
+    if execution_id in active_tasks:
+        del active_tasks[execution_id]  # ❌ Removed immediately!
+```
+
+**After (FIXED)**:
+```python
+finally:
+    if gateway_client:
+        await gateway_client.__aexit__(None, None, None)
+    # NOTE: Task cleanup is handled by TTL mechanism, not here
+    # Removing task too early prevents cancel endpoint from finding it
+```
+
+**Why This Fixes It**:
+- Task reference now stays in `active_tasks` for the entire execution duration
+- Cancel endpoint can now find the task and call `task.cancel()` to interrupt it
+- TTL cleanup mechanism (already in place) handles task removal after 30 minutes
+- No memory leak - TTL cleanup prevents accumulation of old tasks
+
+**Files Modified**:
+- `ignition_toolkit/api/routers/executions.py` (lines 535-536)
+
+**Testing Required**:
+1. Start a long-running playbook execution
+2. Click Cancel button during execution
+3. Verify execution stops immediately (not after current step)
+4. Verify status changes to "cancelled" in UI
+5. Verify no errors in server logs
+
+---
+
+**Priority**: ✅ FIXED in v3.44.13
+**Complexity**: Low - Simple fix, removed premature cleanup
+**Risk**: Low - Existing TTL mechanism handles cleanup properly

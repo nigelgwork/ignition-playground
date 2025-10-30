@@ -532,10 +532,8 @@ def create_execution_runner(
         finally:
             if gateway_client:
                 await gateway_client.__aexit__(None, None, None)
-            # Clean up task reference
-            active_tasks = get_active_tasks()
-            if execution_id in active_tasks:
-                del active_tasks[execution_id]
+            # NOTE: Task cleanup is handled by TTL mechanism, not here
+            # Removing task too early prevents cancel endpoint from finding it
 
     return run_execution
 

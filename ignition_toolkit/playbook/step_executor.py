@@ -32,6 +32,7 @@ from ignition_toolkit.playbook.executors import (
     BrowserWaitHandler,
     DesignerCloseHandler,
     DesignerLaunchHandler,
+    DesignerLaunchShortcutHandler,
     DesignerLoginHandler,
     DesignerOpenProjectHandler,
     DesignerScreenshotHandler,
@@ -141,6 +142,7 @@ class StepExecutor:
         # Designer handlers
         if self.designer_manager:
             handlers[StepType.DESIGNER_LAUNCH] = DesignerLaunchHandler(self.designer_manager)
+            handlers[StepType.DESIGNER_LAUNCH_SHORTCUT] = DesignerLaunchShortcutHandler(self.designer_manager)
             handlers[StepType.DESIGNER_LOGIN] = DesignerLoginHandler(self.designer_manager)
             handlers[StepType.DESIGNER_OPEN_PROJECT] = DesignerOpenProjectHandler(self.designer_manager)
             handlers[StepType.DESIGNER_CLOSE] = DesignerCloseHandler(self.designer_manager)

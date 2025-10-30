@@ -401,5 +401,11 @@ def playbook_import(json_path: str, output_dir: str) -> None:
     console.print(f"   Run with: [cyan]ignition-toolkit playbook run {yaml_path}[/cyan]\n")
 
 
+# Import and register server management commands
+from ignition_toolkit.cli_server import server
+
+main.add_command(server)
+
+
 if __name__ == "__main__":
     main()

@@ -20,7 +20,9 @@ def setup_environment():
     """
     # Set consistent Playwright browsers path
     if "PLAYWRIGHT_BROWSERS_PATH" not in os.environ:
-        browsers_path = Path("/git/ignition-playground/data/.playwright-browsers")
+        # Calculate from package location instead of hardcoded path
+        package_root = Path(__file__).parent.parent.resolve()
+        browsers_path = package_root / "data" / ".playwright-browsers"
         os.environ["PLAYWRIGHT_BROWSERS_PATH"] = str(browsers_path)
         logger.debug(f"Set PLAYWRIGHT_BROWSERS_PATH={browsers_path}")
 
@@ -35,11 +37,11 @@ def get_toolkit_data_dir() -> Path:
 
     Priority order:
     1. IGNITION_TOOLKIT_DATA environment variable (if set)
-    2. Project directory: /git/ignition-playground/data/.ignition-toolkit
-    3. Fallback: /root/.ignition-toolkit (actual root home, not $HOME)
+    2. Project directory: <package_root>/data/.ignition-toolkit
+    3. Fallback: ~/.ignition-toolkit (user's home directory)
 
     This ensures credentials are stored in a consistent location regardless
-    of how the HOME environment variable is set by different tools.
+    of installation method or operating system.
 
     Returns:
         Path to data directory
@@ -47,20 +49,22 @@ def get_toolkit_data_dir() -> Path:
     # Check environment variable override
     env_path = os.getenv("IGNITION_TOOLKIT_DATA")
     if env_path:
-        path = Path(env_path)
+        path = Path(env_path).expanduser().resolve()
         logger.info(f"Using data directory from IGNITION_TOOLKIT_DATA: {path}")
         return path
 
-    # Try to detect if we're running from the project directory
-    project_dir = Path("/git/ignition-playground")
-    if project_dir.exists():
-        # Use project-relative data directory
-        data_dir = project_dir / "data" / ".ignition-toolkit"
-        logger.debug(f"Using project data directory: {data_dir}")
-        return data_dir
+    # Calculate project root from package location
+    package_root = Path(__file__).parent.parent.resolve()
 
-    # Fallback to actual root home (not $HOME which can be overridden)
-    fallback = Path("/root/.ignition-toolkit")
+    # Check if we have a data/ directory at package root (development mode)
+    project_data_dir = package_root / "data" / ".ignition-toolkit"
+    if (package_root / "data").exists() or (package_root / "playbooks").exists():
+        # We're in development mode - use project-relative directory
+        logger.debug(f"Using project data directory: {project_data_dir}")
+        return project_data_dir
+
+    # Fallback to user's home directory (works on all platforms)
+    fallback = Path.home() / ".ignition-toolkit"
     logger.debug(f"Using fallback data directory: {fallback}")
     return fallback
 
@@ -84,11 +88,11 @@ def migrate_credentials_if_needed() -> None:
         logger.debug(f"Credentials already exist in {new_location}, skipping migration")
         return
 
-    # Check old locations
+    # Check old locations (platform-independent)
     old_locations = [
-        Path("/root/.config/claude-work/.ignition-toolkit"),
-        Path("/root/.config/claude-personal/.ignition-toolkit"),
-        Path.home() / ".ignition-toolkit",  # Wherever HOME currently points
+        Path.home() / ".config" / "claude-work" / ".ignition-toolkit",
+        Path.home() / ".config" / "claude-personal" / ".ignition-toolkit",
+        Path.home() / ".ignition-toolkit",  # Standard location
     ]
 
     for old_location in old_locations:

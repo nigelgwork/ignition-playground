@@ -50,6 +50,7 @@ class StepType(str, Enum):
 
     # Designer operations (desktop application automation)
     DESIGNER_LAUNCH = "designer.launch"
+    DESIGNER_LAUNCH_SHORTCUT = "designer.launch_shortcut"
     DESIGNER_LOGIN = "designer.login"
     DESIGNER_OPEN_PROJECT = "designer.open_project"
     DESIGNER_CLOSE = "designer.close"
