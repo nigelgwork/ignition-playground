@@ -110,10 +110,17 @@ export function Executions() {
     }
   };
 
-  // Helper function to format timestamp
+  // Helper function to format timestamp (Australian format: DD/MM/YYYY HH:MM:SS)
   const formatTimestamp = (timestamp?: string | null): string => {
     if (!timestamp) return '-';
-    return new Date(timestamp).toLocaleString();
+    const date = new Date(timestamp);
+    const day = date.getDate().toString().padStart(2, '0');
+    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+    const year = date.getFullYear();
+    const hours = date.getHours().toString().padStart(2, '0');
+    const minutes = date.getMinutes().toString().padStart(2, '0');
+    const seconds = date.getSeconds().toString().padStart(2, '0');
+    return `${day}/${month}/${year} ${hours}:${minutes}:${seconds}`;
   };
 
   // Helper function to calculate duration
@@ -393,7 +400,7 @@ export function Executions() {
           <Table size="medium" sx={{ tableLayout: 'fixed', width: '100%' }}>
             <TableHead>
               <TableRow>
-                <TableCell width="4%" padding="checkbox">
+                <TableCell width="50px" padding="checkbox">
                   <Checkbox
                     indeterminate={selectedIds.size > 0 && selectedIds.size < filteredExecutions.length}
                     checked={filteredExecutions.length > 0 && selectedIds.size === filteredExecutions.length}
@@ -401,13 +408,13 @@ export function Executions() {
                     inputProps={{ 'aria-label': 'Select all executions' }}
                   />
                 </TableCell>
-                <TableCell width="4%"></TableCell>
-                <TableCell width="18%">Playbook</TableCell>
-                <TableCell width="12%">Status</TableCell>
-                <TableCell width="12%">Progress</TableCell>
-                <TableCell width="16%">Started</TableCell>
-                <TableCell width="14%">Duration</TableCell>
-                <TableCell width="24%" align="right">Actions</TableCell>
+                <TableCell width="50px"></TableCell>
+                <TableCell width="250px">Playbook</TableCell>
+                <TableCell width="120px">Status</TableCell>
+                <TableCell width="100px">Progress</TableCell>
+                <TableCell width="180px">Started</TableCell>
+                <TableCell width="100px">Duration</TableCell>
+                <TableCell align="right">Actions</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
