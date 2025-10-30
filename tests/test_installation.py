@@ -7,7 +7,7 @@ def test_package_imports():
     """Test that main package can be imported"""
     import ignition_toolkit
 
-    assert ignition_toolkit.__version__ == "3.42.0"
+    assert ignition_toolkit.__version__ == "3.44.0"
 
 
 def test_gateway_client_import():
