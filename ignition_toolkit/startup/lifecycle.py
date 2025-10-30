@@ -110,6 +110,33 @@ async def lifespan(app: FastAPI):
             logger.info("Phase 5/5: Frontend Validation (SKIPPED - dev mode)")
             set_component_healthy("frontend", "Dev mode - frontend served separately")
 
+        # Phase 6: Start Scheduler (NON-FATAL)
+        logger.info("Phase 6/6: Starting Playbook Scheduler")
+        try:
+            from ignition_toolkit.scheduler import get_scheduler
+
+            scheduler = get_scheduler()
+            await scheduler.start()
+            set_component_healthy("scheduler", "Scheduler running")
+            logger.info("✅ Playbook scheduler started")
+        except Exception as e:
+            logger.warning(f"⚠️  Scheduler startup failed: {e}")
+            set_component_degraded("scheduler", str(e))
+
+        # Phase 7: Initialize Application Services
+        logger.info("Phase 7/7: Initializing Application Services")
+        try:
+            from ignition_toolkit.api.services import AppServices
+
+            services = AppServices.create(ttl_minutes=30)
+            app.state.services = services
+            set_component_healthy("services", "Application services initialized")
+            logger.info("✅ Application services initialized")
+        except Exception as e:
+            logger.error(f"❌ Failed to initialize services: {e}")
+            set_component_unhealthy("services", str(e))
+            raise
+
         # Mark system ready
         health.ready = True
         health.startup_time = datetime.utcnow()
@@ -131,6 +158,7 @@ async def lifespan(app: FastAPI):
         logger.info(f"   Vault: {health.vault.status.value}")
         logger.info(f"   Playbooks: {health.playbooks.status.value}")
         logger.info(f"   Frontend: {health.frontend.status.value}")
+        logger.info(f"   Scheduler: {health.scheduler.status.value if hasattr(health, 'scheduler') else 'N/A'}")
 
         if health.warnings:
             logger.warning(f"   Warnings: {len(health.warnings)}")
@@ -160,5 +188,23 @@ async def lifespan(app: FastAPI):
     finally:
         # Shutdown cleanup
         logger.info("🛑 Shutting down...")
-        # Add any cleanup logic here (close connections, etc.)
+
+        # Cleanup application services
+        try:
+            if hasattr(app.state, "services"):
+                await app.state.services.cleanup()
+                logger.info("✅ Application services cleaned up")
+        except Exception as e:
+            logger.warning(f"⚠️  Service cleanup warning: {e}")
+
+        # Stop scheduler
+        try:
+            from ignition_toolkit.scheduler import get_scheduler
+
+            scheduler = get_scheduler()
+            await scheduler.stop()
+            logger.info("✅ Scheduler stopped")
+        except Exception as e:
+            logger.warning(f"⚠️  Scheduler shutdown warning: {e}")
+
         logger.info("✅ Shutdown complete")

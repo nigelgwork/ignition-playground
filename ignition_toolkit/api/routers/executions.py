@@ -158,6 +158,7 @@ def _convert_step_results_to_response(
             error=result.error,
             started_at=result.started_at,
             completed_at=result.completed_at,
+            output=result.output,
         )
         for result in step_results
     ]
@@ -486,11 +487,14 @@ def create_execution_runner(
 
     async def run_execution():
         """Execute playbook in background"""
+        print(f"[DEBUG RUN_EXECUTION] Starting background execution for {execution_id}", flush=True)
         start_time = datetime.now()
         try:
+            print(f"[DEBUG RUN_EXECUTION] Entering gateway client context", flush=True)
             if gateway_client:
                 await gateway_client.__aenter__()
 
+            print(f"[DEBUG RUN_EXECUTION] Calling engine.execute_playbook", flush=True)
             execution_state = await engine.execute_playbook(
                 playbook,
                 parameters,
@@ -498,6 +502,7 @@ def create_execution_runner(
                 execution_id=execution_id,
                 playbook_path=playbook_path,
             )
+            print(f"[DEBUG RUN_EXECUTION] engine.execute_playbook returned", flush=True)
 
             logger.info(
                 f"Execution {execution_state.execution_id} completed with status: {execution_state.status}"
@@ -695,65 +700,54 @@ async def cleanup_old_executions():
 
 @router.post("", response_model=ExecutionResponse)
 async def start_execution(request: ExecutionRequest, background_tasks: BackgroundTasks):
-    """Start playbook execution"""
-    import uuid
+    """
+    Start playbook execution
 
+    Simplified implementation using ExecutionService (replaces 11-step process with 3 lines).
+    """
+    from ignition_toolkit.api.dependencies import get_services
     from ignition_toolkit.playbook.loader import PlaybookLoader
 
-    active_engines = get_active_engines()
-
     try:
-        # Step 1: Validate and resolve playbook path
-        playbooks_dir, playbook_path = validate_and_resolve_playbook_path(request.playbook_path)
+        # Get services from app state
+        # Note: We can't use Depends() here without refactoring to accept Request parameter
+        # For now, get services directly from app (will refactor in next iteration)
+        from ignition_toolkit.api.app import app
 
-        # Step 2: Load playbook
-        loader = PlaybookLoader()
-        playbook = loader.load_from_file(playbook_path)
+        if not hasattr(app.state, "services"):
+            raise HTTPException(
+                status_code=503,
+                detail="Application services not initialized",
+            )
 
-        # Step 3: Apply credential auto-fill
-        parameters = request.parameters.copy()
-        gateway_url, parameters = apply_credential_autofill(
-            playbook, request.credential_name, request.gateway_url, parameters
+        services = app.state.services
+
+        # Start execution using service layer (replaces 100+ lines of boilerplate)
+        execution_id = await services.execution_service.start_execution(
+            playbook_path=request.playbook_path,
+            parameters=request.parameters,
+            gateway_url=request.gateway_url,
+            credential_name=request.credential_name,
+            debug_mode=request.debug_mode,
+            timeout_seconds=3600,  # 1 hour
         )
 
-        # Step 4: Create engine with all callbacks configured
-        engine, gateway_client = create_playbook_engine_with_callbacks(gateway_url)
+        # Load playbook for response (TODO: return from service)
+        from ignition_toolkit.core.validation import PathValidator
 
-        # Step 5: Generate execution ID and store engine
-        execution_id = str(uuid.uuid4())
-        logger.info(f"Starting execution {execution_id} for playbook: {playbook.name}")
-        active_engines[execution_id] = engine
+        _, playbook_path = PathValidator.validate_and_resolve(request.playbook_path)
+        playbook = PlaybookLoader.load_from_file(playbook_path)
 
-        # Step 6: Enable debug mode if requested
-        if request.debug_mode:
-            engine.enable_debug(execution_id)
-            logger.info(f"Debug mode enabled for execution {execution_id}")
+        # Schedule cleanup background task
+        background_tasks.add_task(services.execution_manager.cleanup_expired)
 
-        # Step 7: Broadcast initial execution state
-        await broadcast_initial_execution_state(execution_id, playbook.name)
-
-        # Step 8: Create and start background execution task
-        run_execution = create_execution_runner(
-            engine, playbook, parameters, playbook_path, execution_id, gateway_client
-        )
-        task = asyncio.create_task(run_execution())
-
-        # Step 9: Store task for cancellation support
-        active_tasks = get_active_tasks()
-        active_tasks[execution_id] = task
-
-        # Step 10: Schedule cleanup and timeout watchdog
-        background_tasks.add_task(cleanup_old_executions)
-        timeout_watchdog = create_timeout_watchdog(execution_id, task, engine)
-        asyncio.create_task(timeout_watchdog())
-
-        # Step 11: Return response
         return ExecutionResponse(
             execution_id=execution_id,
             playbook_name=playbook.name,
             status="started",
             message=f"Execution started with ID: {execution_id}",
         )
+
     except HTTPException:
         raise
     except Exception as e:
@@ -800,6 +794,7 @@ async def list_executions(limit: int = DEFAULT_EXECUTION_LIST_LIMIT, status: str
                         error=step.error_message,
                         started_at=step.started_at,
                         completed_at=step.completed_at,
+                        output=step.output,
                     )
                     for step in db_exec.step_results
                 ]
@@ -846,6 +841,7 @@ async def get_execution_status(execution_id: str):
                         error=step.error_message,
                         started_at=step.started_at,
                         completed_at=step.completed_at,
+                        output=step.output,
                     )
                     for step in execution.step_results
                 ]
@@ -875,31 +871,31 @@ async def get_execution_status_with_path(execution_id: str):
 
 
 @router.post("/{execution_id}/pause")
-async def pause_execution(engine: PlaybookEngine = Depends(get_engine_or_404)):
+async def pause_execution(execution_id: str, engine: PlaybookEngine = Depends(get_engine_or_404)):
     """Pause execution"""
     engine.pause()
-    return {"message": "Execution paused", "execution_id": engine.state_manager.execution_id}
+    return {"message": "Execution paused", "execution_id": execution_id}
 
 
 @router.post("/{execution_id}/resume")
-async def resume_execution(engine: PlaybookEngine = Depends(get_engine_or_404)):
+async def resume_execution(execution_id: str, engine: PlaybookEngine = Depends(get_engine_or_404)):
     """Resume paused execution"""
     await engine.resume()
-    return {"message": "Execution resumed", "execution_id": engine.state_manager.execution_id}
+    return {"message": "Execution resumed", "execution_id": execution_id}
 
 
 @router.post("/{execution_id}/skip")
-async def skip_step(engine: PlaybookEngine = Depends(get_engine_or_404)):
+async def skip_step(execution_id: str, engine: PlaybookEngine = Depends(get_engine_or_404)):
     """Skip current step and move to next"""
     await engine.skip_current_step()
-    return {"message": "Step skipped", "execution_id": engine.state_manager.execution_id}
+    return {"message": "Step skipped", "execution_id": execution_id}
 
 
 @router.post("/{execution_id}/skip_back")
-async def skip_back_step(engine: PlaybookEngine = Depends(get_engine_or_404)):
+async def skip_back_step(execution_id: str, engine: PlaybookEngine = Depends(get_engine_or_404)):
     """Skip back to previous step"""
     await engine.skip_back_step()
-    return {"message": "Skipped back to previous step", "execution_id": engine.state_manager.execution_id}
+    return {"message": "Skipped back to previous step", "execution_id": execution_id}
 
 
 @router.post("/{execution_id}/cancel")

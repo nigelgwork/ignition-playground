@@ -4,7 +4,7 @@ SQLAlchemy database models
 
 from datetime import UTC, datetime
 
-from sqlalchemy import JSON, Column, DateTime, ForeignKey, Index, Integer, String, Text
+from sqlalchemy import JSON, Boolean, Column, DateTime, ForeignKey, Index, Integer, String, Text
 from sqlalchemy.orm import declarative_base, relationship
 
 Base = declarative_base()
@@ -166,7 +166,7 @@ class AISettingsModel(Base):
         String(500), nullable=True
     )  # For local LLMs (e.g., http://localhost:1234/v1)
     model_name = Column(String(100), nullable=True)  # e.g., "gpt-4", "claude-3-sonnet", "llama-3"
-    enabled = Column(String(10), nullable=False, default="false")  # "true" or "false" string
+    enabled = Column(Boolean, nullable=False, default=False)
     created_at = Column(DateTime, default=utcnow, nullable=False)
     updated_at = Column(DateTime, default=utcnow, onupdate=utcnow, nullable=False)
 
@@ -180,6 +180,58 @@ class AISettingsModel(Base):
             "model_name": self.model_name,
             "enabled": self.enabled,
             "has_api_key": bool(self.api_key),  # Don't expose the actual key
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+        }
+
+
+class ScheduledPlaybookModel(Base):
+    """
+    Stores scheduled playbook configurations
+
+    Supports cron-like schedules for automated playbook execution
+    """
+
+    __tablename__ = "scheduled_playbooks"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    name = Column(String(255), nullable=False)  # User-friendly schedule name
+    playbook_path = Column(String(500), nullable=False)  # Path to playbook YAML
+    schedule_type = Column(
+        String(50), nullable=False
+    )  # "cron", "interval", "daily", "weekly", "monthly"
+    schedule_config = Column(
+        JSON, nullable=False
+    )  # Schedule configuration (cron expression, interval, etc.)
+    parameters = Column(JSON, nullable=True)  # Playbook parameters
+    gateway_url = Column(String(500), nullable=True)  # Gateway URL for execution
+    credential_name = Column(String(255), nullable=True)  # Credential to use
+    enabled = Column(Boolean, nullable=False, default=True)
+    last_run_at = Column(DateTime, nullable=True)  # Last execution timestamp
+    next_run_at = Column(DateTime, nullable=True)  # Next scheduled execution
+    created_at = Column(DateTime, default=utcnow, nullable=False)
+    updated_at = Column(DateTime, default=utcnow, onupdate=utcnow, nullable=False)
+
+    # Indexes for performance
+    __table_args__ = (
+        Index("idx_scheduled_playbooks_enabled", "enabled"),
+        Index("idx_scheduled_playbooks_next_run", "next_run_at"),
+    )
+
+    def to_dict(self) -> dict:
+        """Convert to dictionary"""
+        return {
+            "id": self.id,
+            "name": self.name,
+            "playbook_path": self.playbook_path,
+            "schedule_type": self.schedule_type,
+            "schedule_config": self.schedule_config,
+            "parameters": self.parameters,
+            "gateway_url": self.gateway_url,
+            "credential_name": self.credential_name,
+            "enabled": self.enabled,
+            "last_run_at": self.last_run_at.isoformat() if self.last_run_at else None,
+            "next_run_at": self.next_run_at.isoformat() if self.next_run_at else None,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
         }
