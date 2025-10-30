@@ -98,7 +98,16 @@ export function Credentials() {
   };
 
   const handleDeleteCredential = (name: string) => {
-    deleteMutation.mutate(name);
+    if (!name) {
+      console.error('[Credentials] handleDeleteCredential called with empty name');
+      setSnackbarMessage('Error: Credential name is empty');
+      setSnackbarOpen(true);
+      return;
+    }
+
+    if (window.confirm(`Are you sure you want to delete credential "${name}"?`)) {
+      deleteMutation.mutate(name);
+    }
   };
 
   return (

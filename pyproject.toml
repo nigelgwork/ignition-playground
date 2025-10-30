@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ignition-toolkit"
-version = "3.44.6"  # Updated: 2025-10-30 - Fixed cancel button + playbook code endpoint
+version = "3.44.7"  # Updated: 2025-10-30 - Fixed credential deletion confirmation
 description = "Lightweight automation toolkit for Ignition SCADA Gateway operations"
 readme = "README.md"
 requires-python = ">=3.10"
