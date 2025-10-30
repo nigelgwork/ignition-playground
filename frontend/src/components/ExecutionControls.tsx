@@ -4,7 +4,7 @@
  * Provides pause, resume, skip, and stop controls
  */
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import {
   Box,
   Button,
@@ -37,6 +37,7 @@ export function ExecutionControls({
   onAIAssist,
 }: ExecutionControlsProps) {
   const [loading, setLoading] = useState<string | null>(null);
+  const cancelInProgressRef = useRef(false);
 
   const handlePause = async () => {
     try {
@@ -74,8 +75,18 @@ export function ExecutionControls({
 
   const handleCancel = async () => {
     console.log('[ExecutionControls] Cancel button clicked, executionId:', executionId);
+
+    // Prevent duplicate cancel requests
+    if (cancelInProgressRef.current) {
+      console.log('[ExecutionControls] Cancel already in progress, ignoring duplicate click');
+      return;
+    }
+
+    // Mark cancel as in progress using ref (persists across re-renders)
+    cancelInProgressRef.current = true;
+    setLoading('cancel');
+
     try {
-      setLoading('cancel');
       console.log('[ExecutionControls] Sending cancel request...');
       const response = await api.executions.cancel(executionId);
       console.log('[ExecutionControls] Cancel request succeeded:', response);
@@ -84,6 +95,7 @@ export function ExecutionControls({
       alert(`Failed to cancel execution: ${error instanceof Error ? error.message : String(error)}`);
     } finally {
       console.log('[ExecutionControls] Cancel request complete, clearing loading state');
+      cancelInProgressRef.current = false;
       setLoading(null);
     }
   };
@@ -184,8 +196,18 @@ export function ExecutionControls({
         <Tooltip title="Cancel execution">
           <span>
             <Button
-              onClick={handleCancel}
-              disabled={isDisabled || loading !== null}
+              onClick={() => {
+                console.log('[ExecutionControls] Cancel button onClick fired', {
+                  executionId,
+                  status,
+                  isDisabled,
+                  loading,
+                  cancelInProgress: cancelInProgressRef.current,
+                  buttonDisabled: isDisabled || loading !== null
+                });
+                handleCancel();
+              }}
+              disabled={isDisabled || loading !== null || cancelInProgressRef.current}
               color="error"
               startIcon={
                 loading === 'cancel' ? (

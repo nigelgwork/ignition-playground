@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ignition-toolkit"
-version = "3.44.10"  # Updated: 2025-10-30 - WebSocket stability: Server keepalive + reduced ping interval
+version = "3.44.11"  # Updated: 2025-10-30 - Fix cancel button race condition with useRef
 description = "Lightweight automation toolkit for Ignition SCADA Gateway operations"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -41,6 +41,7 @@ dependencies = [
     "click>=8.1.7",
     "rich>=13.9.0",
     "apscheduler>=3.10.4",
+    "psutil>=6.1.0",
 ]
 
 [project.optional-dependencies]
