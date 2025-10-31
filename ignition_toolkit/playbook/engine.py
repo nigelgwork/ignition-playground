@@ -212,9 +212,15 @@ class PlaybookEngine:
             download_path = parameters.get("download_path")
             downloads_dir = Path(download_path) if download_path else None
 
-            # Create browser manager with screenshot streaming if callback provided
+            # Create browser manager ONLY for Perspective/browser playbooks (NOT for Designer)
             print(f"[ENGINE DEBUG] Checking screenshot callback (callback={self.screenshot_callback})", flush=True)
-            if self.screenshot_callback:
+            has_browser_steps = any(step.type.value.startswith("browser.") for step in playbook.steps)
+            playbook_domain = playbook.metadata.get('domain')
+            needs_browser = playbook_domain == "perspective" or has_browser_steps
+
+            print(f"[ENGINE DEBUG] Playbook domain: {playbook_domain}, has_browser_steps: {has_browser_steps}, needs_browser: {needs_browser}", flush=True)
+
+            if self.screenshot_callback and needs_browser:
                 # Create screenshot callback that includes execution_id
                 print(f"[ENGINE DEBUG] Creating browser manager with screenshot streaming", flush=True)
                 async def screenshot_frame_callback(screenshot_b64: str):
@@ -232,6 +238,8 @@ class PlaybookEngine:
                 self._browser_manager = browser_manager  # Store reference for pause/resume
                 print(f"[ENGINE DEBUG] Browser initialization complete", flush=True)
                 logger.info(f"Browser screenshot streaming started for execution {execution_id}")
+            else:
+                print(f"[ENGINE DEBUG] Skipping browser initialization (not needed for domain={playbook_domain})", flush=True)
 
             # Create designer manager if playbook has designer steps
             has_designer_steps = any(step.type.value.startswith("designer.") for step in playbook.steps)
