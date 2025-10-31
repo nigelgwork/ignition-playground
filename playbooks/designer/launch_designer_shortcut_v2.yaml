@@ -30,7 +30,7 @@ steps:
         import asyncio
         import time
 
-        designer_shortcut = """{{ designer_shortcut }}"""
+        designer_shortcut = r"""{{ designer_shortcut }}"""
 
         print(f"[1/3] Launching Ignition Designer...")
 
@@ -84,8 +84,8 @@ steps:
         import subprocess
         import os
 
-        username = """{{ gateway_credential.username }}"""
-        password = """{{ gateway_credential.password }}"""
+        username = r"""{{ gateway_credential.username }}"""
+        password = r"""{{ gateway_credential.password }}"""
 
         print(f"[2/3] Entering credentials for user: {username}")
 
@@ -142,7 +142,7 @@ steps:
         import os
         import time
 
-        project_name = """{{ project_name }}"""
+        project_name = r"""{{ project_name }}"""
 
         print(f"[3/3] Opening project '{project_name}'...")
 
