@@ -122,8 +122,8 @@ class ExecutionService:
             debug_mode=debug_mode,
         )
 
-        # Step 5: Broadcast initial state
-        await self._broadcast_initial_state(execution_id, playbook.name)
+        # Step 5: Broadcast initial state with all steps as "pending"
+        await self._broadcast_initial_state(execution_id, playbook)
 
         # Step 6: Create and start background execution
         runner = self._create_runner(
@@ -203,27 +203,43 @@ class ExecutionService:
 
         return engine, gateway_client
 
-    async def _broadcast_initial_state(self, execution_id: str, playbook_name: str) -> None:
+    async def _broadcast_initial_state(self, execution_id: str, playbook: Playbook) -> None:
         """
-        Broadcast initial execution state
+        Broadcast initial execution state with all steps as "pending"
 
         Args:
             execution_id: Execution UUID
-            playbook_name: Name of the playbook
+            playbook: Loaded playbook object
         """
         if not self.state_update_callback:
             return
 
+        # Create initial step results with all steps as "pending"
+        from ignition_toolkit.playbook.models import StepResult, StepStatus
+
+        initial_step_results = [
+            StepResult(
+                step_id=step.id,
+                step_name=step.name,
+                status=StepStatus.PENDING,
+                started_at=None,
+                completed_at=None,
+                error=None,
+                output={},
+            )
+            for step in playbook.steps
+        ]
+
         initial_state = ExecutionState(
             execution_id=execution_id,
-            playbook_name=playbook_name,
+            playbook_name=playbook.name,
             status=ExecutionStatus.RUNNING,
             current_step_index=None,
             started_at=datetime.now(),
-            step_results=[],
+            step_results=initial_step_results,
         )
         await self.state_update_callback(initial_state)
-        logger.debug(f"Broadcasted initial state for execution {execution_id}")
+        logger.info(f"Broadcasted initial state with {len(initial_step_results)} steps for execution {execution_id}")
 
     def _create_runner(
         self,
