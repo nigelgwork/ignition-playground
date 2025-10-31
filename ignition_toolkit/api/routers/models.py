@@ -52,6 +52,10 @@ class PlaybookInfo(BaseModel):
     enabled: bool = True
     last_modified: str | None = None
     verified_at: str | None = None
+    # PORTABILITY v4: Origin tracking fields
+    origin: str = "unknown"  # built-in, user-created, duplicated, unknown
+    duplicated_from: str | None = None  # Source playbook path if duplicated
+    created_at: str | None = None  # When playbook was created/added
 
 
 # ============================================================================

@@ -198,6 +198,10 @@ async def list_playbooks():
                     enabled=meta.enabled,
                     last_modified=meta.last_modified,
                     verified_at=meta.verified_at,
+                    # PORTABILITY v4: Include origin tracking
+                    origin=meta.origin,
+                    duplicated_from=meta.duplicated_from,
+                    created_at=meta.created_at,
                 )
             )
         except Exception as e:
@@ -210,6 +214,7 @@ async def list_playbooks():
 @router.get("/{playbook_path:path}", response_model=PlaybookInfo)
 async def get_playbook(playbook_path: str):
     """Get detailed playbook information including full parameter schema"""
+    metadata_store = get_metadata_store()
     try:
         # Validate path for security
         validated_path = validate_playbook_path(playbook_path)
@@ -241,9 +246,14 @@ async def get_playbook(playbook_path: str):
             for s in playbook.steps
         ]
 
+        # Get metadata for this playbook
+        playbooks_dir = get_playbooks_dir()
+        relative_path = str(validated_path.relative_to(playbooks_dir))
+        meta = metadata_store.get_metadata(relative_path)
+
         return PlaybookInfo(
             name=playbook.name,
-            path=str(validated_path),
+            path=relative_path,  # Use relative path
             version=playbook.version,
             description=playbook.description,
             parameter_count=len(playbook.parameters),
@@ -251,6 +261,15 @@ async def get_playbook(playbook_path: str):
             parameters=parameters,
             steps=steps,
             domain=playbook.metadata.get("domain"),  # Extract domain from metadata
+            revision=meta.revision,
+            verified=meta.verified,
+            enabled=meta.enabled,
+            last_modified=meta.last_modified,
+            verified_at=meta.verified_at,
+            # PORTABILITY v4: Include origin tracking
+            origin=meta.origin,
+            duplicated_from=meta.duplicated_from,
+            created_at=meta.created_at,
         )
     except HTTPException:
         raise
