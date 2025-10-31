@@ -12,7 +12,7 @@ from typing import Any
 
 import yaml
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, validator
 
 from ignition_toolkit.api.routers.models import ParameterInfo, PlaybookInfo, StepInfo
 from ignition_toolkit.core.paths import get_playbooks_dir
@@ -45,11 +45,76 @@ class PlaybookUpdateRequest(BaseModel):
 
 
 class PlaybookMetadataUpdateRequest(BaseModel):
-    """Request to update playbook name and description"""
+    """Request to update playbook name and description
+
+    SECURITY: Includes input validation to prevent XSS, injection attacks, and DoS
+    """
 
     playbook_path: str
     name: str | None = None
     description: str | None = None
+
+    @validator('playbook_path')
+    def validate_playbook_path_field(cls, v):
+        """Validate playbook path field"""
+        if not v or not v.strip():
+            raise ValueError("Playbook path cannot be empty")
+        if len(v) > 500:
+            raise ValueError("Playbook path too long (max 500 characters)")
+        # Path traversal is checked by validate_playbook_path() function later
+        return v.strip()
+
+    @validator('name')
+    def validate_name(cls, v):
+        """Validate playbook name for security and sanity"""
+        if v is None:
+            return v
+
+        v = v.strip()
+        if not v:
+            raise ValueError("Name cannot be empty or whitespace")
+
+        # Length check
+        if len(v) > 200:
+            raise ValueError("Name too long (max 200 characters)")
+
+        # Check for dangerous characters that could break YAML or enable XSS
+        dangerous_chars = ['<', '>', '"', "'", '`', '{', '}', '$', '|', '&', ';']
+        for char in dangerous_chars:
+            if char in v:
+                raise ValueError(f"Name contains invalid character: {char}")
+
+        # Check for control characters
+        if any(ord(c) < 32 for c in v):
+            raise ValueError("Name contains control characters")
+
+        return v
+
+    @validator('description')
+    def validate_description(cls, v):
+        """Validate playbook description for security"""
+        if v is None:
+            return v
+
+        v = v.strip()
+
+        # Length check - descriptions can be longer but still need limits
+        if len(v) > 2000:
+            raise ValueError("Description too long (max 2000 characters)")
+
+        # Check for dangerous patterns (less strict than name but still important)
+        dangerous_patterns = ['<script', 'javascript:', 'onerror=', 'onload=', '<?php']
+        v_lower = v.lower()
+        for pattern in dangerous_patterns:
+            if pattern in v_lower:
+                raise ValueError(f"Description contains potentially dangerous pattern: {pattern}")
+
+        # Check for control characters (except newlines and tabs)
+        for c in v:
+            if ord(c) < 32 and c not in ['\n', '\r', '\t']:
+                raise ValueError("Description contains invalid control characters")
+
+        return v
 
 
 class StepEditRequest(BaseModel):
