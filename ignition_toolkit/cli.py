@@ -20,23 +20,32 @@ def main() -> None:
 
 
 @main.command()
-@click.option("--host", default="0.0.0.0", help="API server host")
-@click.option("--port", default=5000, help="API server port")
+@click.option("--host", default=None, help="API server host (default: from settings)")
+@click.option("--port", default=None, type=int, help="API server port (default: from settings)")
 @click.option("--reload", is_flag=True, help="Enable auto-reload for development")
-def serve(host: str, port: int, reload: bool) -> None:
+def serve(host: str | None, port: int | None, reload: bool) -> None:
     """Start the API server and web UI"""
+    # Import settings to get defaults from .env or Settings
+    from ignition_toolkit.core.config import get_settings
+
+    settings = get_settings()
+
+    # Use CLI args if provided, otherwise use settings
+    actual_host = host or settings.api_host
+    actual_port = port or settings.api_port
+
     console.print(
         Panel.fit(
             "[bold cyan]Ignition Automation Toolkit[/bold cyan]\n"
-            f"Server starting on http://{host}:{port}",
+            f"Server starting on http://{actual_host}:{actual_port}",
             border_style="cyan",
         )
     )
 
     uvicorn.run(
         "ignition_toolkit.api.app:app",
-        host=host,
-        port=port,
+        host=actual_host,
+        port=actual_port,
         reload=reload,
         log_level="info",
     )
@@ -157,10 +166,10 @@ def verify(verbose: bool) -> None:
 
     # 6. Database check
     try:
-        from ignition_toolkit.storage import get_database
+        from ignition_toolkit.core.config import get_settings
 
-        db = get_database()
-        db_path = db.db_path
+        settings = get_settings()
+        db_path = settings.database_path
         db_ok = db_path.exists()
         checks.append(("Database", str(db_path), "✅" if db_ok else "⚠️"))
         if not db_ok:
@@ -194,7 +203,7 @@ def verify(verbose: bool) -> None:
         errors.append(f"Playwright check failed: {e}")
 
     # 9. Dependencies check (sample key packages)
-    key_packages = ["fastapi", "uvicorn", "httpx", "playwright", "pyyaml", "cryptography"]
+    key_packages = ["fastapi", "uvicorn", "httpx", "playwright", "yaml", "cryptography"]
     for pkg in key_packages:
         try:
             __import__(pkg)
