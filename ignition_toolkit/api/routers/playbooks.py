@@ -502,6 +502,93 @@ async def delete_playbook(playbook_path: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.post("/{playbook_path:path}/duplicate")
+async def duplicate_playbook(playbook_path: str, new_name: str | None = None):
+    """
+    Duplicate a playbook with a new name
+
+    Creates a copy of the playbook in the same directory with a new name.
+    Marks the new playbook as duplicated from the source.
+
+    Args:
+        playbook_path: Source playbook path (relative to playbooks dir)
+        new_name: Optional new playbook name (defaults to source_name_copy)
+
+    Returns:
+        dict: New playbook info with path and metadata
+    """
+    metadata_store = get_metadata_store()
+
+    try:
+        # Validate source playbook exists
+        from ignition_toolkit.core.validation import PathValidator
+
+        source_path = PathValidator.validate_playbook_path(
+            playbook_path,
+            base_dir=get_playbooks_dir(),
+            must_exist=True
+        )
+
+        if not source_path.is_file():
+            raise HTTPException(status_code=400, detail=f"Source is not a file: {playbook_path}")
+
+        # Generate new filename
+        source_parent = source_path.parent
+        source_stem = source_path.stem  # filename without extension
+        source_suffix = source_path.suffix  # .yaml or .yml
+
+        if new_name:
+            # User provided new name
+            new_stem = new_name.replace(source_suffix, "")  # Remove extension if included
+        else:
+            # Auto-generate name with _copy suffix
+            new_stem = f"{source_stem}_copy"
+
+        # Check if file exists, add number if needed
+        new_path = source_parent / f"{new_stem}{source_suffix}"
+        counter = 1
+        while new_path.exists():
+            new_path = source_parent / f"{new_stem}_{counter}{source_suffix}"
+            counter += 1
+
+        # Copy the file
+        import shutil
+        shutil.copy2(source_path, new_path)
+        logger.info(f"Duplicated playbook: {source_path} -> {new_path}")
+
+        # Mark as duplicated in metadata
+        playbooks_dir = get_playbooks_dir()
+        source_relative = str(source_path.relative_to(playbooks_dir))
+        new_relative = str(new_path.relative_to(playbooks_dir))
+
+        metadata_store.mark_as_duplicated(new_relative, source_relative)
+        logger.info(f"Marked {new_relative} as duplicated from {source_relative}")
+
+        # Load and return new playbook info
+        loader = PlaybookLoader()
+        new_playbook = loader.load_from_file(new_path)
+
+        return {
+            "status": "success",
+            "message": f"Playbook duplicated successfully",
+            "source_path": source_relative,
+            "new_path": new_relative,
+            "playbook": {
+                "path": new_relative,
+                "name": new_playbook.name,
+                "description": new_playbook.description,
+                "version": new_playbook.version,
+                "domain": new_playbook.domain.value,
+            }
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception(f"Error duplicating playbook: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.post("/edit-step")
 async def edit_step(request: StepEditRequest):
     """Edit a step's parameters in a playbook during execution"""
