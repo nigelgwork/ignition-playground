@@ -21,6 +21,7 @@ from fastapi.staticfiles import StaticFiles
 
 from ignition_toolkit import __version__
 from ignition_toolkit.ai import AIAssistant
+from ignition_toolkit.api.middleware import RateLimitMiddleware
 from ignition_toolkit.api.routers import health_router
 from ignition_toolkit.api.routers.ai import router as ai_router
 from ignition_toolkit.api.routers.config import router as config_router
@@ -71,11 +72,19 @@ app.include_router(ai_router)
 # Register WebSocket router
 app.include_router(websockets_router)
 
-# CORS middleware - Restrict to localhost only (secure default)
+# ============================================================================
+# Middleware (order matters - applied in reverse order)
+# ============================================================================
 
+# SECURITY: Rate limiting middleware (PORTABILITY v4)
+# Prevents DoS attacks and API abuse
+# No external dependencies - uses token bucket algorithm
+app.add_middleware(RateLimitMiddleware)
+
+# CORS middleware - Restrict to localhost only (secure default)
 ALLOWED_ORIGINS = os.getenv(
     "ALLOWED_ORIGINS",
-    "http://localhost:5000,http://127.0.0.1:5000,http://localhost:3000,http://127.0.0.1:3000",
+    "http://localhost:5000,http://127.0.0.1:5000,http://localhost:3000,http://127.0.0.1:3000,http://localhost:5001,http://127.0.0.1:5001",
 ).split(",")
 
 app.add_middleware(
