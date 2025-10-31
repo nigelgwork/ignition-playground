@@ -569,7 +569,7 @@ class PlaybookEngine:
     async def _save_execution_start(
         self, execution_state: ExecutionState, playbook: Playbook, parameters: dict[str, Any]
     ) -> None:
-        """Save execution start to database"""
+        """Save execution start to database including initial pending steps"""
         try:
             logger.info(f"Saving execution start to database: {execution_state.execution_id}")
             with self.database.session_scope() as session:
@@ -587,9 +587,24 @@ class PlaybookEngine:
                 )
                 session.add(execution_model)
                 session.flush()  # Get the auto-generated ID
+
+                # Save initial pending steps to database
+                for step_result in execution_state.step_results:
+                    step_model = StepResultModel(
+                        execution_id=execution_model.id,
+                        step_id=step_result.step_id,
+                        step_name=step_result.step_name,
+                        status=step_result.status.value,
+                        started_at=step_result.started_at,
+                        completed_at=step_result.completed_at,
+                        error_message=step_result.error,
+                        output=step_result.output,
+                    )
+                    session.add(step_model)
+
                 # Store the database ID for later queries
                 execution_state.db_execution_id = execution_model.id
-                logger.info(f"Execution saved to database with ID: {execution_model.id}")
+                logger.info(f"Execution saved to database with ID: {execution_model.id} and {len(execution_state.step_results)} pending steps")
         except Exception as e:
             logger.exception(f"Error saving execution to database: {e}")
 
