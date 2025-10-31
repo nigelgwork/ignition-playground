@@ -1,0 +1,6 @@
+# Linux-specific Python dependencies for Ignition Automation Toolkit
+# These are installed in addition to common/requirements.txt
+
+# Designer automation via X11/AT-SPI
+python-xlib>=0.33
+pyatspi>=2.38.2

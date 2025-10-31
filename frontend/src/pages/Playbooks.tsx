@@ -14,12 +14,22 @@ import {
   Button,
   IconButton,
   Tooltip,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  TextField,
+  Select,
+  MenuItem,
+  FormControl,
+  InputLabel,
 } from '@mui/material';
 import {
   ExpandMore as ExpandMoreIcon,
   Upload as UploadIcon,
   Refresh as RefreshIcon,
   DragIndicator as DragIcon,
+  Add as AddIcon,
 } from '@mui/icons-material';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -169,6 +179,10 @@ export function Playbooks() {
   const [selectedPlaybook, setSelectedPlaybook] = useState<PlaybookInfo | null>(null);
   const [dragEnabled, setDragEnabled] = useState(false);
   const [stepsDialogPlaybook, setStepsDialogPlaybook] = useState<PlaybookInfo | null>(null);
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [newPlaybookName, setNewPlaybookName] = useState('');
+  const [newPlaybookDescription, setNewPlaybookDescription] = useState('');
+  const [newPlaybookDomain, setNewPlaybookDomain] = useState<'gateway' | 'perspective' | 'designer'>('gateway');
 
   // Fetch playbooks
   const { data: playbooks = [], isLoading, error } = useQuery<PlaybookInfo[]>({
@@ -368,47 +382,140 @@ export function Playbooks() {
     setStepsDialogPlaybook(playbook);
   };
 
-  const handleExport = (playbook: PlaybookInfo) => {
-    // Create download link for playbook export
-    const exportData = {
-      name: playbook.name,
-      path: playbook.path,
-      version: playbook.version,
-      description: playbook.description,
-      message: 'To import this playbook, use the Import button and select this JSON file.',
-    };
+  const handleExport = async (playbook: PlaybookInfo) => {
+    try {
+      // Fetch full playbook export with YAML content
+      const exportData = await api.playbooks.export(playbook.path);
 
-    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${playbook.name.replace(/\s+/g, '_')}.json`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+      // Create download link
+      const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${playbook.name.replace(/\s+/g, '_')}_export.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      alert(`Failed to export playbook: ${(error as Error).message}`);
+    }
   };
 
   const handleImport = () => {
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = '.json';
-    input.onchange = (e: Event) => {
+    input.onchange = async (e: Event) => {
       const file = (e.target as HTMLInputElement).files?.[0];
       if (file) {
         const reader = new FileReader();
-        reader.onload = (event) => {
+        reader.onload = async (event) => {
           try {
             const data = JSON.parse(event.target?.result as string);
-            alert(`Import playbook: ${data.name}\n\nNote: This is a reference. The actual playbook YAML file must be copied to:\n${data.path}\n\nSee documentation for import instructions.`);
+
+            // Validate export format
+            if (!data.yaml_content || !data.name || !data.domain) {
+              alert('Invalid export file: missing required fields (yaml_content, name, domain)');
+              return;
+            }
+
+            // Confirm import
+            const confirmImport = window.confirm(
+              `Import playbook "${data.name}"?\n\n` +
+              `Domain: ${data.domain}\n` +
+              `Version: ${data.version}\n\n` +
+              `This will create a new playbook in your playbooks/${data.domain}/ directory.`
+            );
+
+            if (!confirmImport) return;
+
+            // Import playbook
+            const result = await api.playbooks.import(
+              data.name,
+              data.domain,
+              data.yaml_content,
+              false // Don't overwrite by default
+            );
+
+            alert(`Success! Playbook imported to:\n${result.path}\n\nRefreshing playbook list...`);
+
+            // Refresh playbook list
+            window.location.reload();
           } catch (error) {
-            alert('Invalid JSON file');
+            alert(`Failed to import playbook: ${(error as Error).message}`);
           }
         };
         reader.readAsText(file);
       }
     };
     input.click();
+  };
+
+  const handleCreatePlaybook = async () => {
+    if (!newPlaybookName.trim()) {
+      alert('Please enter a playbook name');
+      return;
+    }
+
+    // Create basic playbook template
+    const yamlTemplate = `name: "${newPlaybookName}"
+version: "1.0"
+description: "${newPlaybookDescription || 'New playbook'}"
+domain: ${newPlaybookDomain}
+
+parameters:
+  - name: gateway_url
+    type: string
+    required: true
+    description: "Gateway URL (e.g., http://localhost:8088)"
+
+  - name: username
+    type: string
+    required: true
+    description: "Gateway admin username"
+
+  - name: password
+    type: string
+    required: true
+    description: "Gateway admin password"
+
+steps:
+  # Add your steps here
+  - id: step1
+    name: "Example Step"
+    type: utility.sleep
+    parameters:
+      seconds: 1
+    timeout: 10
+    on_failure: abort
+
+metadata:
+  author: "User"
+  category: "${newPlaybookDomain}"
+  tags: ["custom"]
+`;
+
+    try {
+      const result = await api.playbooks.create(
+        newPlaybookName,
+        newPlaybookDomain,
+        yamlTemplate
+      );
+
+      alert(`Success! Playbook created at:\n${result.path}\n\nRefreshing playbook list...`);
+
+      // Reset form
+      setNewPlaybookName('');
+      setNewPlaybookDescription('');
+      setNewPlaybookDomain('gateway');
+      setCreateDialogOpen(false);
+
+      // Refresh playbook list
+      window.location.reload();
+    } catch (error) {
+      alert(`Failed to create playbook: ${(error as Error).message}`);
+    }
   };
 
   return (
@@ -424,6 +531,18 @@ export function Playbooks() {
         </Box>
 
         <Box sx={{ display: 'flex', gap: 1 }}>
+          <Tooltip title="Create a new playbook from template">
+            <Button
+              variant="contained"
+              startIcon={<AddIcon />}
+              onClick={() => setCreateDialogOpen(true)}
+              size="small"
+              color="primary"
+            >
+              Create New
+            </Button>
+          </Tooltip>
+
           <Tooltip title={dragEnabled ? "Disable drag mode" : "Enable drag mode to reorder playbooks"}>
             <Button
               variant={dragEnabled ? "contained" : "outlined"}
@@ -436,7 +555,7 @@ export function Playbooks() {
             </Button>
           </Tooltip>
 
-          <Tooltip title="Import playbook reference">
+          <Tooltip title="Import playbook from JSON export">
             <Button
               variant="outlined"
               startIcon={<UploadIcon />}
@@ -630,6 +749,67 @@ export function Playbooks() {
         playbook={stepsDialogPlaybook}
         onClose={() => setStepsDialogPlaybook(null)}
       />
+
+      {/* Create New Playbook Dialog */}
+      <Dialog
+        open={createDialogOpen}
+        onClose={() => setCreateDialogOpen(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>Create New Playbook</DialogTitle>
+        <DialogContent>
+          <Box sx={{ mt: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <TextField
+              label="Playbook Name"
+              value={newPlaybookName}
+              onChange={(e) => setNewPlaybookName(e.target.value)}
+              fullWidth
+              required
+              variant="outlined"
+              helperText="Give your playbook a descriptive name"
+            />
+            <TextField
+              label="Description"
+              value={newPlaybookDescription}
+              onChange={(e) => setNewPlaybookDescription(e.target.value)}
+              fullWidth
+              multiline
+              rows={2}
+              variant="outlined"
+              helperText="Describe what this playbook does"
+            />
+            <FormControl fullWidth>
+              <InputLabel>Domain</InputLabel>
+              <Select
+                value={newPlaybookDomain}
+                onChange={(e) => setNewPlaybookDomain(e.target.value as 'gateway' | 'perspective' | 'designer')}
+                label="Domain"
+              >
+                <MenuItem value="gateway">Gateway</MenuItem>
+                <MenuItem value="perspective">Perspective</MenuItem>
+                <MenuItem value="designer">Designer</MenuItem>
+              </Select>
+            </FormControl>
+            <Alert severity="info">
+              A basic playbook template will be created with standard parameters and a sample step.
+              You can edit the YAML file after creation to add your own steps.
+            </Alert>
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setCreateDialogOpen(false)}>
+            Cancel
+          </Button>
+          <Button
+            onClick={handleCreatePlaybook}
+            variant="contained"
+            disabled={!newPlaybookName.trim()}
+          >
+            Create Playbook
+          </Button>
+        </DialogActions>
+      </Dialog>
 
     </Box>
   );

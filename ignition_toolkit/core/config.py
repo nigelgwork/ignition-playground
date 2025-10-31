@@ -65,6 +65,9 @@ class Settings(BaseSettings):
     # Frontend (defaults to dynamic path from paths.py)
     frontend_dir: Path = get_frontend_dist_dir()
 
+    # Filesystem browser security
+    filesystem_allowed_paths: str = ""  # Colon-separated list of allowed directories
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"

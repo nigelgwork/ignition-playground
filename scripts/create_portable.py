@@ -45,163 +45,60 @@ def get_project_root() -> Path:
     return Path(__file__).parent.parent.resolve()
 
 
-def create_launcher_scripts(output_dir: Path):
-    """Create launcher scripts for Linux and Windows"""
+def create_launcher_scripts(output_dir: Path, project_root: Path, platform: str, version: str):
+    """Create launcher scripts from platform-specific templates"""
 
-    # Linux/macOS launcher
-    linux_launcher = output_dir / "run.sh"
-    linux_launcher.write_text("""#!/bin/bash
-# Ignition Automation Toolkit - Portable Launcher (Linux/macOS)
+    import sys
 
-set -e
+    # Get Python version
+    python_version = f"{sys.version_info.major}.{sys.version_info.minor}"
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-cd "${SCRIPT_DIR}"
+    # Template variables for substitution
+    template_vars = {
+        "TOOLKIT_VERSION": version,
+        "PYTHON_VERSION": python_version,
+    }
 
-echo "========================================"
-echo "Ignition Automation Toolkit"
-echo "========================================"
-echo ""
+    if platform in ("linux", "wsl2"):
+        # Read Linux launcher template (WSL2 runs on Linux kernel)
+        template_path = project_root / "platform-config" / "linux" / "launcher.sh.template"
+        if template_path.exists():
+            template_content = template_path.read_text()
 
-# Check if venv exists
-if [ ! -d "venv" ]; then
-    echo "🔧 First run detected - setting up virtual environment..."
-    echo ""
+            # Substitute variables
+            launcher_content = template_content
+            for key, value in template_vars.items():
+                launcher_content = launcher_content.replace(f"{{{key}}}", value)
 
-    # Check Python version
-    if ! command -v python3 &> /dev/null; then
-        echo "❌ ERROR: python3 not found. Please install Python 3.10 or later."
-        exit 1
-    fi
+            # Write launcher
+            launcher_path = output_dir / "run.sh"
+            launcher_path.write_text(launcher_content)
+            launcher_path.chmod(0o755)
+            platform_name = "WSL2/Linux" if platform == "wsl2" else "Linux"
+            print(f"  ✓ Created {platform_name} launcher (run.sh)")
+        else:
+            print(f"  ⚠️  Linux launcher template not found: {template_path}")
 
-    PYTHON_VERSION=$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
-    echo "✓ Found Python ${PYTHON_VERSION}"
+    elif platform == "windows":
+        # Read Windows launcher template
+        template_path = project_root / "platform-config" / "windows" / "launcher.bat.template"
+        if template_path.exists():
+            template_content = template_path.read_text()
 
-    # Create venv
-    echo "✓ Creating virtual environment..."
-    python3 -m venv venv
+            # Substitute variables
+            launcher_content = template_content
+            for key, value in template_vars.items():
+                launcher_content = launcher_content.replace(f"{{{key}}}", value)
 
-    # Activate venv
-    source venv/bin/activate
+            # Write launcher
+            launcher_path = output_dir / "run.bat"
+            launcher_path.write_text(launcher_content)
+            print(f"  ✓ Created Windows launcher (run.bat)")
+        else:
+            print(f"  ⚠️  Windows launcher template not found: {template_path}")
 
-    # Upgrade pip
-    echo "✓ Upgrading pip..."
-    pip install --upgrade pip > /dev/null 2>&1
-
-    # Install dependencies
-    echo "✓ Installing dependencies..."
-    pip install -e . > /dev/null 2>&1
-
-    # Install Playwright browsers
-    echo "✓ Installing Playwright browsers..."
-    export PLAYWRIGHT_BROWSERS_PATH="${SCRIPT_DIR}/data/.playwright-browsers"
-    playwright install chromium > /dev/null 2>&1
-
-    echo ""
-    echo "✅ Setup complete!"
-    echo ""
-fi
-
-# Activate venv
-source venv/bin/activate
-
-# Set Playwright browser path
-export PLAYWRIGHT_BROWSERS_PATH="${SCRIPT_DIR}/data/.playwright-browsers"
-
-# Read port from .env or default
-if [ -f ".env" ]; then
-    PORT=$(grep "^API_PORT=" .env | cut -d'=' -f2)
-    PORT=${PORT:-5000}
-else
-    PORT=5000
-fi
-
-echo "🚀 Starting Ignition Automation Toolkit..."
-echo ""
-echo "📍 Access the web interface at: http://localhost:${PORT}"
-echo ""
-echo "Press Ctrl+C to stop the server"
-echo ""
-
-# Start server
-exec ./venv/bin/uvicorn ignition_toolkit.api.app:app --host 0.0.0.0 --port ${PORT}
-""")
-    linux_launcher.chmod(0o755)
-
-    # Windows launcher
-    windows_launcher = output_dir / "run.bat"
-    windows_launcher.write_text("""@echo off
-REM Ignition Automation Toolkit - Portable Launcher (Windows)
-
-setlocal enabledelayedexpansion
-
-cd /d "%~dp0"
-
-echo ========================================
-echo Ignition Automation Toolkit
-echo ========================================
-echo.
-
-REM Check if venv exists
-if not exist "venv" (
-    echo Setting up virtual environment...
-    echo.
-
-    REM Check Python
-    python --version >nul 2>&1
-    if errorlevel 1 (
-        echo ERROR: Python not found. Please install Python 3.10 or later.
-        pause
-        exit /b 1
-    )
-
-    echo Creating virtual environment...
-    python -m venv venv
-
-    REM Activate venv
-    call venv\\Scripts\\activate.bat
-
-    echo Upgrading pip...
-    python -m pip install --upgrade pip >nul 2>&1
-
-    echo Installing dependencies...
-    pip install -e . >nul 2>&1
-
-    echo Installing Playwright browsers...
-    set PLAYWRIGHT_BROWSERS_PATH=%CD%\\data\\.playwright-browsers
-    playwright install chromium >nul 2>&1
-
-    echo.
-    echo Setup complete!
-    echo.
-) else (
-    REM Activate venv
-    call venv\\Scripts\\activate.bat
-)
-
-REM Set Playwright browser path
-set PLAYWRIGHT_BROWSERS_PATH=%CD%\\data\\.playwright-browsers
-
-REM Read port from .env or default
-set PORT=5000
-if exist .env (
-    for /f "tokens=1,2 delims==" %%a in (.env) do (
-        if "%%a"=="API_PORT" set PORT=%%b
-    )
-)
-
-echo Starting Ignition Automation Toolkit...
-echo.
-echo Access the web interface at: http://localhost:%PORT%
-echo.
-echo Press Ctrl+C to stop the server
-echo.
-
-REM Start server
-venv\\Scripts\\uvicorn.exe ignition_toolkit.api.app:app --host 0.0.0.0 --port %PORT%
-""")
-
-    print(f"  ✓ Created launcher scripts")
+    else:
+        print(f"  ⚠️  Unknown platform: {platform}")
 
 
 def create_install_instructions(output_dir: Path, version: str, runtime_included: bool = False):
@@ -369,13 +266,20 @@ Getting Started: docs/getting_started.md
     print(f"  ✓ Created INSTALL.txt")
 
 
-def copy_project_files(output_dir: Path, project_root: Path):
-    """Copy necessary project files to output directory"""
+def copy_project_files(output_dir: Path, project_root: Path, platform: str = "linux"):
+    """Copy necessary project files to output directory
+
+    Args:
+        output_dir: Destination directory for copied files
+        project_root: Source project root directory
+        platform: Target platform (linux/windows) - used to filter platform-specific content
+    """
 
     # Files and directories to include
     include_patterns = [
         "ignition_toolkit/",
         "playbooks/",
+        "platform-config/",
         "frontend/dist/",
         "frontend/package.json",
         "docs/",
@@ -398,6 +302,19 @@ def copy_project_files(output_dir: Path, project_root: Path):
         "data",  # Will be created by user
         ".ignition-toolkit",
     }
+
+    # Platform-specific file exclusions
+    exclude_platform_files = set()
+    if platform == "linux":
+        # Exclude Windows-specific Designer playbook (uses PowerShell)
+        exclude_platform_files.add("launch_designer_shortcut.yaml")
+    elif platform == "windows":
+        # Exclude Linux-specific Designer playbook (uses xdotool)
+        exclude_platform_files.add("launch_designer_linux.yaml")
+    elif platform == "wsl2":
+        # WSL2: Include BOTH playbooks (hybrid environment)
+        # Users can use Linux tools OR call Windows PowerShell
+        pass  # No exclusions
 
     # File patterns to exclude
     exclude_files = {
@@ -424,9 +341,20 @@ def copy_project_files(output_dir: Path, project_root: Path):
 
             def ignore_patterns(dir, files):
                 ignored = []
+                # Get relative path from source to current directory
+                try:
+                    rel_path = Path(dir).relative_to(source)
+                except ValueError:
+                    rel_path = Path(".")
+
                 for file in files:
-                    # Exclude specific directories
-                    if file in exclude_dirs:
+                    # Exclude platform-specific files
+                    if file in exclude_platform_files:
+                        ignored.append(file)
+                        continue
+
+                    # Exclude specific directories (always)
+                    if file in {"__pycache__", ".pytest_cache", "node_modules", ".git", "venv", ".venv", "data", ".ignition-toolkit"}:
                         ignored.append(file)
                         continue
 
@@ -479,29 +407,15 @@ def create_zipfile(source_dir: Path, output_file: Path):
 
 
 def get_platform_suffix() -> str:
-    """Get platform suffix for archive name"""
-    import platform
+    """
+    Get target architecture suffix for archive name.
 
-    system = platform.system().lower()
-    machine = platform.machine().lower()
-
-    # Normalize architecture names
-    if machine in ["x86_64", "amd64"]:
-        arch = "x64"
-    elif machine in ["aarch64", "arm64"]:
-        arch = "arm64"
-    else:
-        arch = machine
-
-    # Normalize system names
-    if system == "linux":
-        return f"linux-{arch}"
-    elif system == "darwin":
-        return f"macos-{arch}"
-    elif system == "windows":
-        return f"windows-{arch}"
-    else:
-        return f"{system}-{arch}"
+    Currently hardcoded to x64 (most common target).
+    Future: Add --target-arch parameter for ARM64 support.
+    """
+    # Hardcode x64 target architecture (most common)
+    # This is the TARGET architecture, not the BUILD architecture
+    return "x64"
 
 
 def copy_runtime(build_dir: Path, project_root: Path):
@@ -529,6 +443,13 @@ def copy_runtime(build_dir: Path, project_root: Path):
         shutil.copytree(browsers_source, browsers_dest)
         browsers_size = sum(f.stat().st_size for f in browsers_dest.rglob("*") if f.is_file()) / (1024 * 1024)
         print(f"✓ ({browsers_size:.0f} MB)")
+
+        # Create symlink in root directory for launcher script compatibility
+        symlink_path = build_dir / ".playwright-browsers"
+        symlink_target = Path("data") / ".playwright-browsers"
+        if not symlink_path.exists():
+            symlink_path.symlink_to(symlink_target)
+            print(f"    ✓ Created symlink: .playwright-browsers -> data/.playwright-browsers")
     else:
         print(f"    ⚠️  Playwright browsers not found - will be downloaded on first run")
 
@@ -544,6 +465,12 @@ def main():
         help="Archive format to create (default: both)"
     )
     parser.add_argument(
+        "--platform",
+        choices=["linux", "windows", "wsl2", "auto"],
+        default="auto",
+        help="Target platform: linux (pure Linux), windows (pure Windows), wsl2 (WSL2 hybrid with both Linux and Windows tools), auto (auto-detect)"
+    )
+    parser.add_argument(
         "--output-dir",
         type=Path,
         default=None,
@@ -556,6 +483,20 @@ def main():
     )
 
     args = parser.parse_args()
+
+    # Determine target platform
+    if args.platform == "auto":
+        import platform as plat
+        system = plat.system().lower()
+        if system == "windows" or system.startswith("win"):
+            target_platform = "windows"
+        else:
+            target_platform = "linux"  # Default to Linux for Unix-like systems
+        print(f"Auto-detected platform: {target_platform}")
+    else:
+        target_platform = args.platform
+
+    args.target_platform = target_platform
 
     project_root = get_project_root()
     version = get_version()
@@ -571,12 +512,12 @@ def main():
     # Determine archive name suffix
     if args.include_runtime:
         platform_suffix = get_platform_suffix()
-        archive_suffix = f"{platform_suffix}-full"
-        build_dir_name = f"ignition-toolkit-v{version}-{platform_suffix}-full"
+        archive_suffix = f"{args.target_platform}-{platform_suffix}-full"
+        build_dir_name = f"ignition-toolkit-v{version}-{args.target_platform}-{platform_suffix}-full"
         archive_type = "FULL RUNTIME"
     else:
-        archive_suffix = "portable"
-        build_dir_name = f"ignition-toolkit-portable-v{version}"
+        archive_suffix = f"{args.target_platform}-portable"
+        build_dir_name = f"ignition-toolkit-v{version}-{args.target_platform}-portable"
         archive_type = "SOURCE"
 
     # Create temporary build directory
@@ -585,8 +526,9 @@ def main():
     print("=" * 70)
     print(f"Creating Portable Archive - v{version}")
     print(f"Type: {archive_type}")
+    print(f"Target Platform: {args.target_platform}")
     if args.include_runtime:
-        print(f"Platform: {get_platform_suffix()}")
+        print(f"Architecture: {get_platform_suffix()}")
         print("⚠️  Runtime included - archive will be large (~850MB)")
     print("=" * 70)
     print()
@@ -602,7 +544,7 @@ def main():
 
     # Step 1: Copy project files
     print("Step 1: Copying project files")
-    copy_project_files(build_dir, project_root)
+    copy_project_files(build_dir, project_root, args.target_platform)
     print()
 
     # Step 2: Copy runtime dependencies (if requested)
@@ -616,7 +558,7 @@ def main():
 
     # Step 3 (or 2): Create launcher scripts
     print(f"Step {2 + step_offset}: Creating launcher scripts")
-    create_launcher_scripts(build_dir)
+    create_launcher_scripts(build_dir, project_root, args.target_platform, version)
     print()
 
     # Step 4 (or 3): Create installation instructions

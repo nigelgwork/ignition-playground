@@ -112,6 +112,36 @@ export const api = {
         `/api/playbooks/${encodeURIComponent(path)}/duplicate${newName ? `?new_name=${encodeURIComponent(newName)}` : ''}`,
         { method: 'POST' }
       ),
+    export: (path: string) =>
+      fetchJSON<{ name: string; path: string; version: string; description: string; domain: string; yaml_content: string; metadata: any }>(
+        `/api/playbooks/${encodeURIComponent(path)}/export`
+      ),
+    import: (name: string, domain: string, yamlContent: string, overwrite: boolean = false) =>
+      fetchJSON<{ status: string; message: string; path: string; playbook: any }>(
+        '/api/playbooks/import',
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            name,
+            domain,
+            yaml_content: yamlContent,
+            overwrite,
+          }),
+        }
+      ),
+    create: (name: string, domain: string, yamlContent: string) =>
+      fetchJSON<{ status: string; message: string; path: string; playbook: any }>(
+        '/api/playbooks/create',
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            name,
+            domain,
+            yaml_content: yamlContent,
+            overwrite: false,
+          }),
+        }
+      ),
   },
 
   /**

@@ -703,3 +703,155 @@ async def edit_step(request: StepEditRequest):
     except Exception as e:
         logger.exception(f"Step edit error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+class PlaybookExportResponse(BaseModel):
+    """Response for playbook export containing YAML content"""
+    name: str
+    path: str
+    version: str
+    description: str
+    domain: str
+    yaml_content: str
+    metadata: dict[str, Any]
+
+
+class PlaybookImportRequest(BaseModel):
+    """Request to import a playbook from JSON"""
+    name: str
+    domain: str  # gateway, perspective, or designer
+    yaml_content: str
+    overwrite: bool = False
+
+
+@router.get("/{playbook_path:path}/export", response_model=PlaybookExportResponse)
+async def export_playbook(playbook_path: str):
+    """
+    Export a playbook with full YAML content
+
+    Returns JSON with playbook metadata and YAML content for portability
+    """
+    try:
+        # Validate path
+        validated_path = validate_playbook_path(playbook_path)
+
+        # Load playbook
+        loader = PlaybookLoader()
+        playbook = loader.load_from_file(validated_path)
+
+        # Read YAML content
+        with open(validated_path) as f:
+            yaml_content = f.read()
+
+        # Get metadata
+        playbooks_dir = get_playbooks_dir()
+        relative_path = str(validated_path.relative_to(playbooks_dir))
+        metadata_store = get_metadata_store()
+        meta = metadata_store.get_metadata(relative_path)
+
+        return PlaybookExportResponse(
+            name=playbook.name,
+            path=relative_path,
+            version=playbook.version,
+            description=playbook.description,
+            domain=playbook.domain.value if hasattr(playbook, 'domain') else 'gateway',
+            yaml_content=yaml_content,
+            metadata={
+                'revision': meta.revision,
+                'verified': meta.verified,
+                'origin': meta.origin,
+                'created_at': meta.created_at,
+                'exported_at': datetime.now().isoformat(),
+            }
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception(f"Error exporting playbook: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/import")
+async def import_playbook(request: PlaybookImportRequest):
+    """
+    Import a playbook from JSON export
+
+    Creates a new playbook file in the appropriate domain directory.
+    If a playbook with the same name exists, either overwrites or creates a copy.
+    """
+    metadata_store = get_metadata_store()
+    try:
+        # Validate domain
+        if request.domain not in ['gateway', 'perspective', 'designer']:
+            raise HTTPException(status_code=400, detail=f"Invalid domain: {request.domain}")
+
+        # Validate YAML syntax
+        try:
+            yaml.safe_load(request.yaml_content)
+        except yaml.YAMLError as e:
+            raise HTTPException(status_code=400, detail=f"Invalid YAML: {str(e)}")
+
+        # Determine target directory
+        playbooks_dir = get_playbooks_dir()
+        target_dir = playbooks_dir / request.domain
+        target_dir.mkdir(parents=True, exist_ok=True)
+
+        # Generate filename from name
+        safe_name = request.name.lower().replace(' ', '_').replace('-', '_')
+        # Remove any characters that aren't alphanumeric or underscore
+        import re
+        safe_name = re.sub(r'[^a-z0-9_]', '', safe_name)
+
+        target_file = target_dir / f"{safe_name}.yaml"
+
+        # Check if file exists
+        if target_file.exists() and not request.overwrite:
+            # Create a copy with a number suffix
+            counter = 1
+            while target_file.exists():
+                target_file = target_dir / f"{safe_name}_{counter}.yaml"
+                counter += 1
+
+        # Write playbook file
+        with open(target_file, 'w') as f:
+            f.write(request.yaml_content)
+
+        logger.info(f"Imported playbook to: {target_file}")
+
+        # Create metadata
+        relative_path = str(target_file.relative_to(playbooks_dir))
+        metadata_store.mark_as_imported(relative_path)
+
+        # Load and return playbook info
+        loader = PlaybookLoader()
+        new_playbook = loader.load_from_file(target_file)
+
+        return {
+            "status": "success",
+            "message": "Playbook imported successfully",
+            "path": relative_path,
+            "playbook": {
+                "name": new_playbook.name,
+                "path": relative_path,
+                "version": new_playbook.version,
+                "description": new_playbook.description,
+                "domain": request.domain,
+            }
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception(f"Error importing playbook: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/create")
+async def create_playbook(request: PlaybookImportRequest):
+    """
+    Create a new blank playbook or from template
+
+    Same as import but intended for creating new playbooks from scratch
+    """
+    return await import_playbook(request)

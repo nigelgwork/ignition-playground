@@ -44,6 +44,8 @@ class StepType(str, Enum):
     BROWSER_NAVIGATE = "browser.navigate"
     BROWSER_CLICK = "browser.click"
     BROWSER_FILL = "browser.fill"
+    BROWSER_KEYBOARD = "browser.keyboard"
+    BROWSER_FILE_UPLOAD = "browser.file_upload"
     BROWSER_SCREENSHOT = "browser.screenshot"
     BROWSER_WAIT = "browser.wait"
     BROWSER_VERIFY = "browser.verify"

@@ -1,0 +1,18 @@
+# Linux system dependencies (install via apt-get or equivalent package manager)
+# These are NOT Python packages and must be installed at the OS level
+
+# X11 automation tools
+xdotool
+
+# Image processing (for screenshot comparison)
+imagemagick
+
+# Java Runtime Environment (required for Ignition Designer)
+default-jre
+
+# AT-SPI development files (required for pyatspi)
+libatspi2.0-dev
+python3-gi
+
+# X11 development files (required for python-xlib)
+libx11-dev

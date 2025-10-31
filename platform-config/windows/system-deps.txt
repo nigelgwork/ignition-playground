@@ -1,0 +1,18 @@
+# Windows system dependencies
+# These must be available on the target Windows system
+
+# PowerShell (required for automation scripts)
+# Minimum version: 5.0 (included in Windows 10+)
+# Check version: $PSVersionTable.PSVersion
+
+# .NET Framework (required for UI Automation)
+# Minimum version: 4.5+ (included in Windows 10+)
+# Check version: Get-ItemProperty "HKLM:SOFTWARE\Microsoft\NET Framework Setup\NDP\v4\Full"
+
+# Java Runtime Environment (required for Ignition Designer)
+# Minimum version: Java 11+
+# Download from: https://adoptium.net/ or https://www.oracle.com/java/technologies/downloads/
+# Check version: java -version
+
+# Note: These are typically pre-installed on Windows 10+ systems
+# The portable build will check for these prerequisites on first run

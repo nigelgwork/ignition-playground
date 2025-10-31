@@ -1,0 +1,149 @@
+@echo off
+REM Ignition Automation Toolkit - Windows Launcher
+REM Version: {TOOLKIT_VERSION}
+REM Python: {PYTHON_VERSION}
+
+setlocal enabledelayedexpansion
+
+echo ========================================
+echo Ignition Automation Toolkit v{TOOLKIT_VERSION}
+echo ========================================
+echo.
+
+REM Get script directory
+set SCRIPT_DIR=%~dp0
+cd /d "%SCRIPT_DIR%"
+
+REM Check system dependencies
+echo Checking system dependencies...
+echo.
+
+REM Check PowerShell version
+powershell -Command "$version = $PSVersionTable.PSVersion; if ($version.Major -lt 5) { exit 1 }" 2>nul
+if errorlevel 1 (
+    echo [ERROR] PowerShell 5.0 or higher required
+    echo Please update PowerShell: https://aka.ms/powershell
+    pause
+    exit /b 1
+) else (
+    echo [OK] PowerShell found
+)
+
+REM Check .NET Framework
+reg query "HKLM\SOFTWARE\Microsoft\NET Framework Setup\NDP\v4\Full" /v Version >nul 2>&1
+if errorlevel 1 (
+    echo [WARNING] .NET Framework 4.5+ not detected
+    echo Some features may not work correctly
+) else (
+    echo [OK] .NET Framework found
+)
+
+REM Check Java
+java -version >nul 2>&1
+if errorlevel 1 (
+    echo [WARNING] Java Runtime Environment not found
+    echo Java is required for Ignition Designer automation
+    echo Download from: https://adoptium.net/
+    echo.
+    set /p CONTINUE="Continue anyway? (y/N): "
+    if /i not "!CONTINUE!"=="y" exit /b 1
+) else (
+    echo [OK] Java Runtime found
+)
+
+echo.
+
+REM Setup virtual environment
+echo Setting up Python environment...
+if not exist "venv\" (
+    echo Virtual environment not found - creating (first run only)...
+    echo This may take 3-5 minutes...
+    echo.
+
+    REM Check Python is installed
+    python --version >nul 2>&1
+    if errorlevel 1 (
+        echo [ERROR] Python not found
+        echo Please install Python 3.10 or higher from https://www.python.org
+        echo Make sure to check "Add Python to PATH" during installation
+        pause
+        exit /b 1
+    )
+
+    REM Create virtual environment
+    echo Creating virtual environment...
+    python -m venv venv
+    if errorlevel 1 (
+        echo [ERROR] Failed to create virtual environment
+        echo Make sure Python 3.10+ is installed
+        pause
+        exit /b 1
+    )
+    echo [OK] Virtual environment created
+
+    REM Activate and install dependencies
+    call venv\Scripts\activate.bat
+    echo Installing dependencies...
+    python -m pip install --upgrade pip --quiet
+    pip install -e . --quiet
+    if errorlevel 1 (
+        echo [ERROR] Failed to install dependencies
+        pause
+        exit /b 1
+    )
+    echo [OK] Dependencies installed
+) else (
+    echo [OK] Virtual environment found
+    call venv\Scripts\activate.bat
+    if errorlevel 1 (
+        echo [ERROR] Failed to activate virtual environment
+        pause
+        exit /b 1
+    )
+    echo [OK] Virtual environment activated
+)
+echo.
+
+REM Check Playwright browsers
+echo Checking Playwright browsers...
+if not exist ".playwright-browsers\" (
+    echo Installing Playwright browsers (first run only)...
+    set PLAYWRIGHT_BROWSERS_PATH=.playwright-browsers
+    python -m playwright install chromium
+    if errorlevel 1 (
+        echo [ERROR] Failed to install Playwright browsers
+        pause
+        exit /b 1
+    )
+    echo [OK] Playwright browsers installed
+) else (
+    echo [OK] Playwright browsers already installed
+)
+echo.
+
+REM Set environment
+set PLAYWRIGHT_BROWSERS_PATH=.playwright-browsers
+
+REM Start the toolkit
+echo Starting Ignition Automation Toolkit...
+echo Server will be available at: http://localhost:5000
+echo.
+echo Press Ctrl+C to stop the server
+echo.
+
+REM Start server in background and open browser
+REM Use python -m to avoid shebang path issues with portable venvs
+start /B venv\Scripts\python.exe -m ignition_toolkit.cli serve
+
+REM Wait for server to start
+timeout /t 3 /nobreak >nul
+
+REM Open browser
+start http://localhost:5000
+
+REM Wait for user to close
+echo.
+echo Server is running. Browser should have opened automatically.
+echo If not, navigate to: http://localhost:5000
+echo.
+pause

@@ -1,0 +1,5 @@
+# Windows-specific Python dependencies for Ignition Automation Toolkit
+# These are installed in addition to common/requirements.txt
+
+# Designer automation via Windows UI Automation API
+pywinauto>=0.6.8

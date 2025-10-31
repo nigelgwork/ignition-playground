@@ -239,6 +239,19 @@ class PlaybookMetadataStore:
         self.update_metadata(playbook_path, metadata)
         logger.info(f"Marked {playbook_path} as duplicated from {source_path}")
 
+    def mark_as_imported(self, playbook_path: str):
+        """
+        Mark playbook as imported from JSON export
+
+        Args:
+            playbook_path: Relative path from playbooks directory
+        """
+        metadata = self.get_metadata(playbook_path)
+        metadata.origin = "imported"
+        metadata.created_at = datetime.now().isoformat()
+        self.update_metadata(playbook_path, metadata)
+        logger.info(f"Marked {playbook_path} as imported")
+
     def auto_detect_built_ins(self, playbooks_dir: Path):
         """
         Auto-detect and mark built-in playbooks

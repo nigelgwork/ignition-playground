@@ -64,8 +64,11 @@ def _get_allowed_base_paths() -> List[Path]:
     # Always allow data/ directory
     allowed_paths = [get_data_dir()]
 
-    # Allow additional paths from environment variable if set
-    extra_paths = os.environ.get("FILESYSTEM_ALLOWED_PATHS", "").strip()
+    # Get additional paths from settings (loaded from .env)
+    from ignition_toolkit.core.config import get_settings
+    settings = get_settings()
+    extra_paths = settings.filesystem_allowed_paths.strip()
+
     if extra_paths:
         for path_str in extra_paths.split(":"):
             path_str = path_str.strip()
