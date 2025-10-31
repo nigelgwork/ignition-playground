@@ -96,60 +96,65 @@ class UtilityPythonHandler(StepHandler):
         if not script:
             raise StepExecutionError("utility", "Python script is required")
 
-        # SECURITY: Execute in sandboxed environment
-        output_buffer = io.StringIO()
-        result = {}
-
-        try:
-            # Create restricted builtins
-            safe_builtins = {
-                name: getattr(__builtins__, name)
-                for name in self.SAFE_BUILTINS
-                if hasattr(__builtins__, name)
-            }
-
-            # SECURITY: Restricted execution environment - NO dangerous modules
-            exec_globals = {
-                "__builtins__": safe_builtins,
-                "json": __import__("json"),  # JSON parsing only
-                "re": __import__("re"),      # Regex operations
-                "datetime": __import__("datetime"),  # Date/time
-                # NOTE: os, subprocess, sys, pathlib are NOT available
-            }
-
-            # Set 5 second timeout using signal (Unix only)
-            import signal
-
-            def timeout_handler(signum, frame):
-                raise TimeoutError("Script execution timed out (5s limit)")
-
-            # Only set signal handler on Unix systems
-            if hasattr(signal, 'SIGALRM'):
-                signal.signal(signal.SIGALRM, timeout_handler)
-                signal.alarm(5)  # 5 second timeout
+        # SECURITY: Execute in sandboxed environment (in thread pool to avoid blocking event loop)
+        def _run_sandboxed_script():
+            output_buffer = io.StringIO()
+            result = {}
 
             try:
-                # Redirect stdout to capture print() statements
-                with redirect_stdout(output_buffer):
-                    exec(script, exec_globals)
-            finally:
-                # Cancel timeout
+                # Create restricted builtins (v4 security)
+                safe_builtins = {
+                    name: getattr(__builtins__, name)
+                    for name in self.SAFE_BUILTINS
+                    if hasattr(__builtins__, name)
+                }
+
+                # SECURITY: Restricted execution environment - NO dangerous modules
+                exec_globals = {
+                    "__builtins__": safe_builtins,
+                    "json": __import__("json"),  # JSON parsing only
+                    "re": __import__("re"),      # Regex operations
+                    "datetime": __import__("datetime"),  # Date/time
+                    # NOTE: os, subprocess, sys, pathlib are NOT available
+                }
+
+                # Set 5 second timeout using signal (Unix only)
+                import signal
+
+                def timeout_handler(signum, frame):
+                    raise TimeoutError("Script execution timed out (5s limit)")
+
+                # Only set signal handler on Unix systems
                 if hasattr(signal, 'SIGALRM'):
-                    signal.alarm(0)
+                    signal.signal(signal.SIGALRM, timeout_handler)
+                    signal.alarm(5)  # 5 second timeout
 
-            # Parse output for key=value pairs (e.g., DETECTED_MODULE_FILE=/path/to/file)
-            output = output_buffer.getvalue()
-            for line in output.strip().split("\n"):
-                if "=" in line:
-                    key, value = line.split("=", 1)
-                    result[key.strip()] = value.strip()
+                try:
+                    # Redirect stdout to capture print() statements
+                    with redirect_stdout(output_buffer):
+                        exec(script, exec_globals)
+                finally:
+                    # Cancel timeout
+                    if hasattr(signal, 'SIGALRM'):
+                        signal.alarm(0)
 
-            # Also include raw output
-            result["_output"] = output
+                # Parse output for key=value pairs (e.g., DETECTED_MODULE_FILE=/path/to/file)
+                output = output_buffer.getvalue()
+                for line in output.strip().split("\n"):
+                    if "=" in line:
+                        key, value = line.split("=", 1)
+                        result[key.strip()] = value.strip()
 
-            return result
+                # Also include raw output
+                result["_output"] = output
 
-        except TimeoutError as e:
-            raise StepExecutionError("utility.python", str(e))
-        except Exception as e:
-            raise StepExecutionError("utility.python", f"Script execution failed: {str(e)}")
+                return result
+
+            except TimeoutError as e:
+                raise StepExecutionError("utility.python", str(e))
+            except Exception as e:
+                raise StepExecutionError("utility.python", f"Script execution failed: {str(e)}")
+
+        # Run in thread pool to avoid blocking event loop (v3.45.7 bug fix)
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(None, _run_sandboxed_script)

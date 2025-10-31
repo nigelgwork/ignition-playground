@@ -22,7 +22,7 @@ parameters:
 steps:
   # Step 1: Launch Designer and wait for login window
   - id: launch_designer
-    name: "Launch Designer and wait for login window"
+    name: "Step 1: Launch Designer and wait for login window"
     type: utility.python
     parameters:
       script: |
@@ -54,11 +54,16 @@ steps:
         login_window = False
 
         while attempt < max_attempts:
-            check_cmd = "powershell.exe -Command \"Get-Process | Where-Object {$_.MainWindowTitle -eq 'Login - Ignition'} | Measure-Object | Select-Object -ExpandProperty Count\""
-            result = subprocess.run(check_cmd, shell=True, capture_output=True, text=True)
+            # Use list form to avoid shell expansion of $_ variable
+            check_cmd = [
+                "powershell.exe",
+                "-Command",
+                "Get-Process | Where-Object {$_.MainWindowTitle -eq 'Login - Ignition'} | Measure-Object | Select-Object -ExpandProperty Count"
+            ]
+            result = subprocess.run(check_cmd, capture_output=True, text=True)
             count = result.stdout.strip()
 
-            if count != "0":
+            if count and count != "0":
                 print("✓ Login window detected!")
                 login_window = True
                 break
@@ -71,21 +76,25 @@ steps:
         if not login_window:
             raise Exception("Login window did not appear after 30 seconds")
 
+        # Wait for UI to fully initialize (Java Swing needs time after window appears)
+        print("Allowing login window to fully initialize...")
+        time.sleep(2)
+
         print("LOGIN_WINDOW_READY=true")
     timeout: 60
     on_failure: abort
 
   # Step 2: Enter credentials and login
   - id: login
-    name: "Enter credentials and login"
+    name: "Step 2: Enter credentials and login"
     type: utility.python
     parameters:
       script: |
         import subprocess
         import os
 
-        username = r"""{{ gateway_credential.username }}"""
-        password = r"""{{ gateway_credential.password }}"""
+        username = r"""{{ parameter.gateway_credential.username }}"""
+        password = r"""{{ parameter.gateway_credential.password }}"""
 
         print(f"[2/3] Entering credentials for user: {username}")
 
@@ -111,11 +120,16 @@ steps:
         project_window = False
 
         while attempt < max_attempts:
-            check_cmd = "powershell.exe -Command \"Get-Process | Where-Object {$_.MainWindowTitle -like '*Open/Create Project*'} | Measure-Object | Select-Object -ExpandProperty Count\""
-            result = subprocess.run(check_cmd, shell=True, capture_output=True, text=True)
+            # Use list form to avoid shell expansion of $_ variable
+            check_cmd = [
+                "powershell.exe",
+                "-Command",
+                "Get-Process | Where-Object {$_.MainWindowTitle -like '*Open/Create Project*'} | Measure-Object | Select-Object -ExpandProperty Count"
+            ]
+            result = subprocess.run(check_cmd, capture_output=True, text=True)
             count = result.stdout.strip()
 
-            if count != "0":
+            if count and count != "0":
                 print("✓ Project selection screen detected!")
                 project_window = True
                 break
@@ -134,7 +148,7 @@ steps:
 
   # Step 3: Search and open project
   - id: open_project
-    name: "Search and open project"
+    name: "Step 3: Search and open project"
     type: utility.python
     parameters:
       script: |
@@ -166,8 +180,13 @@ steps:
 
         # Wait and verify project opened
         time.sleep(5)
-        verify_cmd = f"powershell.exe -Command \"Get-Process | Where-Object {{($_.ProcessName -eq 'java') -or ($_.ProcessName -eq 'javaw')}} | Select-Object -ExpandProperty MainWindowTitle\""
-        result = subprocess.run(verify_cmd, shell=True, capture_output=True, text=True)
+        # Use list form to avoid shell expansion of $_ variable
+        verify_cmd = [
+            "powershell.exe",
+            "-Command",
+            "Get-Process | Where-Object {($_.ProcessName -eq 'java') -or ($_.ProcessName -eq 'javaw')} | Select-Object -ExpandProperty MainWindowTitle"
+        ]
+        result = subprocess.run(verify_cmd, capture_output=True, text=True)
         window_titles = result.stdout
 
         if project_name.lower() in window_titles.lower():

@@ -237,6 +237,7 @@ export function Playbooks() {
   };
 
   const handleExecute = async (playbook: PlaybookInfo) => {
+    // v3.45.2 - Non-blocking execution with immediate navigation
     // Get global selected credential
     const selectedCredential = useStore.getState().selectedCredential;
 
@@ -250,36 +251,35 @@ export function Playbooks() {
 
     // If global credential is selected, execute directly with it
     if (selectedCredential && !savedConfigStr) {
-      try {
-        console.log('Executing playbook with credential:', {
-          playbook_path: playbook.path,
-          credential_name: selectedCredential.name,
-          gateway_url: selectedCredential.gateway_url,
-          debug_mode,
-        });
+      console.log('Executing playbook with credential:', {
+        playbook_path: playbook.path,
+        credential_name: selectedCredential.name,
+        gateway_url: selectedCredential.gateway_url,
+        debug_mode,
+      });
 
-        const response = await api.executions.start({
-          playbook_path: playbook.path,
-          parameters: {}, // Backend will auto-fill from credential
-          gateway_url: selectedCredential.gateway_url,
-          credential_name: selectedCredential.name,
-          debug_mode,
-        });
-
+      // Start execution (don't await - let it run in background)
+      api.executions.start({
+        playbook_path: playbook.path,
+        parameters: {}, // Backend will auto-fill from credential
+        gateway_url: selectedCredential.gateway_url,
+        credential_name: selectedCredential.name,
+        debug_mode,
+      }).then(response => {
         console.log('Execution started successfully:', response);
-
-        // Navigate to execution detail page
+        // Navigate to execution detail page AFTER getting execution ID
         window.location.href = `/executions/${response.execution_id}`;
-        return;
-      } catch (error) {
+      }).catch(error => {
         console.error('Failed to execute playbook:', error);
         console.error('Error details:', error instanceof Error ? error.message : String(error));
         if (error && typeof error === 'object' && 'data' in error) {
           console.error('Error data:', (error as any).data);
         }
         alert(`Failed to start execution: ${error instanceof Error ? error.message : String(error)}\n\nCheck console for details.`);
-        return;
-      }
+      });
+
+      // Return immediately without waiting - navigation will happen when API responds
+      return;
     }
 
     if (!savedConfigStr) {
@@ -310,20 +310,23 @@ export function Playbooks() {
         }
       }
 
-      // Execute with saved config parameters + global credential
-      const response = await api.executions.start({
+      // Execute with saved config parameters + global credential (don't await - navigate when ready)
+      api.executions.start({
         playbook_path: playbook.path,
         parameters: convertedParams, // Use converted params (boolean types fixed)
         gateway_url: selectedCredential.gateway_url, // Always use global credential's gateway_url
         credential_name: selectedCredential.name, // Always use global credential
         debug_mode,
+      }).then(response => {
+        // Navigate to execution detail page AFTER getting execution ID
+        window.location.href = `/executions/${response.execution_id}`;
+      }).catch(error => {
+        console.error('Failed to execute playbook:', error);
+        alert('Failed to start execution. Please check the console for details.');
       });
-
-      // Navigate to execution detail page
-      window.location.href = `/executions/${response.execution_id}`;
     } catch (error) {
-      console.error('Failed to execute playbook:', error);
-      alert('Failed to start execution. Please check the console for details.');
+      console.error('Failed to parse saved config:', error);
+      alert('Failed to load saved configuration. Please try again.');
     }
   };
 

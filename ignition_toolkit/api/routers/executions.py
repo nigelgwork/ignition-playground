@@ -199,9 +199,9 @@ def _create_execution_status_from_engine(
     """
     step_results = _convert_step_results_to_response(state.step_results)
 
-    # Extract domain from playbook metadata
-    domain = None
-    if engine._current_playbook:
+    # Extract domain from execution state (preferred) or playbook metadata (fallback)
+    domain = state.domain
+    if domain is None and engine._current_playbook:
         domain = engine._current_playbook.metadata.get("domain")
 
     return ExecutionStatusResponse(
@@ -256,6 +256,9 @@ def _create_execution_status_from_db(
         # pending, failed, cancelled - show last completed step or None
         current_step_index = len(step_results) - 1 if step_results else None
 
+    # Extract domain from execution metadata
+    domain = db_exec.execution_metadata.get("domain") if db_exec.execution_metadata else None
+
     return ExecutionStatusResponse(
         execution_id=db_exec.execution_id,
         playbook_name=db_exec.playbook_name,
@@ -267,6 +270,7 @@ def _create_execution_status_from_db(
         error=db_exec.error_message,
         debug_mode=db_exec.execution_metadata.get("debug_mode", False) if db_exec.execution_metadata else False,
         step_results=step_results,
+        domain=domain,
     )
 
 

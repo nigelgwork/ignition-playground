@@ -1,6 +1,7 @@
 name: "Module Upgrade"
 version: "3.6"
 description: "Upgrade an Ignition module to a newer version"
+domain: gateway
 
 parameters:
   - name: gateway_url

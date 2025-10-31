@@ -1,6 +1,7 @@
 name: "Gateway Login"
 version: "2.0"
 description: "Login to Ignition Gateway with credentials"
+domain: gateway
 
 parameters:
   - name: gateway_url
