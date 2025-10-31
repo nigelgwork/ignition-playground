@@ -26,6 +26,9 @@ class PlaybookMetadata:
     verified_at: str | None = None
     verified_by: str | None = None
     notes: str = ""
+    origin: str | None = None  # "built-in" or "user-created"
+    duplicated_from: str | None = None  # Original playbook path if duplicated
+    created_at: str | None = None  # When playbook was first added
 
     def increment_revision(self):
         """Increment revision number"""
