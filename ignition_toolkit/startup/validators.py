@@ -193,6 +193,16 @@ async def validate_playbooks() -> dict:
         f"{len(example_playbooks)} examples)"
     )
 
+    # PORTABILITY v4: Auto-detect and mark built-in playbooks
+    try:
+        from ignition_toolkit.playbook.metadata import PlaybookMetadataStore
+
+        metadata_store = PlaybookMetadataStore()
+        metadata_store.auto_detect_built_ins(playbooks_dir)
+        logger.info("✓ Auto-detected built-in playbooks")
+    except Exception as e:
+        logger.warning(f"⚠️  Failed to auto-detect built-in playbooks: {e}")
+
     return {
         "total": total,
         "gateway": len(gateway_playbooks),

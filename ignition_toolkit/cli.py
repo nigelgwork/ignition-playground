@@ -20,23 +20,32 @@ def main() -> None:
 
 
 @main.command()
-@click.option("--host", default="0.0.0.0", help="API server host")
-@click.option("--port", default=5000, help="API server port")
+@click.option("--host", default=None, help="API server host (default: from settings)")
+@click.option("--port", default=None, type=int, help="API server port (default: from settings)")
 @click.option("--reload", is_flag=True, help="Enable auto-reload for development")
-def serve(host: str, port: int, reload: bool) -> None:
+def serve(host: str | None, port: int | None, reload: bool) -> None:
     """Start the API server and web UI"""
+    # Import settings to get defaults from .env or Settings
+    from ignition_toolkit.core.config import get_settings
+
+    settings = get_settings()
+
+    # Use CLI args if provided, otherwise use settings
+    actual_host = host or settings.api_host
+    actual_port = port or settings.api_port
+
     console.print(
         Panel.fit(
             "[bold cyan]Ignition Automation Toolkit[/bold cyan]\n"
-            f"Server starting on http://{host}:{port}",
+            f"Server starting on http://{actual_host}:{actual_port}",
             border_style="cyan",
         )
     )
 
     uvicorn.run(
         "ignition_toolkit.api.app:app",
-        host=host,
-        port=port,
+        host=actual_host,
+        port=actual_port,
         reload=reload,
         log_level="info",
     )
@@ -74,6 +83,187 @@ def init() -> None:
     console.print("  1. Run: [cyan]ignition-toolkit serve[/cyan]")
     console.print("  2. Open: [cyan]http://localhost:5000[/cyan]")
     console.print("  3. Add credentials via web UI or CLI\n")
+
+
+@main.command()
+@click.option("--verbose", "-v", is_flag=True, help="Show detailed information")
+def verify(verbose: bool) -> None:
+    """Verify installation and configuration"""
+    import os
+    import subprocess
+    import sys
+    from pathlib import Path
+
+    from rich.table import Table
+
+    from ignition_toolkit.core.paths import (
+        get_package_root,
+        get_playbooks_dir,
+        get_user_data_dir,
+    )
+
+    console.print("\n[bold cyan]Verifying Ignition Automation Toolkit Installation[/bold cyan]\n")
+
+    checks = []
+    errors = []
+    warnings = []
+
+    # 1. Python version check
+    python_version = f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
+    python_ok = sys.version_info >= (3, 10)
+    checks.append(("Python Version", f"{python_version}", "✅" if python_ok else "❌"))
+    if not python_ok:
+        errors.append(f"Python 3.10+ required, found {python_version}")
+
+    # 2. Package root check
+    try:
+        package_root = get_package_root()
+        package_root_ok = package_root.exists()
+        checks.append(("Package Root", str(package_root), "✅" if package_root_ok else "❌"))
+        if not package_root_ok:
+            errors.append(f"Package root not found: {package_root}")
+    except Exception as e:
+        checks.append(("Package Root", "ERROR", "❌"))
+        errors.append(f"Package root check failed: {e}")
+
+    # 3. Playbooks directory check
+    try:
+        playbooks_dir = get_playbooks_dir()
+        playbooks_ok = playbooks_dir.exists()
+        checks.append(("Playbooks Directory", str(playbooks_dir), "✅" if playbooks_ok else "⚠️"))
+        if not playbooks_ok:
+            warnings.append(f"Playbooks directory not found: {playbooks_dir} (run 'init')")
+    except Exception as e:
+        checks.append(("Playbooks Directory", "ERROR", "❌"))
+        errors.append(f"Playbooks directory check failed: {e}")
+
+    # 4. User data directory check
+    try:
+        user_data_dir = get_user_data_dir()
+        user_data_ok = user_data_dir.exists()
+        checks.append(("User Data Directory", str(user_data_dir), "✅" if user_data_ok else "⚠️"))
+        if not user_data_ok:
+            warnings.append(f"User data directory not found: {user_data_dir} (run 'init')")
+    except Exception as e:
+        checks.append(("User Data Directory", "ERROR", "❌"))
+        errors.append(f"User data directory check failed: {e}")
+
+    # 5. Credential vault check
+    try:
+        from ignition_toolkit.credentials.vault import CredentialVault
+
+        vault = CredentialVault()
+        vault_ok = vault.vault_path.exists()
+        key_exists = (vault.vault_path / "encryption.key").exists()
+        checks.append(("Credential Vault", str(vault.vault_path), "✅" if vault_ok else "⚠️"))
+        if not vault_ok:
+            warnings.append(f"Credential vault not initialized (run 'init')")
+        elif not key_exists:
+            warnings.append("Encryption key not found")
+    except Exception as e:
+        checks.append(("Credential Vault", "ERROR", "❌"))
+        errors.append(f"Credential vault check failed: {e}")
+
+    # 6. Database check
+    try:
+        from ignition_toolkit.core.config import get_settings
+
+        settings = get_settings()
+        db_path = settings.database_path
+        db_ok = db_path.exists()
+        checks.append(("Database", str(db_path), "✅" if db_ok else "⚠️"))
+        if not db_ok:
+            warnings.append(f"Database not found: {db_path} (will be created on first use)")
+    except Exception as e:
+        checks.append(("Database", "ERROR", "❌"))
+        errors.append(f"Database check failed: {e}")
+
+    # 7. Frontend build check
+    try:
+        frontend_dist = package_root / "frontend" / "dist"
+        frontend_ok = frontend_dist.exists() and (frontend_dist / "index.html").exists()
+        checks.append(("Frontend Build", str(frontend_dist), "✅" if frontend_ok else "⚠️"))
+        if not frontend_ok:
+            warnings.append(
+                "Frontend not built (run 'cd frontend && npm install && npm run build')"
+            )
+    except Exception as e:
+        checks.append(("Frontend Build", "ERROR", "❌"))
+        errors.append(f"Frontend check failed: {e}")
+
+    # 8. Playwright browsers check
+    try:
+        playwright_path = os.getenv("PLAYWRIGHT_BROWSERS_PATH", str(package_root / "data" / ".playwright-browsers"))
+        playwright_ok = Path(playwright_path).exists()
+        checks.append(("Playwright Browsers", playwright_path, "✅" if playwright_ok else "⚠️"))
+        if not playwright_ok:
+            warnings.append(f"Playwright browsers not installed (run 'playwright install chromium')")
+    except Exception as e:
+        checks.append(("Playwright Browsers", "ERROR", "❌"))
+        errors.append(f"Playwright check failed: {e}")
+
+    # 9. Dependencies check (sample key packages)
+    key_packages = ["fastapi", "uvicorn", "httpx", "playwright", "yaml", "cryptography"]
+    for pkg in key_packages:
+        try:
+            __import__(pkg)
+            if verbose:
+                checks.append((f"Package: {pkg}", "installed", "✅"))
+        except ImportError:
+            checks.append((f"Package: {pkg}", "NOT INSTALLED", "❌"))
+            errors.append(f"Required package '{pkg}' not installed")
+
+    # 10. .env file check (optional)
+    env_file = package_root / ".env"
+    env_ok = env_file.exists()
+    if verbose or not env_ok:
+        checks.append((".env Configuration", str(env_file), "✅" if env_ok else "⚠️"))
+        if not env_ok:
+            warnings.append(".env file not found (copy from .env.example)")
+
+    # Display results
+    table = Table(title="Installation Verification", show_header=True, header_style="bold cyan")
+    table.add_column("Check", style="white")
+    table.add_column("Location/Value", style="dim")
+    table.add_column("Status", style="white")
+
+    for check_name, check_value, check_status in checks:
+        # Truncate long paths
+        if len(check_value) > 60 and not verbose:
+            check_value = "..." + check_value[-57:]
+        table.add_row(check_name, check_value, check_status)
+
+    console.print(table)
+    console.print()
+
+    # Show warnings
+    if warnings:
+        console.print("[bold yellow]⚠️  Warnings:[/bold yellow]")
+        for warning in warnings:
+            console.print(f"  • {warning}")
+        console.print()
+
+    # Show errors
+    if errors:
+        console.print("[bold red]❌ Errors:[/bold red]")
+        for error in errors:
+            console.print(f"  • {error}")
+        console.print()
+        console.print("[red]Installation has critical issues. Please fix the errors above.[/red]\n")
+        sys.exit(1)
+
+    # Success
+    if not warnings:
+        console.print("[bold green]✅ All checks passed! Installation is healthy.[/bold green]\n")
+    else:
+        console.print("[bold yellow]✅ Installation is functional but has warnings.[/bold yellow]")
+        console.print("[dim]Fix warnings for optimal operation.[/dim]\n")
+
+    # Next steps
+    console.print("[bold]Next steps:[/bold]")
+    console.print("  • Run: [cyan]ignition-toolkit serve[/cyan]")
+    console.print("  • Access: [cyan]http://localhost:5000[/cyan]")
+    console.print("  • For detailed output: [cyan]ignition-toolkit verify --verbose[/cyan]\n")
 
 
 @main.group()

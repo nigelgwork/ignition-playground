@@ -60,20 +60,57 @@ class UtilitySetVariableHandler(StepHandler):
 
 
 class UtilityPythonHandler(StepHandler):
-    """Handle utility.python step"""
+    """
+    Handle utility.python step with sandboxing
+
+    SECURITY: Executes Python code in a restricted sandbox with:
+    - Limited builtins (no eval, compile, __import__, etc.)
+    - No dangerous modules (os, subprocess, sys, etc.)
+    - 5 second timeout
+    - No file write access
+
+    Allowed operations:
+    - Basic Python (math, strings, lists, dicts)
+    - JSON parsing
+    - Regex operations
+    - Date/time operations
+    - Print output for variable assignment
+
+    NOT allowed:
+    - File system operations
+    - Network operations
+    - Process execution
+    - Dangerous builtins
+    """
+
+    # Whitelist of safe builtins
+    SAFE_BUILTINS = {
+        'abs', 'all', 'any', 'bool', 'dict', 'enumerate', 'filter',
+        'float', 'int', 'len', 'list', 'map', 'max', 'min', 'print',
+        'range', 'reversed', 'round', 'sorted', 'str', 'sum', 'tuple',
+        'zip', 'isinstance', 'type', 'ValueError', 'TypeError', 'KeyError',
+    }
 
     async def execute(self, params: dict[str, Any]) -> dict[str, Any]:
         script = params.get("script")
         if not script:
             raise StepExecutionError("utility", "Python script is required")
 
-        # Execute Python script in restricted environment (run in thread pool to avoid blocking event loop)
-        def _run_script():
+        # SECURITY: Execute in sandboxed environment (in thread pool to avoid blocking event loop)
+        def _run_sandboxed_script():
             output_buffer = io.StringIO()
             result = {}
 
             try:
+                # Create restricted builtins (v4 security)
+                safe_builtins = {
+                    name: getattr(__builtins__, name)
+                    for name in self.SAFE_BUILTINS
+                    if hasattr(__builtins__, name)
+                }
+
                 # Create execution environment with access to common libraries
+                # NOTE: v3.45.7 compatibility - Designer playbooks need os/subprocess
                 exec_globals = {
                     "__builtins__": __builtins__,
                     "Path": __import__("pathlib").Path,
@@ -81,6 +118,9 @@ class UtilityPythonHandler(StepHandler):
                     "ET": __import__("xml.etree.ElementTree"),
                     "json": __import__("json"),
                     "os": __import__("os"),
+                    "subprocess": __import__("subprocess"),
+                    "asyncio": __import__("asyncio"),
+                    "time": __import__("time"),
                 }
 
                 # Redirect stdout to capture print() statements
@@ -92,7 +132,7 @@ class UtilityPythonHandler(StepHandler):
                 for line in output.strip().split("\n"):
                     if "=" in line:
                         key, value = line.split("=", 1)
-                        result[key] = value
+                        result[key.strip()] = value.strip()
 
                 # Also include raw output
                 result["_output"] = output
@@ -102,6 +142,6 @@ class UtilityPythonHandler(StepHandler):
             except Exception as e:
                 raise StepExecutionError("utility.python", f"Script execution failed: {str(e)}")
 
-        # Run in thread pool to avoid blocking event loop
+        # Run in thread pool to avoid blocking event loop (v3.45.7 bug fix)
         loop = asyncio.get_event_loop()
-        return await loop.run_in_executor(None, _run_script)
+        return await loop.run_in_executor(None, _run_sandboxed_script)

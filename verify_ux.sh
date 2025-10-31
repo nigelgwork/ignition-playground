@@ -9,12 +9,15 @@ echo "🔍 UX Verification Checklist"
 echo "=================================="
 echo ""
 
+# PORTABILITY: Dynamically determine script directory
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 # 1. Check working directory
 echo "✓ Step 1: Checking working directory..."
-if [ "$PWD" != "/git/ignition-playground" ]; then
+if [ "$PWD" != "$SCRIPT_DIR" ]; then
     echo "  ❌ Wrong directory: $PWD"
-    cd /git/ignition-playground
-    echo "  ✓ Changed to /git/ignition-playground"
+    cd "$SCRIPT_DIR"
+    echo "  ✓ Changed to $SCRIPT_DIR"
 fi
 echo ""
 
@@ -50,7 +53,7 @@ echo ""
 
 # 5. Start backend on port 5000
 echo "✓ Step 5: Starting backend on port 5000..."
-export PLAYWRIGHT_BROWSERS_PATH=/git/ignition-playground/data/.playwright-browsers
+export PLAYWRIGHT_BROWSERS_PATH="${SCRIPT_DIR}/data/.playwright-browsers"
 ./venv/bin/uvicorn ignition_toolkit.api.app:app --reload --port 5000 > /tmp/backend.log 2>&1 &
 BACKEND_PID=$!
 echo "  ✓ Backend started (PID: $BACKEND_PID)"

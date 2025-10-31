@@ -14,7 +14,8 @@ import type {
   HealthResponse,
 } from '../types/api';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+// Use window.location.origin to automatically connect to the correct port (v4 portability)
+const API_BASE_URL = import.meta.env.VITE_API_URL || window.location.origin;
 
 class APIError extends Error {
   status: number;
@@ -105,6 +106,11 @@ export const api = {
       fetchJSON<{ status: string; playbook_path: string; message: string }>(
         `/api/playbooks/${encodeURIComponent(path)}`,
         { method: 'DELETE' }
+      ),
+    duplicate: (path: string, newName?: string) =>
+      fetchJSON<{ status: string; message: string; source_path: string; new_path: string; playbook: any }>(
+        `/api/playbooks/${encodeURIComponent(path)}/duplicate${newName ? `?new_name=${encodeURIComponent(newName)}` : ''}`,
+        { method: 'POST' }
       ),
   },
 

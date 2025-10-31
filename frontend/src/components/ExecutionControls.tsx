@@ -50,8 +50,11 @@ export function ExecutionControls({
 
 
   const handleCancel = async () => {
+    console.log('[ExecutionControls] Cancel button clicked, executionId:', executionId);
+
     // Prevent duplicate cancel requests
     if (cancelInProgressRef.current) {
+      console.log('[ExecutionControls] Cancel already in progress, ignoring duplicate click');
       return;
     }
 
@@ -60,11 +63,14 @@ export function ExecutionControls({
     setLoading('cancel');
 
     try {
-      await api.executions.cancel(executionId);
+      console.log('[ExecutionControls] Sending cancel request...');
+      const response = await api.executions.cancel(executionId);
+      console.log('[ExecutionControls] Cancel request succeeded:', response);
     } catch (error) {
-      console.error('Failed to cancel execution:', error);
+      console.error('[ExecutionControls] Failed to cancel execution:', error);
       alert(`Failed to cancel execution: ${error instanceof Error ? error.message : String(error)}`);
     } finally {
+      console.log('[ExecutionControls] Cancel request complete, clearing loading state');
       cancelInProgressRef.current = false;
       setLoading(null);
     }
@@ -116,7 +122,15 @@ export function ExecutionControls({
         <Tooltip title="Cancel execution">
           <span>
             <Button
-              onClick={handleCancel}
+              onClick={() => {
+                console.log('[ExecutionControls] Cancel button onClick fired', {
+                  isDisabled,
+                  loading,
+                  cancelInProgress: cancelInProgressRef.current,
+                  buttonDisabled: isDisabled || loading !== null || cancelInProgressRef.current
+                });
+                handleCancel();
+              }}
               disabled={isDisabled || loading !== null || cancelInProgressRef.current}
               color="error"
               startIcon={

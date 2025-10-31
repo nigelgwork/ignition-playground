@@ -47,6 +47,7 @@ import {
   Cancel as CancelIcon,
   Delete as DeleteIcon,
   Schedule as ScheduleIcon,
+  ContentCopy as DuplicateIcon,
 } from '@mui/icons-material';
 import type { PlaybookInfo } from '../types/api';
 import { useStore } from '../store';
@@ -200,6 +201,21 @@ export function PlaybookCard({ playbook, onConfigure, onExecute, onExport, onVie
     },
     onError: (error) => {
       setSnackbarMessage(`Failed to delete: ${(error as Error).message}`);
+      setSnackbarOpen(true);
+    },
+  });
+
+  // Mutation for duplicating playbook
+  const duplicateMutation = useMutation({
+    mutationFn: () => api.playbooks.duplicate(playbook.path),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['playbooks'] });
+      setSnackbarMessage(`Playbook duplicated: ${data.new_path}`);
+      setSnackbarOpen(true);
+      setMenuAnchor(null);
+    },
+    onError: (error) => {
+      setSnackbarMessage(`Failed to duplicate: ${(error as Error).message}`);
       setSnackbarOpen(true);
     },
   });
@@ -512,6 +528,15 @@ export function PlaybookCard({ playbook, onConfigure, onExecute, onExport, onVie
         <MenuItem onClick={handleOpenEditDialog}>
           <EditIcon fontSize="small" sx={{ mr: 1 }} />
           Edit Playbook
+        </MenuItem>
+
+        {/* Duplicate Playbook */}
+        <MenuItem
+          onClick={() => duplicateMutation.mutate()}
+          disabled={duplicateMutation.isPending}
+        >
+          <DuplicateIcon fontSize="small" sx={{ mr: 1 }} />
+          Duplicate Playbook
         </MenuItem>
 
         <Divider />

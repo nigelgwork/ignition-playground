@@ -26,9 +26,10 @@ class PlaybookMetadata:
     verified_at: str | None = None
     verified_by: str | None = None
     notes: str = ""
-    origin: str | None = None  # "built-in" or "user-created"
-    duplicated_from: str | None = None  # Original playbook path if duplicated
-    created_at: str | None = None  # When playbook was first added
+    # PORTABILITY v4: Origin tracking for playbook management
+    origin: str = "unknown"  # built-in, user-created, duplicated
+    duplicated_from: str | None = None  # Source playbook path if duplicated
+    created_at: str | None = None  # When playbook was created/added
 
     def increment_revision(self):
         """Increment revision number"""
@@ -46,6 +47,25 @@ class PlaybookMetadata:
         self.verified = False
         self.verified_at = None
         self.verified_by = None
+
+    def mark_as_built_in(self):
+        """Mark playbook as built-in (shipped with toolkit)"""
+        self.origin = "built-in"
+        if self.created_at is None:
+            self.created_at = datetime.now().isoformat()
+
+    def mark_as_user_created(self):
+        """Mark playbook as user-created (new playbook)"""
+        self.origin = "user-created"
+        if self.created_at is None:
+            self.created_at = datetime.now().isoformat()
+
+    def mark_as_duplicated(self, source_path: str):
+        """Mark playbook as duplicated from another playbook"""
+        self.origin = "duplicated"
+        self.duplicated_from = source_path
+        if self.created_at is None:
+            self.created_at = datetime.now().isoformat()
 
 
 class PlaybookMetadataStore:
@@ -181,3 +201,82 @@ class PlaybookMetadataStore:
             Dictionary mapping playbook paths to metadata
         """
         return self._metadata.copy()
+
+    def mark_as_built_in(self, playbook_path: str):
+        """
+        Mark playbook as built-in (shipped with toolkit)
+
+        Args:
+            playbook_path: Relative path from playbooks directory
+        """
+        metadata = self.get_metadata(playbook_path)
+        metadata.mark_as_built_in()
+        self.update_metadata(playbook_path, metadata)
+        logger.info(f"Marked {playbook_path} as built-in")
+
+    def mark_as_user_created(self, playbook_path: str):
+        """
+        Mark playbook as user-created
+
+        Args:
+            playbook_path: Relative path from playbooks directory
+        """
+        metadata = self.get_metadata(playbook_path)
+        metadata.mark_as_user_created()
+        self.update_metadata(playbook_path, metadata)
+        logger.info(f"Marked {playbook_path} as user-created")
+
+    def mark_as_duplicated(self, playbook_path: str, source_path: str):
+        """
+        Mark playbook as duplicated from another playbook
+
+        Args:
+            playbook_path: Relative path from playbooks directory
+            source_path: Path of source playbook that was duplicated
+        """
+        metadata = self.get_metadata(playbook_path)
+        metadata.mark_as_duplicated(source_path)
+        self.update_metadata(playbook_path, metadata)
+        logger.info(f"Marked {playbook_path} as duplicated from {source_path}")
+
+    def auto_detect_built_ins(self, playbooks_dir: Path):
+        """
+        Auto-detect and mark built-in playbooks
+
+        Built-in playbooks are those in:
+        - playbooks/gateway/
+        - playbooks/perspective/
+        - playbooks/designer/
+        - playbooks/examples/
+
+        But NOT in user-created directories
+
+        Args:
+            playbooks_dir: Path to playbooks directory
+        """
+        built_in_dirs = ["gateway", "perspective", "designer", "examples"]
+
+        for dir_name in built_in_dirs:
+            dir_path = playbooks_dir / dir_name
+            if not dir_path.exists():
+                continue
+
+            # Find all YAML files in this directory
+            for yaml_file in dir_path.rglob("*.yaml"):
+                try:
+                    relative_path = yaml_file.relative_to(playbooks_dir)
+                    relative_path_str = str(relative_path)
+
+                    # Get metadata
+                    metadata = self.get_metadata(relative_path_str)
+
+                    # Only mark as built-in if origin is unknown
+                    if metadata.origin == "unknown":
+                        metadata.mark_as_built_in()
+                        self.update_metadata(relative_path_str, metadata)
+                        logger.debug(f"Auto-marked {relative_path_str} as built-in")
+
+                except Exception as e:
+                    logger.warning(f"Error processing {yaml_file}: {e}")
+
+        logger.info("Completed auto-detection of built-in playbooks")
