@@ -69,6 +69,9 @@ def validate_playbook_path(path_str: str) -> Path:
     """
     Validate playbook path to prevent directory traversal attacks
 
+    SECURITY: This is a wrapper around PathValidator for backwards compatibility.
+    Use PathValidator directly for new code.
+
     Args:
         path_str: User-provided playbook path
 
@@ -78,34 +81,22 @@ def validate_playbook_path(path_str: str) -> Path:
     Raises:
         HTTPException: If path is invalid or outside playbooks directory
     """
-    playbooks_dir = get_playbooks_dir().resolve()
+    # SECURITY: Use centralized PathValidator to prevent path traversal
+    # This checks for ".." and absolute paths BEFORE resolution
+    from ignition_toolkit.core.validation import PathValidator
 
-    # Resolve the provided path
-    try:
-        playbook_path = Path(path_str).resolve()
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Invalid path format: {e}")
-
-    # Check if path is within playbooks directory
-    if not playbook_path.is_relative_to(playbooks_dir):
-        raise HTTPException(
-            status_code=400, detail="Playbook path must be within ./playbooks directory"
-        )
-
-    # Check file extension
-    if playbook_path.suffix not in [".yaml", ".yml"]:
-        raise HTTPException(status_code=400, detail="Playbook must be a YAML file")
-
-    # Check file exists
-    if not playbook_path.exists():
-        raise HTTPException(status_code=404, detail="Playbook file not found")
-
-    return playbook_path
+    return PathValidator.validate_playbook_path(
+        path_str,
+        base_dir=get_playbooks_dir(),
+        must_exist=True
+    )
 
 
 def get_relative_playbook_path(path_str: str) -> str:
     """
     Convert a playbook path (full or relative) to a relative path from playbooks directory
+
+    SECURITY: Validates path before conversion to prevent traversal attacks.
 
     Args:
         path_str: User-provided playbook path (can be full or relative)
@@ -113,17 +104,32 @@ def get_relative_playbook_path(path_str: str) -> str:
     Returns:
         Relative path string from playbooks directory (e.g., "gateway/reset_gateway_trial.yaml")
     """
-    playbooks_dir = get_playbooks_dir().resolve()
-    playbook_path = Path(path_str).resolve()
+    # SECURITY: First validate the path to prevent traversal
+    from ignition_toolkit.core.validation import PathValidator
 
-    # Convert to relative path from playbooks directory
+    playbooks_dir = get_playbooks_dir().resolve()
+
+    # Validate path (prevents ".." and absolute paths)
+    # Use must_exist=False because metadata operations might reference non-existent files
     try:
-        relative_path = playbook_path.relative_to(playbooks_dir)
+        validated_path = PathValidator.validate_playbook_path(
+            path_str,
+            base_dir=playbooks_dir,
+            must_exist=False  # Metadata operations might reference deleted playbooks
+        )
+        # Convert to relative path
+        relative_path = validated_path.relative_to(playbooks_dir)
         return str(relative_path)
-    except ValueError:
-        # If path is not relative to playbooks_dir, try using it as-is
-        # (might already be relative)
-        return path_str
+    except HTTPException:
+        # If validation fails, path might already be relative
+        # Return as-is if it looks safe
+        if ".." not in path_str and not Path(path_str).is_absolute():
+            return path_str
+        # Otherwise reject it
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid playbook path - must be relative path within playbooks directory"
+        )
 
 
 # ============================================================================
@@ -453,29 +459,19 @@ async def delete_playbook(playbook_path: str):
     """Delete a playbook file and its metadata"""
     metadata_store = get_metadata_store()
     try:
-        # Get absolute path to playbook
-        playbooks_dir = get_playbooks_dir().resolve()
-        full_path = Path(playbook_path)
+        # SECURITY: Use centralized validator to prevent path traversal
+        from ignition_toolkit.core.validation import PathValidator
 
-        if not full_path.is_absolute():
-            # Resolve relative paths against playbooks directory
-            full_path = playbooks_dir / playbook_path
-
-        # Resolve to absolute path
-        full_path = full_path.resolve()
-
-        # Safety check - only allow deleting files in playbooks/ directory
-        try:
-            # Check if full_path is relative to playbooks_dir
-            full_path.relative_to(playbooks_dir)
-        except ValueError:
-            # Path is not within playbooks directory
-            raise HTTPException(
-                status_code=400, detail="Can only delete playbooks from the playbooks/ directory"
-            )
-
-        if not full_path.exists():
-            raise HTTPException(status_code=404, detail=f"Playbook not found: {playbook_path}")
+        # This validates and ensures:
+        # 1. No ".." or absolute paths (prevents traversal)
+        # 2. Path is within playbooks directory
+        # 3. File exists
+        # 4. Valid YAML extension
+        full_path = PathValidator.validate_playbook_path(
+            playbook_path,
+            base_dir=get_playbooks_dir(),
+            must_exist=True
+        )
 
         if not full_path.is_file():
             raise HTTPException(status_code=400, detail=f"Path is not a file: {playbook_path}")
