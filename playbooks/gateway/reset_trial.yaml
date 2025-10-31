@@ -1,6 +1,6 @@
 name: "Reset Gateway Trial"
 version: "3.0"
-description: "Resets Gateway trial license. Skips reset if trial already active, clicks reset button if needed."
+description: "Reset Gateway trial license"
 
 parameters:
   - name: gateway_url

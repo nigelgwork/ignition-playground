@@ -1,6 +1,6 @@
 name: "Gateway Login"
 version: "2.0"
-description: "Base building block playbook: Login to Ignition Gateway and verify authentication. Use this as a foundation for other playbooks that require authenticated access."
+description: "Login to Ignition Gateway with credentials"
 
 parameters:
   - name: gateway_url
