@@ -447,7 +447,7 @@ export function PlaybookCard({ playbook, onConfigure, onExecute, onExport, onVie
               }
               label={
                 <Typography variant="caption" color={debugMode ? 'primary' : 'text.secondary'} fontWeight={debugMode ? 'bold' : 'normal'}>
-                  Debug Mode
+                  Debug
                 </Typography>
               }
             />
@@ -468,7 +468,7 @@ export function PlaybookCard({ playbook, onConfigure, onExecute, onExport, onVie
               }
               label={
                 <Typography variant="caption" color={scheduleMode ? 'secondary' : 'text.secondary'} fontWeight={scheduleMode ? 'bold' : 'normal'}>
-                  Schedule Mode
+                  Schedule
                 </Typography>
               }
             />

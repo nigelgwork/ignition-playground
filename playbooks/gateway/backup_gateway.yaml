@@ -1,6 +1,6 @@
 name: "Backup Gateway"
 version: "5.0"
-description: "Downloads Gateway backup file to configured directory (default: ./data/downloads)."
+description: "Download a Gateway backup file"
 
 parameters:
   - name: gateway_url

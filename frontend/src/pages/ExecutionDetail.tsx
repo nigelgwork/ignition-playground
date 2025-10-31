@@ -437,11 +437,32 @@ export function ExecutionDetail() {
           </List>
         </Paper>
 
-        {/* Middle: Live Browser View OR Debug Panel */}
+        {/* Middle: Live Browser View OR Debug Panel OR Placeholder */}
         {showDebugPanel ? (
           <DebugPanel executionId={executionId} />
-        ) : (
+        ) : execution?.domain === 'perspective' || execution?.domain === null ? (
           <LiveBrowserView executionId={executionId} />
+        ) : (
+          <Paper
+            sx={{
+              flex: 1,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              bgcolor: '#2a2a2a',
+              borderRadius: 1,
+              minHeight: '400px',
+            }}
+          >
+            <VisibilityOffIcon sx={{ fontSize: 48, color: '#666', mb: 2 }} />
+            <Typography variant="h6" sx={{ color: '#999' }}>
+              No browser view available for this playbook
+            </Typography>
+            <Typography variant="body2" sx={{ color: '#666', mt: 1 }}>
+              Domain: {execution?.domain || 'unknown'}
+            </Typography>
+          </Paper>
         )}
       </Box>
 

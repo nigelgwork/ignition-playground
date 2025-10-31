@@ -199,6 +199,11 @@ def _create_execution_status_from_engine(
     """
     step_results = _convert_step_results_to_response(state.step_results)
 
+    # Extract domain from playbook metadata
+    domain = None
+    if engine._current_playbook:
+        domain = engine._current_playbook.metadata.get("domain")
+
     return ExecutionStatusResponse(
         execution_id=execution_id,
         playbook_name=state.playbook_name,
@@ -210,6 +215,7 @@ def _create_execution_status_from_engine(
         error=state.error,
         debug_mode=engine.state_manager.is_debug_mode_enabled(),
         step_results=step_results,
+        domain=domain,
     )
 
 
@@ -814,6 +820,11 @@ async def get_execution_status(execution_id: str):
                     for step in execution.step_results
                 ]
 
+                # Extract domain from execution metadata
+                domain = None
+                if execution.execution_metadata:
+                    domain = execution.execution_metadata.get("domain")
+
                 return ExecutionStatusResponse(
                     execution_id=execution.execution_id,
                     playbook_name=execution.playbook_name,
@@ -825,6 +836,7 @@ async def get_execution_status(execution_id: str):
                     error=execution.error_message,
                     debug_mode=execution.execution_metadata.get("debug_mode", False) if execution.execution_metadata else False,
                     step_results=step_results,
+                    domain=domain,
                 )
     except Exception as e:
         logger.error(f"Error loading execution from database: {e}")

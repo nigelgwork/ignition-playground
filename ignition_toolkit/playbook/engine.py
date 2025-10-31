@@ -159,6 +159,7 @@ class PlaybookEngine:
             total_steps=len(playbook.steps),
             debug_mode=self.state_manager.is_debug_mode_enabled(),
             step_results=initial_step_results,
+            domain=playbook.metadata.get("domain"),  # Include playbook domain
         )
         self._current_execution = execution_state
         self._current_playbook = playbook  # Store playbook for API access
@@ -212,9 +213,15 @@ class PlaybookEngine:
             download_path = parameters.get("download_path")
             downloads_dir = Path(download_path) if download_path else None
 
-            # Create browser manager with screenshot streaming if callback provided
+            # Create browser manager ONLY for Perspective/browser playbooks (NOT for Designer)
             print(f"[ENGINE DEBUG] Checking screenshot callback (callback={self.screenshot_callback})", flush=True)
-            if self.screenshot_callback:
+            has_browser_steps = any(step.type.value.startswith("browser.") for step in playbook.steps)
+            playbook_domain = playbook.metadata.get('domain')
+            needs_browser = playbook_domain == "perspective" or has_browser_steps
+
+            print(f"[ENGINE DEBUG] Playbook domain: {playbook_domain}, has_browser_steps: {has_browser_steps}, needs_browser: {needs_browser}", flush=True)
+
+            if self.screenshot_callback and needs_browser:
                 # Create screenshot callback that includes execution_id
                 print(f"[ENGINE DEBUG] Creating browser manager with screenshot streaming", flush=True)
                 async def screenshot_frame_callback(screenshot_b64: str):
@@ -232,6 +239,8 @@ class PlaybookEngine:
                 self._browser_manager = browser_manager  # Store reference for pause/resume
                 print(f"[ENGINE DEBUG] Browser initialization complete", flush=True)
                 logger.info(f"Browser screenshot streaming started for execution {execution_id}")
+            else:
+                print(f"[ENGINE DEBUG] Skipping browser initialization (not needed for domain={playbook_domain})", flush=True)
 
             # Create designer manager if playbook has designer steps
             has_designer_steps = any(step.type.value.startswith("designer.") for step in playbook.steps)
@@ -561,7 +570,7 @@ class PlaybookEngine:
     async def _save_execution_start(
         self, execution_state: ExecutionState, playbook: Playbook, parameters: dict[str, Any]
     ) -> None:
-        """Save execution start to database"""
+        """Save execution start to database including initial pending steps"""
         try:
             logger.info(f"Saving execution start to database: {execution_state.execution_id}")
             with self.database.session_scope() as session:
@@ -575,13 +584,29 @@ class PlaybookEngine:
                     execution_metadata={
                         "debug_mode": self.state_manager.is_debug_mode_enabled(),
                         "total_steps": len(playbook.steps),
+                        "domain": playbook.metadata.get("domain"),  # Save playbook domain
                     },
                 )
                 session.add(execution_model)
                 session.flush()  # Get the auto-generated ID
+
+                # Save initial pending steps to database
+                for step_result in execution_state.step_results:
+                    step_model = StepResultModel(
+                        execution_id=execution_model.id,
+                        step_id=step_result.step_id,
+                        step_name=step_result.step_name,
+                        status=step_result.status.value,
+                        started_at=step_result.started_at,
+                        completed_at=step_result.completed_at,
+                        error_message=step_result.error,
+                        output=step_result.output,
+                    )
+                    session.add(step_model)
+
                 # Store the database ID for later queries
                 execution_state.db_execution_id = execution_model.id
-                logger.info(f"Execution saved to database with ID: {execution_model.id}")
+                logger.info(f"Execution saved to database with ID: {execution_model.id} and {len(execution_state.step_results)} pending steps")
         except Exception as e:
             logger.exception(f"Error saving execution to database: {e}")
 
