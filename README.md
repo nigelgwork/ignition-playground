@@ -356,6 +356,207 @@ ignition-toolkit import module_upgrade.json
 - 🎥 **Live Browser**: Watch automation in real-time
 - 📊 **WebSocket Logs**: Streaming execution updates
 
+## 📦 Portability (New in v4.0)
+
+The Ignition Automation Toolkit is designed to be **fully portable** - run it from any directory on any machine without hardcoded paths or environment assumptions.
+
+### Key Portability Features
+
+✅ **Dynamic Path Resolution**
+- All paths calculated from package installation location
+- No hardcoded absolute paths in code
+- Works from any directory (`/git/project`, `/home/user/toolkit`, `C:\Projects\automation`)
+
+✅ **Portable Archives**
+- Package entire toolkit with playbooks and frontend
+- Transfer between machines or teams
+- Credentials remain local (never included in archives)
+
+✅ **Environment Verification**
+- Built-in verification command checks all dependencies
+- Validates paths, permissions, and configurations
+- Helpful error messages with fix suggestions
+
+✅ **Configurable Security**
+- Filesystem access restricted by default (data/ only)
+- Optional additional paths via environment variables
+- Rate limiting to prevent abuse
+
+### Creating Portable Archives
+
+Package the toolkit for transfer to another machine:
+
+```bash
+# Create portable archive (excludes venv, node_modules, credentials)
+python scripts/create_portable.py
+
+# Output: ignition-toolkit-portable-v4.0.0.tar.gz (~50MB)
+# Includes: source code, playbooks, built frontend, documentation
+```
+
+**What's Included:**
+- Complete source code
+- All playbooks (gateway/, perspective/, designer/, examples/)
+- Built React frontend (frontend/dist/)
+- Documentation
+- Configuration files
+
+**What's Excluded (for security):**
+- Virtual environments (venv/)
+- Node modules (node_modules/)
+- User credentials (~/.ignition-toolkit/)
+- Execution history database
+- Git repository (.git/)
+
+### Using a Portable Archive
+
+Extract and run on a new machine:
+
+```bash
+# Extract archive
+tar -xzf ignition-toolkit-portable-v4.0.0.tar.gz
+cd ignition-toolkit-v4.0.0
+
+# Install dependencies
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+pip install -e .
+playwright install chromium
+
+# Initialize (creates new credential vault)
+ignition-toolkit init
+
+# Verify installation
+ignition-toolkit verify
+
+# Start server
+ignition-toolkit server start
+```
+
+### Environment Verification
+
+Check that your environment is correctly configured:
+
+```bash
+# Verify all dependencies and paths
+ignition-toolkit verify
+
+# Example output:
+# ✓ Python version: 3.10.12
+# ✓ Package installation: /opt/ignition-toolkit
+# ✓ Playbooks directory: /opt/ignition-toolkit/playbooks (42 playbooks)
+# ✓ Frontend build: /opt/ignition-toolkit/frontend/dist
+# ✓ Data directory: /opt/ignition-toolkit/data (writable)
+# ✓ Playwright: Chromium installed
+# ✓ Credential vault: /home/user/.ignition-toolkit/credentials.enc
+# ✓ Database: /home/user/.ignition-toolkit/executions.db
+#
+# All checks passed! ✅
+```
+
+### Advanced Configuration
+
+#### Custom Filesystem Access
+
+By default, filesystem browsing is restricted to the `data/` directory for security. To allow access to additional directories (e.g., for module storage):
+
+```bash
+# Allow access to custom module directory
+export FILESYSTEM_ALLOWED_PATHS="/opt/ignition-modules:/mnt/shared/modules"
+
+# Paths are colon-separated (:)
+# Both /opt/ignition-modules and /mnt/shared/modules will be accessible
+```
+
+#### Custom Ports
+
+Run multiple instances on different ports:
+
+```bash
+# Set custom port via environment variable
+export API_PORT=5001
+ignition-toolkit server start
+
+# Or specify in command (if supported)
+ignition-toolkit server start --port 5001
+```
+
+#### CORS Configuration
+
+Allow connections from additional origins:
+
+```bash
+# Add custom origins (comma-separated)
+export ALLOWED_ORIGINS="http://localhost:5000,http://localhost:5001,http://192.168.1.100:5000"
+```
+
+### Security in Portable Deployments
+
+**Rate Limiting (New in v4.0):**
+- Critical endpoints: 10 requests/minute (credentials, execution start)
+- Normal endpoints: 60 requests/minute (list, get operations)
+- High-frequency endpoints: 120 requests/minute (status, health checks)
+
+**Filesystem Protection:**
+- Browsing restricted to `data/` directory by default
+- Prevents access to credentials, SSH keys, system files
+- Path traversal attacks blocked by PathValidator
+
+**Input Validation:**
+- All user inputs validated and sanitized
+- XSS protection on metadata fields
+- YAML injection prevention
+
+**Credentials:**
+- Always stored in user home directory (`~/.ignition-toolkit/`)
+- Never included in portable archives
+- Fernet encryption at rest
+- Each machine maintains its own credential vault
+
+### Playbook Portability
+
+**Origin Tracking (New in v4.0):**
+Playbooks are automatically tagged with their origin:
+
+- **Built-in** 🏭 - Shipped with toolkit (gateway/, perspective/, designer/, examples/)
+- **Custom** 👤 - User-created playbooks
+- **Duplicated** 📋 - Copied from existing playbooks
+
+**Duplication:**
+```bash
+# Duplicate a playbook via UI (one-click)
+# Or via CLI:
+curl -X POST http://localhost:5000/api/playbooks/gateway/module_upgrade.yaml/duplicate
+```
+
+Duplicated playbooks are marked with their source for easy tracking.
+
+### Path Resolution Details
+
+The toolkit uses dynamic path resolution to work from any directory:
+
+```python
+# Package root automatically detected from installation
+/opt/ignition-toolkit/               # Wherever you install
+├── playbooks/                       # Always found relative to package
+├── frontend/dist/                   # Built frontend location
+├── data/                            # Runtime data
+└── ignition_toolkit/                # Python package
+```
+
+**User data is always stored in home directory:**
+```bash
+~/.ignition-toolkit/                 # Platform-independent
+├── credentials.enc                  # Fernet-encrypted credentials
+└── executions.db                    # SQLite execution history
+```
+
+This design ensures:
+- No hardcoded paths in code
+- Works on Windows, Linux, macOS
+- Multiple installations can coexist
+- Each user has separate credentials
+
 ## 🧪 Testing
 
 ```bash
