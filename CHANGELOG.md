@@ -5,6 +5,31 @@ All notable changes to the Ignition Automation Toolkit will be documented in thi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.0.2] - 2025-10-31
+
+### Fixed
+- **Critical:** Resolved cancel button race condition causing task cleanup before cancellation logic completes
+- Replaced 43 debug `print()` statements with `logger.debug()` for proper logging
+  - `ignition_toolkit/playbook/engine.py`: 33 statements
+  - `ignition_toolkit/api/routers/executions.py`: 4 statements
+  - `ignition_toolkit/browser/manager.py`: 6 statements
+
+### Removed
+- Deleted unused legacy file `step_executor_old.py` (781 lines, 32KB)
+- Removed 115 lines of dead credential autofill code from `executions.py` (duplicate of `CredentialManager`)
+- Cleaned up 8 screenshot files from root directory → moved to `docs/screenshots/`
+- Archived 63MB tarball `designerlauncher.tar.gz` → moved to `archive/`
+- Archived 8 temporary V4 development documents → moved to `archive/v4-development/`
+
+### Changed
+- Updated all version references from 3.0.0 → 4.0.2 across 10 documentation files
+- Moved 7 test files from root directory to `tests/` for better organization
+- Standardized "Last Updated" dates to 2025-10-31 across documentation
+
+### Security
+- Verified `.env` never committed to git history
+- Confirmed `.env` properly listed in `.gitignore`
+
 ## [3.1.0] - 2025-10-30
 
 ### Added - Designer Automation

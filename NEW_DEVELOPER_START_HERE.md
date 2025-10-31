@@ -2,8 +2,8 @@
 
 Welcome to the **Ignition Automation Toolkit** project! This guide will get you up and running quickly.
 
-**Current Version:** 3.0.0 (Production Ready)
-**Last Updated:** 2025-10-28
+**Current Version:** 4.0.2 (Production Ready)
+**Last Updated:** 2025-10-31
 
 ---
 

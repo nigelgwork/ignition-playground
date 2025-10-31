@@ -326,121 +326,6 @@ def validate_and_resolve_playbook_path(playbook_relative_path_str: str) -> tuple
     return playbooks_dir, playbook_path
 
 
-def _retrieve_credential(credential_name: str):
-    """
-    Retrieve credential from vault
-
-    Args:
-        credential_name: Name of credential to retrieve
-
-    Returns:
-        Credential object
-
-    Raises:
-        HTTPException: If credential not found
-    """
-    from ignition_toolkit.credentials import CredentialVault
-
-    vault = CredentialVault()
-    credential = vault.get_credential(credential_name)
-    if not credential:
-        raise HTTPException(
-            status_code=404, detail=f"Credential '{credential_name}' not found"
-        )
-    return credential
-
-
-def _autofill_credential_type_parameters(
-    playbook: "Playbook", credential_name: str, parameters: dict
-) -> None:
-    """
-    Auto-fill credential-type parameters with credential name
-
-    Args:
-        playbook: Loaded playbook object
-        credential_name: Name of credential to use
-        parameters: Parameters dict to modify (modified in-place)
-    """
-    for param in playbook.parameters:
-        if param.type == "credential" and param.name not in parameters:
-            parameters[param.name] = credential_name
-
-
-def _autofill_gateway_url_parameter(playbook: "Playbook", credential, parameters: dict) -> None:
-    """
-    Auto-fill gateway_url parameter if it exists in playbook
-
-    Args:
-        playbook: Loaded playbook object
-        credential: Credential object with gateway_url
-        parameters: Parameters dict to modify (modified in-place)
-    """
-    if not credential.gateway_url:
-        return
-
-    for param in playbook.parameters:
-        if param.name.lower() in ["gateway_url", "url"] and param.name not in parameters:
-            parameters[param.name] = credential.gateway_url
-
-
-def _autofill_username_password_parameters(playbook: "Playbook", credential, parameters: dict) -> None:
-    """
-    Auto-fill username/password parameters if they exist in playbook
-
-    Args:
-        playbook: Loaded playbook object
-        credential: Credential object with username/password
-        parameters: Parameters dict to modify (modified in-place)
-    """
-    for param in playbook.parameters:
-        if param.name.lower() in ["username", "user", "gateway_username"] and param.name not in parameters:
-            parameters[param.name] = credential.username
-        elif param.name.lower() in ["password", "pass", "gateway_password"] and param.name not in parameters:
-            parameters[param.name] = credential.password
-
-
-def apply_credential_autofill(
-    playbook: "Playbook",
-    credential_name: str | None,
-    gateway_url: str | None,
-    parameters: dict,
-) -> tuple[str | None, dict]:
-    """
-    Auto-fill parameters from credential if provided
-
-    Args:
-        playbook: Loaded playbook object
-        credential_name: Name of credential to use
-        gateway_url: Optional gateway URL from request
-        parameters: Parameters dict to modify
-
-    Returns:
-        Tuple of (gateway_url, parameters) with auto-filled values
-
-    Raises:
-        HTTPException: If credential not found
-    """
-    if not credential_name:
-        return gateway_url, parameters
-
-    # Retrieve credential from vault
-    credential = _retrieve_credential(credential_name)
-
-    # Auto-fill gateway_url if not provided in request
-    if not gateway_url and credential.gateway_url:
-        gateway_url = credential.gateway_url
-
-    # Auto-fill all parameter types
-    _autofill_credential_type_parameters(playbook, credential_name, parameters)
-    _autofill_gateway_url_parameter(playbook, credential, parameters)
-    _autofill_username_password_parameters(playbook, credential, parameters)
-
-    logger.info(
-        f"Execution parameters after credential auto-fill: gateway_url={gateway_url}, params={parameters}"
-    )
-
-    return gateway_url, parameters
-
 
 def create_execution_runner(
     engine: PlaybookEngine,
@@ -467,14 +352,14 @@ def create_execution_runner(
 
     async def run_execution():
         """Execute playbook in background"""
-        print(f"[DEBUG RUN_EXECUTION] Starting background execution for {execution_id}", flush=True)
+        logger.debug("Starting background execution for {execution_id}")
         start_time = datetime.now()
         try:
-            print(f"[DEBUG RUN_EXECUTION] Entering gateway client context", flush=True)
+            logger.debug("Entering gateway client context")
             if gateway_client:
                 await gateway_client.__aenter__()
 
-            print(f"[DEBUG RUN_EXECUTION] Calling engine.execute_playbook", flush=True)
+            logger.debug("Calling engine.execute_playbook")
             execution_state = await engine.execute_playbook(
                 playbook,
                 parameters,
@@ -482,7 +367,7 @@ def create_execution_runner(
                 execution_id=execution_id,
                 playbook_path=playbook_path,
             )
-            print(f"[DEBUG RUN_EXECUTION] engine.execute_playbook returned", flush=True)
+            logger.debug("engine.execute_playbook returned")
 
             logger.info(
                 f"Execution {execution_state.execution_id} completed with status: {execution_state.status}"

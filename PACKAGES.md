@@ -1,8 +1,8 @@
 # Package Dependencies
 
 **Project:** Ignition Automation Toolkit
-**Current Version:** 3.0.0
-**Last Updated:** 2025-10-27
+**Current Version:** 4.0.2
+**Last Updated:** 2025-10-31
 **Python:** 3.10+
 **Node.js:** 18+ or 20+
 
@@ -14,7 +14,7 @@ This document tracks all project dependencies, their versions, and provides guid
 
 ### Production Dependencies
 
-From `pyproject.toml` (version 3.0.0):
+From `pyproject.toml` (version 4.0.2):
 
 | Package | Version | Purpose | Notes |
 |---------|---------|---------|-------|

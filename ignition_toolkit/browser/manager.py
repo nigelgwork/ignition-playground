@@ -92,32 +92,32 @@ class BrowserManager:
             return
 
         logger.info("[BROWSER] Starting Playwright browser...")
-        print(f"[BROWSER DEBUG] Starting Playwright initialization", flush=True)
+        logger.debug("Starting Playwright initialization")
 
         # CRITICAL FIX: Run browser initialization without await to avoid event loop conflicts
         # This prevents deadlocks with FastAPI's event loop
         self._playwright = await async_playwright().start()
-        print(f"[BROWSER DEBUG] Playwright started", flush=True)
+        logger.debug("Playwright started")
 
         self._browser = await self._playwright.chromium.launch(
             headless=self.headless,
             slow_mo=self.slow_mo,
         )
-        print(f"[BROWSER DEBUG] Browser launched", flush=True)
+        logger.debug("Browser launched")
 
         self._context = await self._browser.new_context(
             viewport={"width": 1920, "height": 1080},
             ignore_https_errors=True,
             accept_downloads=True,
         )
-        print(f"[BROWSER DEBUG] Context created", flush=True)
+        logger.debug("Context created")
 
         # WORKAROUND: new_page() hangs in FastAPI - create page synchronously then await
         # This avoids the asyncio event loop deadlock issue
-        print(f"[BROWSER DEBUG] Creating page (working around FastAPI deadlock)", flush=True)
+        logger.debug("Creating page (working around FastAPI deadlock)")
         page_task = self._context.new_page()
         self._page = await page_task
-        print(f"[BROWSER DEBUG] Page created successfully", flush=True)
+        logger.debug("Page created successfully")
 
         # Set up download handler
         self._page.on("download", self._download_started)

@@ -127,17 +127,17 @@ class PlaybookEngine:
         Raises:
             PlaybookExecutionError: If execution fails
         """
-        print(f"[ENGINE DEBUG] execute_playbook called for playbook: {playbook.name}", flush=True)
+        logger.debug("execute_playbook called for playbook: {playbook.name}")
 
         # Create execution state FIRST (before validation)
         # This ensures ALL executions are tracked, even validation failures
         if execution_id is None:
             execution_id = str(uuid.uuid4())
 
-        print(f"[ENGINE DEBUG] execution_id: {execution_id}", flush=True)
+        logger.debug("execution_id: {execution_id}")
 
         # Pre-populate all steps with pending status so UI can show them upfront
-        print(f"[ENGINE DEBUG] Creating initial step results for {len(playbook.steps)} steps", flush=True)
+        logger.debug("Creating initial step results for {len(playbook.steps)} steps")
         initial_step_results = [
             StepResult(
                 step_id=step.id,
@@ -150,7 +150,7 @@ class PlaybookEngine:
             for step in playbook.steps
         ]
 
-        print(f"[ENGINE DEBUG] Creating execution state", flush=True)
+        logger.debug("Creating execution state")
         execution_state = ExecutionState(
             execution_id=execution_id,
             playbook_name=playbook.name,
@@ -166,17 +166,17 @@ class PlaybookEngine:
         self._playbook_path = playbook_path  # Store path for code editing
 
         # Reset state manager
-        print(f"[ENGINE DEBUG] Resetting state manager", flush=True)
+        logger.debug("Resetting state manager")
         self.state_manager.reset()
 
         # Save to database IMMEDIATELY (before validation)
-        print(f"[ENGINE DEBUG] Saving to database (database={self.database})", flush=True)
+        logger.debug("Saving to database (database={self.database})")
         logger.info(f"Database object: {self.database}, Type: {type(self.database)}")
         if self.database:
             logger.info("Database exists, calling _save_execution_start")
-            print(f"[ENGINE DEBUG] Calling _save_execution_start", flush=True)
+            logger.debug("Calling _save_execution_start")
             await self._save_execution_start(execution_state, playbook, parameters)
-            print(f"[ENGINE DEBUG] _save_execution_start completed", flush=True)
+            logger.debug("_save_execution_start completed")
         else:
             logger.warning("No database configured - execution will not be saved")
 
@@ -184,24 +184,24 @@ class PlaybookEngine:
         browser_manager = None
         designer_manager = None
 
-        print(f"[ENGINE DEBUG] Entering try block", flush=True)
+        logger.debug("Entering try block")
         try:
             # Validate parameters (can fail, but state already saved)
-            print(f"[ENGINE DEBUG] Validating parameters", flush=True)
+            logger.debug("Validating parameters")
             self._validate_parameters(playbook, parameters)
-            print(f"[ENGINE DEBUG] Parameter validation complete", flush=True)
+            logger.debug("Parameter validation complete")
 
             # Preprocess credential-type parameters
             # Convert credential names (strings) to Credential objects
-            print(f"[ENGINE DEBUG] Preprocessing credential parameters", flush=True)
+            logger.debug("Preprocessing credential parameters")
             parameters = self._preprocess_credential_parameters(playbook, parameters)
-            print(f"[ENGINE DEBUG] Credential parameter preprocessing complete", flush=True)
+            logger.debug("Credential parameter preprocessing complete")
 
             # Create step_results dictionary for tracking step outputs (shared by reference)
             step_results_dict: dict[str, dict[str, Any]] = {}
 
             # Create parameter resolver
-            print(f"[ENGINE DEBUG] Creating parameter resolver", flush=True)
+            logger.debug("Creating parameter resolver")
             resolver = ParameterResolver(
                 credential_vault=self.credential_vault,
                 parameters=parameters,
@@ -214,16 +214,16 @@ class PlaybookEngine:
             downloads_dir = Path(download_path) if download_path else None
 
             # Create browser manager ONLY for Perspective/browser playbooks (NOT for Designer)
-            print(f"[ENGINE DEBUG] Checking screenshot callback (callback={self.screenshot_callback})", flush=True)
+            logger.debug("Checking screenshot callback (callback={self.screenshot_callback})")
             has_browser_steps = any(step.type.value.startswith("browser.") for step in playbook.steps)
             playbook_domain = playbook.metadata.get('domain')
             needs_browser = playbook_domain == "perspective" or has_browser_steps
 
-            print(f"[ENGINE DEBUG] Playbook domain: {playbook_domain}, has_browser_steps: {has_browser_steps}, needs_browser: {needs_browser}", flush=True)
+            logger.debug("Playbook domain: {playbook_domain}, has_browser_steps: {has_browser_steps}, needs_browser: {needs_browser}")
 
             if self.screenshot_callback and needs_browser:
                 # Create screenshot callback that includes execution_id
-                print(f"[ENGINE DEBUG] Creating browser manager with screenshot streaming", flush=True)
+                logger.debug("Creating browser manager with screenshot streaming")
                 async def screenshot_frame_callback(screenshot_b64: str):
                     await self.screenshot_callback(execution_id, screenshot_b64)
 
@@ -232,15 +232,15 @@ class PlaybookEngine:
                     screenshot_callback=screenshot_frame_callback,
                     downloads_dir=downloads_dir,
                 )
-                print(f"[ENGINE DEBUG] Starting browser manager", flush=True)
+                logger.debug("Starting browser manager")
                 await browser_manager.start()
-                print(f"[ENGINE DEBUG] Starting screenshot streaming", flush=True)
+                logger.debug("Starting screenshot streaming")
                 await browser_manager.start_screenshot_streaming()
                 self._browser_manager = browser_manager  # Store reference for pause/resume
-                print(f"[ENGINE DEBUG] Browser initialization complete", flush=True)
+                logger.debug("Browser initialization complete")
                 logger.info(f"Browser screenshot streaming started for execution {execution_id}")
             else:
-                print(f"[ENGINE DEBUG] Skipping browser initialization (not needed for domain={playbook_domain})", flush=True)
+                logger.debug("Skipping browser initialization (not needed for domain={playbook_domain})")
 
             # Create designer manager if playbook has designer steps
             has_designer_steps = any(step.type.value.startswith("designer.") for step in playbook.steps)
@@ -257,7 +257,7 @@ class PlaybookEngine:
                 logger.info(f"Designer manager started for execution {execution_id}")
 
             # Create step executor
-            print(f"[ENGINE DEBUG] Creating step executor", flush=True)
+            logger.debug("Creating step executor")
             executor = StepExecutor(
                 gateway_client=self.gateway_client,
                 browser_manager=browser_manager,
@@ -266,21 +266,21 @@ class PlaybookEngine:
                 base_path=base_path,
                 state_manager=self.state_manager,
             )
-            print(f"[ENGINE DEBUG] Step executor created", flush=True)
+            logger.debug("Step executor created")
 
             # Execute steps (using while loop to support skip back)
             step_index = 0
-            print(f"[ENGINE DEBUG] Entering step execution loop ({len(playbook.steps)} steps)", flush=True)
+            logger.debug("Entering step execution loop ({len(playbook.steps)} steps)")
             while step_index < len(playbook.steps):
-                print(f"[ENGINE DEBUG] Step loop iteration: step_index={step_index}", flush=True)
+                logger.debug("Step loop iteration: step_index={step_index}")
                 step = playbook.steps[step_index]
                 execution_state.current_step_index = step_index
 
                 # Check control signals
-                print(f"[ENGINE DEBUG] Checking control signals", flush=True)
+                logger.debug("Checking control signals")
                 try:
                     await self.state_manager.check_control_signal()
-                    print(f"[ENGINE DEBUG] Control signal check passed", flush=True)
+                    logger.debug("Control signal check passed")
                 except asyncio.CancelledError:
                     execution_state.status = ExecutionStatus.CANCELLED
                     execution_state.completed_at = datetime.now()
@@ -329,10 +329,10 @@ class PlaybookEngine:
                     continue
 
                 # Execute step
-                print(f"[ENGINE DEBUG] Executing step {step_index + 1}/{len(playbook.steps)}: {step.name}", flush=True)
+                logger.debug("Executing step {step_index + 1}/{len(playbook.steps)}: {step.name}")
                 logger.info(f"Executing step {step_index + 1}/{len(playbook.steps)}: {step.name}")
                 step_result = await executor.execute_step(step)
-                print(f"[ENGINE DEBUG] Step execution complete: {step.name} - status={step_result.status}", flush=True)
+                logger.debug("Step execution complete: {step.name} - status={step_result.status}")
                 execution_state.add_step_result(step_result)
 
                 # Keep current_step_index synchronized - use step_index (0-based)
@@ -553,19 +553,19 @@ class PlaybookEngine:
         Args:
             execution_state: Current execution state
         """
-        print(f"[ENGINE] _notify_update called: status={execution_state.status.value}, current_step={execution_state.current_step_index}, steps={len(execution_state.step_results)}", flush=True)
+        logger.debug("_notify_update called: status={execution_state.status.value}, current_step={execution_state.current_step_index}, steps={len(execution_state.step_results)}")
         if self._update_callback:
             try:
                 if asyncio.iscoroutinefunction(self._update_callback):
                     await self._update_callback(execution_state)
-                    print(f"[ENGINE] Update callback completed", flush=True)
+                    logger.debug("Update callback completed")
                 else:
                     self._update_callback(execution_state)
-                    print(f"[ENGINE] Update callback completed (sync)", flush=True)
+                    logger.debug("Update callback completed (sync)")
             except Exception as e:
                 logger.exception(f"Error in update callback: {e}")
         else:
-            print(f"[ENGINE] No update callback registered!", flush=True)
+            logger.debug("No update callback registered!")
 
     async def _save_execution_start(
         self, execution_state: ExecutionState, playbook: Playbook, parameters: dict[str, Any]

@@ -8,7 +8,7 @@ This file provides guidance to Claude Code when working with the Ignition Automa
 
 **Ignition Automation Toolkit** is a visual acceptance testing platform for Ignition SCADA (Gateway, Perspective, Designer) with domain-separated playbook libraries, real-time visual feedback, and optional AI-assisted test creation.
 
-**Current Version:** 3.0.0 (Production Ready)
+**Current Version:** 4.0.2 (Production Ready)
 **Phase:** 8/8 Complete - All Core Features Implemented ✅
 **Target Platform:** Ignition SCADA 8.3+
 **Primary Language:** Python 3.10+
@@ -138,7 +138,7 @@ ignition-playground/
 - Playbook syntax reference
 - Version tracking and changelog
 
-**Status:** Production Ready (v3.0.0) - All core features implemented
+**Status:** Production Ready (v4.0.2) - All core features implemented
 
 ## 🔑 Key Design Patterns
 
@@ -329,7 +329,7 @@ git push origin main
 
 > **See [ROADMAP.md](/docs/ROADMAP.md) for planned features and priorities.**
 
-**Production Ready (v3.0.0)** - All 8 phases complete
+**Production Ready (v4.0.2)** - All 8 phases complete
 
 **Recently Completed (v1.0 - v3.0):**
 1. ✅ Live browser streaming at 2 FPS (v1.0.4)
@@ -401,7 +401,7 @@ This project is a **fresh start** from `ignition-auto-test`. Key differences:
 
 ---
 
-**Last Updated**: 2025-10-25
+**Last Updated**: 2025-10-31
 **Maintainer**: Nigel G
-**Status**: Production Ready (v3.0.0) - All 8 Phases Complete ✅
+**Status**: Production Ready (v4.0.2) - All 8 Phases Complete ✅
 **Confidence Level**: High ✨

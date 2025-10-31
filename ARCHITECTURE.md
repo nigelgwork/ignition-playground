@@ -1,8 +1,8 @@
 # Architecture Documentation
 
 **Project:** Ignition Automation Toolkit
-**Last Updated:** 2025-10-27
-**Version:** 3.0.0
+**Last Updated:** 2025-10-31
+**Version:** 4.0.2
 
 This document provides comprehensive architecture documentation including system design, component interactions, data flow, and key architectural decisions (ADRs).
 
