@@ -150,6 +150,7 @@ class WebSocketManager:
                 "started_at": state.started_at.isoformat() if state.started_at else None,
                 "completed_at": state.completed_at.isoformat() if state.completed_at else None,
                 "error": state.error,
+                "domain": state.domain,
                 "step_results": [
                     {
                         "step_id": sr.step_id,

@@ -67,36 +67,41 @@ class UtilityPythonHandler(StepHandler):
         if not script:
             raise StepExecutionError("utility", "Python script is required")
 
-        # Execute Python script in restricted environment
-        output_buffer = io.StringIO()
-        result = {}
+        # Execute Python script in restricted environment (run in thread pool to avoid blocking event loop)
+        def _run_script():
+            output_buffer = io.StringIO()
+            result = {}
 
-        try:
-            # Create execution environment with access to common libraries
-            exec_globals = {
-                "__builtins__": __builtins__,
-                "Path": __import__("pathlib").Path,
-                "zipfile": __import__("zipfile"),
-                "ET": __import__("xml.etree.ElementTree"),
-                "json": __import__("json"),
-                "os": __import__("os"),
-            }
+            try:
+                # Create execution environment with access to common libraries
+                exec_globals = {
+                    "__builtins__": __builtins__,
+                    "Path": __import__("pathlib").Path,
+                    "zipfile": __import__("zipfile"),
+                    "ET": __import__("xml.etree.ElementTree"),
+                    "json": __import__("json"),
+                    "os": __import__("os"),
+                }
 
-            # Redirect stdout to capture print() statements
-            with redirect_stdout(output_buffer):
-                exec(script, exec_globals)
+                # Redirect stdout to capture print() statements
+                with redirect_stdout(output_buffer):
+                    exec(script, exec_globals)
 
-            # Parse output for key=value pairs (e.g., DETECTED_MODULE_FILE=/path/to/file)
-            output = output_buffer.getvalue()
-            for line in output.strip().split("\n"):
-                if "=" in line:
-                    key, value = line.split("=", 1)
-                    result[key] = value
+                # Parse output for key=value pairs (e.g., DETECTED_MODULE_FILE=/path/to/file)
+                output = output_buffer.getvalue()
+                for line in output.strip().split("\n"):
+                    if "=" in line:
+                        key, value = line.split("=", 1)
+                        result[key] = value
 
-            # Also include raw output
-            result["_output"] = output
+                # Also include raw output
+                result["_output"] = output
 
-            return result
+                return result
 
-        except Exception as e:
-            raise StepExecutionError("utility.python", f"Script execution failed: {str(e)}")
+            except Exception as e:
+                raise StepExecutionError("utility.python", f"Script execution failed: {str(e)}")
+
+        # Run in thread pool to avoid blocking event loop
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(None, _run_script)

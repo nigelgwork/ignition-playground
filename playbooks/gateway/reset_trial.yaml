@@ -1,6 +1,7 @@
 name: "Reset Gateway Trial"
 version: "3.0"
 description: "Reset Gateway trial license"
+domain: gateway
 
 parameters:
   - name: gateway_url

@@ -440,7 +440,7 @@ export function ExecutionDetail() {
         {/* Middle: Live Browser View OR Debug Panel OR Placeholder */}
         {showDebugPanel ? (
           <DebugPanel executionId={executionId} />
-        ) : execution?.domain === 'perspective' || execution?.domain === null ? (
+        ) : execution?.domain === 'perspective' || execution?.domain === 'gateway' || execution?.domain === null ? (
           <LiveBrowserView executionId={executionId} />
         ) : (
           <Paper

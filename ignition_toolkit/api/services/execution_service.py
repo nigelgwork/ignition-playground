@@ -122,8 +122,8 @@ class ExecutionService:
             debug_mode=debug_mode,
         )
 
-        # Step 5: Broadcast initial state with all steps as "pending"
-        await self._broadcast_initial_state(execution_id, playbook)
+        # Step 5: Initial state broadcast - SKIP (engine handles this to avoid duplicates)
+        # The engine will broadcast initial state when execute_playbook() is called
 
         # Step 6: Create and start background execution
         runner = self._create_runner(

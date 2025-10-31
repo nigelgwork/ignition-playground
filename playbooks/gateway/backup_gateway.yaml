@@ -1,6 +1,7 @@
 name: "Backup Gateway"
 version: "5.0"
 description: "Download a Gateway backup file"
+domain: gateway
 
 parameters:
   - name: gateway_url

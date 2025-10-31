@@ -22,13 +22,15 @@ if ($designer) {
 
     # Restore window if minimized and bring to front
     [Win32]::ShowWindow($designer.MainWindowHandle, 9)  # SW_RESTORE
-    Start-Sleep -Milliseconds 200
+    Start-Sleep -Milliseconds 500  # Increased from 200ms for more reliable window restoration
     [Win32]::SetForegroundWindow($designer.MainWindowHandle)
-    Start-Sleep -Milliseconds 200
+    Start-Sleep -Milliseconds 300  # Increased from 200ms
     [Win32]::SetForegroundWindow($designer.MainWindowHandle)  # Call twice to ensure focus
-    Start-Sleep -Milliseconds 500
+    Start-Sleep -Milliseconds 300  # Increased from 200ms
+    [Win32]::SetForegroundWindow($designer.MainWindowHandle)  # Third call for stubborn cases
+    Start-Sleep -Milliseconds 800  # Longer wait for window to be fully ready (total: 1900ms)
 
-    # Enter username
+    # Enter username (field should already have focus when window opens)
     [System.Windows.Forms.SendKeys]::SendWait($Username)
     Start-Sleep -Milliseconds 100
 
