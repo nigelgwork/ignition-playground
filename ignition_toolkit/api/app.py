@@ -23,6 +23,7 @@ from ignition_toolkit import __version__
 from ignition_toolkit.ai import AIAssistant
 from ignition_toolkit.api.routers import health_router
 from ignition_toolkit.api.routers.ai import router as ai_router
+from ignition_toolkit.api.routers.config import router as config_router
 from ignition_toolkit.api.routers.credentials import router as credentials_router
 from ignition_toolkit.api.routers.executions import router as executions_router
 from ignition_toolkit.api.routers.filesystem import router as filesystem_router
@@ -45,6 +46,9 @@ app = FastAPI(
 
 # Register health check router FIRST (before other routes)
 app.include_router(health_router)
+
+# Register config router (for portability)
+app.include_router(config_router)
 
 # Register playbooks router
 app.include_router(playbooks_router)

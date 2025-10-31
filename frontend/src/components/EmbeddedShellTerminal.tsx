@@ -44,8 +44,22 @@ export function EmbeddedShellTerminal({
   const [showInstructions, setShowInstructions] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [playbooksPath, setPlaybooksPath] = useState<string>('./playbooks'); // Default
 
-  const playbooksPath = '/git/ignition-playground/playbooks';
+  // PORTABILITY: Fetch playbooks path from config API on mount
+  useEffect(() => {
+    fetch('/api/config')
+      .then(res => res.json())
+      .then(config => {
+        if (config.paths?.playbooks_dir) {
+          setPlaybooksPath(config.paths.playbooks_dir);
+        }
+      })
+      .catch(err => {
+        console.warn('Failed to fetch config, using default playbooks path:', err);
+        // Keep default './playbooks'
+      });
+  }, []);
 
   // Open in new window
   const handlePopOut = () => {

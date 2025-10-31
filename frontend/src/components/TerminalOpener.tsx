@@ -5,6 +5,7 @@
  * directory where CLAUDE_CODE_INSTRUCTIONS.md provides context for Claude Code.
  */
 
+import { useEffect, useState } from 'react';
 import {
   Dialog,
   DialogTitle,
@@ -37,7 +38,22 @@ export function TerminalOpener({
   open,
   onClose,
 }: TerminalOpenerProps) {
-  const playbooksPath = '/git/ignition-playground/playbooks';
+  const [playbooksPath, setPlaybooksPath] = useState<string>('./playbooks'); // Default
+
+  // PORTABILITY: Fetch playbooks path from config API on mount
+  useEffect(() => {
+    fetch('/api/config')
+      .then(res => res.json())
+      .then(config => {
+        if (config.paths?.playbooks_dir) {
+          setPlaybooksPath(config.paths.playbooks_dir);
+        }
+      })
+      .catch(err => {
+        console.warn('Failed to fetch config, using default playbooks path:', err);
+        // Keep default './playbooks'
+      });
+  }, []);
 
   const handleOpenTerminal = () => {
     // For now, just provide instructions since direct terminal opening requires system integration
