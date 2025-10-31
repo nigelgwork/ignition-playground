@@ -126,3 +126,47 @@ class PathValidator:
         )
 
         return playbooks_dir, full_path
+
+    @staticmethod
+    def validate_path_safety(path: Path) -> None:
+        """
+        Validate that a path is safe (no directory traversal, no suspicious patterns)
+
+        Used by filesystem router and security tests to prevent unauthorized access.
+
+        Args:
+            path: Path to validate (can be relative or absolute)
+
+        Raises:
+            ValueError: If path contains dangerous patterns
+
+        Examples:
+            >>> PathValidator.validate_path_safety(Path("data/file.txt"))  # OK
+            >>> PathValidator.validate_path_safety(Path("../../../etc/passwd"))  # Raises ValueError
+        """
+        path_str = str(path)
+
+        # Check for directory traversal
+        if ".." in path_str:
+            raise ValueError(f"Path contains directory traversal: {path_str}")
+
+        # Check for suspicious patterns
+        suspicious_patterns = [
+            "/etc/passwd",
+            "/etc/shadow",
+            "/.ssh/",
+            "/.ignition-toolkit/credentials",
+            "/root/",
+        ]
+
+        path_lower = path_str.lower()
+        for pattern in suspicious_patterns:
+            if pattern in path_lower:
+                raise ValueError(f"Path contains suspicious pattern: {pattern}")
+
+        # Additional check: reject absolute paths to sensitive locations
+        if path.is_absolute():
+            sensitive_dirs = ["/etc", "/root", "/sys", "/proc"]
+            for sensitive in sensitive_dirs:
+                if path_str.startswith(sensitive):
+                    raise ValueError(f"Access to {sensitive} is not allowed")
