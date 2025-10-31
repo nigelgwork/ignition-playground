@@ -97,7 +97,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         # capacity = burst size, refill_rate = sustainable rate
         self.rate_limits = {
             # Critical endpoints (authentication, execution control)
-            "critical": (10, 10 / 60),  # 10 req/min = 0.167 req/sec
+            "critical": (30, 30 / 60),  # 30 req/min = 0.5 req/sec (increased from 10)
             # Normal endpoints (most APIs)
             "normal": (60, 60 / 60),  # 60 req/min = 1 req/sec
             # High-frequency endpoints (status polling, websocket handshake)
@@ -159,13 +159,19 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         if path == "/api/executions" and method == "POST":
             return "critical"
 
+        # Execution DELETE is normal (not critical like POST)
+        if path.startswith("/api/executions/") and method == "DELETE":
+            return "normal"
+
         # Execution status GET is high-frequency
         if path.startswith("/api/executions/") and method == "GET":
             return "high"
 
-        # Credentials are critical
-        if path.startswith("/api/credentials"):
+        # Credentials POST/PUT are critical, GET is normal
+        if path.startswith("/api/credentials") and method in ["POST", "PUT", "DELETE"]:
             return "critical"
+        if path.startswith("/api/credentials") and method == "GET":
+            return "normal"
 
         # Check other patterns
         for pattern, category in self.endpoint_categories.items():

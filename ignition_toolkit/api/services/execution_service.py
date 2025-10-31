@@ -307,8 +307,9 @@ class ExecutionService:
                 if gateway_client:
                     await gateway_client.__aexit__(None, None, None)
 
-                # Clean up task reference
-                self.execution_manager.remove_task(execution_id)
+                # NOTE: Task cleanup is handled by TTL mechanism, not here
+                # Removing task too early prevents cancel endpoint from finding it
+                # (Fixed in v3.44.13, ported to v4.0.2)
 
         return run_execution
 

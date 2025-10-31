@@ -48,9 +48,6 @@ import {
   Delete as DeleteIcon,
   Schedule as ScheduleIcon,
   ContentCopy as DuplicateIcon,
-  Inventory as BuiltInIcon,
-  Person as UserCreatedIcon,
-  FileCopy as DuplicatedIcon,
 } from '@mui/icons-material';
 import type { PlaybookInfo } from '../types/api';
 import { useStore } from '../store';
@@ -351,36 +348,6 @@ export function PlaybookCard({ playbook, onConfigure, onExecute, onExport, onVie
               size="small"
               variant="outlined"
             />
-          )}
-          {/* PORTABILITY v4: Origin badge */}
-          {playbook.origin === 'built-in' && (
-            <Chip
-              icon={<BuiltInIcon />}
-              label="Built-in"
-              size="small"
-              color="info"
-              variant="outlined"
-            />
-          )}
-          {playbook.origin === 'user-created' && (
-            <Chip
-              icon={<UserCreatedIcon />}
-              label="Custom"
-              size="small"
-              color="secondary"
-              variant="outlined"
-            />
-          )}
-          {playbook.origin === 'duplicated' && (
-            <Tooltip title={playbook.duplicated_from ? `Copied from: ${playbook.duplicated_from}` : 'Duplicated playbook'}>
-              <Chip
-                icon={<DuplicatedIcon />}
-                label="Duplicated"
-                size="small"
-                color="secondary"
-                variant="outlined"
-              />
-            </Tooltip>
           )}
           {playbook.verified && (
             <Chip

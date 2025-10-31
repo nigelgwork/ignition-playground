@@ -204,16 +204,35 @@ venv\\Scripts\\uvicorn.exe ignition_toolkit.api.app:app --host 0.0.0.0 --port %P
     print(f"  ✓ Created launcher scripts")
 
 
-def create_install_instructions(output_dir: Path, version: str):
+def create_install_instructions(output_dir: Path, version: str, runtime_included: bool = False):
     """Create INSTALL.txt with setup instructions"""
 
     instructions = output_dir / "INSTALL.txt"
-    instructions.write_text(f"""
-================================================================================
-Ignition Automation Toolkit v{version} - Installation Guide
-================================================================================
 
-QUICK START
+    # Different instructions for bundled runtime vs source archives
+    if runtime_included:
+        quick_start = """QUICK START (BUNDLED RUNTIME - NO SETUP REQUIRED)
+--------------------------------------------------
+
+1. Extract this archive to your desired location
+2. Run the launcher script:
+   - Linux/macOS: ./run.sh
+   - Windows:     run.bat
+
+That's it! Everything is included:
+✓ Python virtual environment
+✓ All dependencies installed
+✓ Playwright browser (Chromium)
+
+The server will start immediately - no installation needed."""
+        requirements = """REQUIREMENTS
+------------
+
+- None! All dependencies are bundled.
+- 850MB free disk space (for this archive)
+- Network access to your Ignition Gateway"""
+    else:
+        quick_start = """QUICK START
 -----------
 
 1. Extract this archive to your desired location
@@ -227,7 +246,21 @@ The first run will:
 - Download Playwright browser (Chromium)
 - Start the web server
 
-After first run, simply run the launcher again to start the server.
+After first run, simply run the launcher again to start the server."""
+        requirements = """REQUIREMENTS
+------------
+
+- Python 3.10 or later
+- 2GB free disk space (for Playwright browser)
+- Network access to your Ignition Gateway"""
+
+    instructions.write_text(f"""
+================================================================================
+Ignition Automation Toolkit v{version} - Installation Guide
+{"[FULL RUNTIME BUNDLE]" if runtime_included else "[SOURCE DISTRIBUTION]"}
+================================================================================
+
+{quick_start}
 
 ACCESS THE APPLICATION
 ----------------------
@@ -240,12 +273,7 @@ The web interface provides:
 - Credential management
 - AI-assisted playbook creation (if API key configured)
 
-REQUIREMENTS
-------------
-
-- Python 3.10 or later
-- 2GB free disk space (for Playwright browser)
-- Network access to your Ignition Gateway
+{requirements}
 
 CONFIGURATION
 -------------
@@ -450,6 +478,61 @@ def create_zipfile(source_dir: Path, output_file: Path):
     print(f"    ✓ Created {output_file.name} ({size_mb:.1f} MB)")
 
 
+def get_platform_suffix() -> str:
+    """Get platform suffix for archive name"""
+    import platform
+
+    system = platform.system().lower()
+    machine = platform.machine().lower()
+
+    # Normalize architecture names
+    if machine in ["x86_64", "amd64"]:
+        arch = "x64"
+    elif machine in ["aarch64", "arm64"]:
+        arch = "arm64"
+    else:
+        arch = machine
+
+    # Normalize system names
+    if system == "linux":
+        return f"linux-{arch}"
+    elif system == "darwin":
+        return f"macos-{arch}"
+    elif system == "windows":
+        return f"windows-{arch}"
+    else:
+        return f"{system}-{arch}"
+
+
+def copy_runtime(build_dir: Path, project_root: Path):
+    """Copy runtime dependencies (venv, browsers) for fully portable archive"""
+
+    print("  📦 Copying runtime dependencies (this may take a while)...")
+
+    # Copy venv
+    venv_source = project_root / "venv"
+    if venv_source.exists():
+        venv_dest = build_dir / "venv"
+        print(f"    → Copying Python venv... ", end="", flush=True)
+        shutil.copytree(venv_source, venv_dest, symlinks=True)
+        venv_size = sum(f.stat().st_size for f in venv_dest.rglob("*") if f.is_file()) / (1024 * 1024)
+        print(f"✓ ({venv_size:.0f} MB)")
+    else:
+        print(f"    ⚠️  venv not found - archive will not be fully portable!")
+
+    # Copy Playwright browsers
+    browsers_source = project_root / "data" / ".playwright-browsers"
+    if browsers_source.exists():
+        browsers_dest = build_dir / "data" / ".playwright-browsers"
+        browsers_dest.parent.mkdir(parents=True, exist_ok=True)
+        print(f"    → Copying Playwright browsers... ", end="", flush=True)
+        shutil.copytree(browsers_source, browsers_dest)
+        browsers_size = sum(f.stat().st_size for f in browsers_dest.rglob("*") if f.is_file()) / (1024 * 1024)
+        print(f"✓ ({browsers_size:.0f} MB)")
+    else:
+        print(f"    ⚠️  Playwright browsers not found - will be downloaded on first run")
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Create portable archive of Ignition Automation Toolkit"
@@ -466,6 +549,11 @@ def main():
         default=None,
         help="Output directory for archives (default: project_root/dist)"
     )
+    parser.add_argument(
+        "--include-runtime",
+        action="store_true",
+        help="Include venv and browsers for fully portable archive (large, ~850MB)"
+    )
 
     args = parser.parse_args()
 
@@ -480,11 +568,26 @@ def main():
 
     output_base.mkdir(parents=True, exist_ok=True)
 
+    # Determine archive name suffix
+    if args.include_runtime:
+        platform_suffix = get_platform_suffix()
+        archive_suffix = f"{platform_suffix}-full"
+        build_dir_name = f"ignition-toolkit-v{version}-{platform_suffix}-full"
+        archive_type = "FULL RUNTIME"
+    else:
+        archive_suffix = "portable"
+        build_dir_name = f"ignition-toolkit-portable-v{version}"
+        archive_type = "SOURCE"
+
     # Create temporary build directory
-    build_dir = output_base / f"ignition-toolkit-portable-v{version}"
+    build_dir = output_base / build_dir_name
 
     print("=" * 70)
     print(f"Creating Portable Archive - v{version}")
+    print(f"Type: {archive_type}")
+    if args.include_runtime:
+        print(f"Platform: {get_platform_suffix()}")
+        print("⚠️  Runtime included - archive will be large (~850MB)")
     print("=" * 70)
     print()
 
@@ -502,25 +605,34 @@ def main():
     copy_project_files(build_dir, project_root)
     print()
 
-    # Step 2: Create launcher scripts
-    print("Step 2: Creating launcher scripts")
+    # Step 2: Copy runtime dependencies (if requested)
+    if args.include_runtime:
+        print("Step 2: Copying runtime dependencies")
+        copy_runtime(build_dir, project_root)
+        print()
+        step_offset = 1
+    else:
+        step_offset = 0
+
+    # Step 3 (or 2): Create launcher scripts
+    print(f"Step {2 + step_offset}: Creating launcher scripts")
     create_launcher_scripts(build_dir)
     print()
 
-    # Step 3: Create installation instructions
-    print("Step 3: Creating installation instructions")
-    create_install_instructions(build_dir, version)
+    # Step 4 (or 3): Create installation instructions
+    print(f"Step {3 + step_offset}: Creating installation instructions")
+    create_install_instructions(build_dir, version, runtime_included=args.include_runtime)
     print()
 
-    # Step 4: Create archives
-    print("Step 4: Creating archives")
+    # Step 5 (or 4): Create archives
+    print(f"Step {4 + step_offset}: Creating archives")
 
     if args.format in ["tar", "both"]:
-        tarball = output_base / f"ignition-toolkit-portable-v{version}.tar.gz"
+        tarball = output_base / f"ignition-toolkit-v{version}-{archive_suffix}.tar.gz"
         create_tarball(build_dir, tarball)
 
     if args.format in ["zip", "both"]:
-        zipball = output_base / f"ignition-toolkit-portable-v{version}.zip"
+        zipball = output_base / f"ignition-toolkit-v{version}-{archive_suffix}.zip"
         create_zipfile(build_dir, zipball)
 
     print()
