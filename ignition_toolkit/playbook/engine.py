@@ -159,6 +159,7 @@ class PlaybookEngine:
             total_steps=len(playbook.steps),
             debug_mode=self.state_manager.is_debug_mode_enabled(),
             step_results=initial_step_results,
+            domain=playbook.metadata.get("domain"),  # Include playbook domain
         )
         self._current_execution = execution_state
         self._current_playbook = playbook  # Store playbook for API access
@@ -583,6 +584,7 @@ class PlaybookEngine:
                     execution_metadata={
                         "debug_mode": self.state_manager.is_debug_mode_enabled(),
                         "total_steps": len(playbook.steps),
+                        "domain": playbook.metadata.get("domain"),  # Save playbook domain
                     },
                 )
                 session.add(execution_model)

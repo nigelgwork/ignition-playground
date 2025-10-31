@@ -63,6 +63,7 @@ export interface ExecutionStatusResponse {
   error: string | null;
   debug_mode?: boolean;
   step_results?: StepResult[];
+  domain?: string | null;  // Playbook domain (gateway, designer, perspective)
 }
 
 export interface CredentialInfo {
@@ -111,6 +112,7 @@ export interface ExecutionUpdate {
   started_at: string | null;
   completed_at: string | null;
   step_results: StepResult[];
+  domain?: string | null;  // Playbook domain (gateway, designer, perspective)
 }
 
 export interface ScreenshotFrame {

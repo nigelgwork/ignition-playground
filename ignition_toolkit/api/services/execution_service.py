@@ -237,6 +237,7 @@ class ExecutionService:
             current_step_index=None,
             started_at=datetime.now(),
             step_results=initial_step_results,
+            domain=playbook.metadata.get("domain"),  # Include playbook domain
         )
         await self.state_update_callback(initial_state)
         logger.info(f"Broadcasted initial state with {len(initial_step_results)} steps for execution {execution_id}")

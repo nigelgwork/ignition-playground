@@ -282,6 +282,7 @@ class ExecutionState:
         step_results: Results of completed steps
         variables: Runtime variables
         error: Error message if failed
+        domain: Playbook domain (gateway, designer, perspective)
     """
 
     execution_id: str
@@ -295,6 +296,7 @@ class ExecutionState:
     step_results: list[StepResult] = field(default_factory=list)
     variables: dict[str, Any] = field(default_factory=dict)
     error: str | None = None
+    domain: str | None = None  # Playbook domain (gateway, designer, perspective)
 
     def get_step_result(self, step_id: str) -> StepResult | None:
         """

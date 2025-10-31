@@ -141,3 +141,4 @@ class ExecutionStatusResponse(BaseModel):
     error: str | None
     debug_mode: bool = False
     step_results: list[StepResultResponse] | None = None
+    domain: str | None = None  # Playbook domain (gateway, designer, perspective)
