@@ -47,6 +47,10 @@ import {
   Cancel as CancelIcon,
   Delete as DeleteIcon,
   Schedule as ScheduleIcon,
+  ContentCopy as DuplicateIcon,
+  Inventory as BuiltInIcon,
+  Person as UserCreatedIcon,
+  FileCopy as DuplicatedIcon,
 } from '@mui/icons-material';
 import type { PlaybookInfo } from '../types/api';
 import { useStore } from '../store';
@@ -204,6 +208,21 @@ export function PlaybookCard({ playbook, onConfigure, onExecute, onExport, onVie
     },
   });
 
+  // Mutation for duplicating playbook
+  const duplicateMutation = useMutation({
+    mutationFn: () => api.playbooks.duplicate(playbook.path),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['playbooks'] });
+      setSnackbarMessage(`Playbook duplicated: ${data.new_path}`);
+      setSnackbarOpen(true);
+      setMenuAnchor(null);
+    },
+    onError: (error) => {
+      setSnackbarMessage(`Failed to duplicate: ${(error as Error).message}`);
+      setSnackbarOpen(true);
+    },
+  });
+
   const handleOpenEditDialog = () => {
     setEditedName(playbook.name);
     setEditedDescription(playbook.description);
@@ -332,6 +351,36 @@ export function PlaybookCard({ playbook, onConfigure, onExecute, onExport, onVie
               size="small"
               variant="outlined"
             />
+          )}
+          {/* PORTABILITY v4: Origin badge */}
+          {playbook.origin === 'built-in' && (
+            <Chip
+              icon={<BuiltInIcon />}
+              label="Built-in"
+              size="small"
+              color="info"
+              variant="outlined"
+            />
+          )}
+          {playbook.origin === 'user-created' && (
+            <Chip
+              icon={<UserCreatedIcon />}
+              label="Custom"
+              size="small"
+              color="secondary"
+              variant="outlined"
+            />
+          )}
+          {playbook.origin === 'duplicated' && (
+            <Tooltip title={playbook.duplicated_from ? `Copied from: ${playbook.duplicated_from}` : 'Duplicated playbook'}>
+              <Chip
+                icon={<DuplicatedIcon />}
+                label="Duplicated"
+                size="small"
+                color="secondary"
+                variant="outlined"
+              />
+            </Tooltip>
           )}
           {playbook.verified && (
             <Chip
@@ -512,6 +561,15 @@ export function PlaybookCard({ playbook, onConfigure, onExecute, onExport, onVie
         <MenuItem onClick={handleOpenEditDialog}>
           <EditIcon fontSize="small" sx={{ mr: 1 }} />
           Edit Playbook
+        </MenuItem>
+
+        {/* Duplicate Playbook */}
+        <MenuItem
+          onClick={() => duplicateMutation.mutate()}
+          disabled={duplicateMutation.isPending}
+        >
+          <DuplicateIcon fontSize="small" sx={{ mr: 1 }} />
+          Duplicate Playbook
         </MenuItem>
 
         <Divider />
