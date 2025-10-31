@@ -1,7 +1,7 @@
 /**
  * ExecutionControls - Control buttons for playbook execution
  *
- * Provides pause, resume, skip, and stop controls
+ * Provides skip and cancel controls
  */
 
 import { useState, useRef } from 'react';
@@ -13,8 +13,6 @@ import {
   CircularProgress,
 } from '@mui/material';
 import {
-  Pause as PauseIcon,
-  PlayArrow as ResumeIcon,
   SkipNext as SkipIcon,
   Cancel as CancelIcon,
   Psychology as AIIcon,
@@ -39,28 +37,6 @@ export function ExecutionControls({
   const [loading, setLoading] = useState<string | null>(null);
   const cancelInProgressRef = useRef(false);
 
-  const handlePause = async () => {
-    try {
-      setLoading('pause');
-      await api.executions.pause(executionId);
-    } catch (error) {
-      console.error('Failed to pause execution:', error);
-    } finally {
-      setLoading(null);
-    }
-  };
-
-  const handleResume = async () => {
-    try {
-      setLoading('resume');
-      await api.executions.resume(executionId);
-    } catch (error) {
-      console.error('Failed to resume execution:', error);
-    } finally {
-      setLoading(null);
-    }
-  };
-
   const handleSkip = async () => {
     try {
       setLoading('skip');
@@ -74,11 +50,8 @@ export function ExecutionControls({
 
 
   const handleCancel = async () => {
-    console.log('[ExecutionControls] Cancel button clicked, executionId:', executionId);
-
     // Prevent duplicate cancel requests
     if (cancelInProgressRef.current) {
-      console.log('[ExecutionControls] Cancel already in progress, ignoring duplicate click');
       return;
     }
 
@@ -87,14 +60,11 @@ export function ExecutionControls({
     setLoading('cancel');
 
     try {
-      console.log('[ExecutionControls] Sending cancel request...');
-      const response = await api.executions.cancel(executionId);
-      console.log('[ExecutionControls] Cancel request succeeded:', response);
+      await api.executions.cancel(executionId);
     } catch (error) {
-      console.error('[ExecutionControls] Failed to cancel execution:', error);
+      console.error('Failed to cancel execution:', error);
       alert(`Failed to cancel execution: ${error instanceof Error ? error.message : String(error)}`);
     } finally {
-      console.log('[ExecutionControls] Cancel request complete, clearing loading state');
       cancelInProgressRef.current = false;
       setLoading(null);
     }
@@ -104,18 +74,6 @@ export function ExecutionControls({
   const isPaused = status === 'paused';
   const isActive = isRunning || isPaused;  // Execution is active if running or paused
   const isDisabled = disabled || !isActive;  // Only disable if not active at all
-
-  // Debug logging
-  console.log('[ExecutionControls] Render:', {
-    executionId,
-    status,
-    isRunning,
-    isPaused,
-    isActive,
-    isDisabled,
-    disabled,
-    loading
-  });
 
   return (
     <Box sx={{ display: 'flex', gap: 1 }}>
@@ -135,44 +93,6 @@ export function ExecutionControls({
       )}
 
       <ButtonGroup variant="outlined" size="small">
-        {/* Pause Button */}
-        <Tooltip title="Pause execution after current step">
-          <span>
-            <Button
-              onClick={handlePause}
-              disabled={disabled || !isRunning || isPaused || loading !== null}
-              startIcon={
-                loading === 'pause' ? (
-                  <CircularProgress size={16} />
-                ) : (
-                  <PauseIcon />
-                )
-              }
-            >
-              Pause
-            </Button>
-          </span>
-        </Tooltip>
-
-        {/* Resume Button */}
-        <Tooltip title="Resume paused execution">
-          <span>
-            <Button
-              onClick={handleResume}
-              disabled={disabled || !isPaused || loading !== null}
-              startIcon={
-                loading === 'resume' ? (
-                  <CircularProgress size={16} />
-                ) : (
-                  <ResumeIcon />
-                )
-              }
-            >
-              Resume
-            </Button>
-          </span>
-        </Tooltip>
-
         {/* Skip Button */}
         <Tooltip title="Skip current step">
           <span>
@@ -196,17 +116,7 @@ export function ExecutionControls({
         <Tooltip title="Cancel execution">
           <span>
             <Button
-              onClick={() => {
-                console.log('[ExecutionControls] Cancel button onClick fired', {
-                  executionId,
-                  status,
-                  isDisabled,
-                  loading,
-                  cancelInProgress: cancelInProgressRef.current,
-                  buttonDisabled: isDisabled || loading !== null
-                });
-                handleCancel();
-              }}
+              onClick={handleCancel}
               disabled={isDisabled || loading !== null || cancelInProgressRef.current}
               color="error"
               startIcon={

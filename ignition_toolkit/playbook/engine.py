@@ -21,6 +21,7 @@ from ignition_toolkit.playbook.models import (
     ExecutionState,
     ExecutionStatus,
     OnFailureAction,
+    ParameterType,
     Playbook,
     StepResult,
     StepStatus,
@@ -188,6 +189,12 @@ class PlaybookEngine:
             print(f"[ENGINE DEBUG] Validating parameters", flush=True)
             self._validate_parameters(playbook, parameters)
             print(f"[ENGINE DEBUG] Parameter validation complete", flush=True)
+
+            # Preprocess credential-type parameters
+            # Convert credential names (strings) to Credential objects
+            print(f"[ENGINE DEBUG] Preprocessing credential parameters", flush=True)
+            parameters = self._preprocess_credential_parameters(playbook, parameters)
+            print(f"[ENGINE DEBUG] Credential parameter preprocessing complete", flush=True)
 
             # Create step_results dictionary for tracking step outputs (shared by reference)
             step_results_dict: dict[str, dict[str, Any]] = {}
@@ -470,6 +477,66 @@ class PlaybookEngine:
             except ValueError as e:
                 raise PlaybookExecutionError(f"Parameter validation failed: {e}")
 
+    def _preprocess_credential_parameters(self, playbook: Playbook, parameters: dict[str, Any]) -> dict[str, Any]:
+        """
+        Preprocess credential-type parameters
+
+        Converts credential parameter values from string names to Credential objects
+        by fetching them from the vault.
+
+        Args:
+            playbook: Playbook definition
+            parameters: Provided parameters
+
+        Returns:
+            Updated parameters dict with Credential objects
+
+        Raises:
+            PlaybookExecutionError: If credential not found
+        """
+        result = parameters.copy()
+
+        for param_def in playbook.parameters:
+            # Check if this parameter is of type credential
+            if param_def.type == ParameterType.CREDENTIAL:
+                param_name = param_def.name
+                credential_name = parameters.get(param_name)
+
+                # If no value provided, try default
+                if credential_name is None:
+                    credential_name = param_def.default
+
+                # If still no value and parameter is required, validation will catch it
+                if credential_name is None:
+                    continue
+
+                # If value is already a Credential object, skip (for nested playbooks)
+                from ignition_toolkit.credentials import Credential
+                if isinstance(credential_name, Credential):
+                    continue
+
+                # Fetch credential from vault
+                if not self.credential_vault:
+                    raise PlaybookExecutionError(
+                        f"Cannot resolve credential parameter '{param_name}': no credential vault configured"
+                    )
+
+                try:
+                    credential = self.credential_vault.get_credential(credential_name)
+                    if credential is None:
+                        raise PlaybookExecutionError(
+                            f"Credential '{credential_name}' not found in vault (parameter: {param_name})"
+                        )
+                    # Replace string with Credential object
+                    result[param_name] = credential
+                    logger.info(f"Resolved credential parameter '{param_name}' to credential '{credential_name}'")
+                except Exception as e:
+                    raise PlaybookExecutionError(
+                        f"Error loading credential '{credential_name}' for parameter '{param_name}': {e}"
+                    )
+
+        return result
+
     async def _notify_update(self, execution_state: ExecutionState) -> None:
         """
         Notify callback of execution update
@@ -597,6 +664,15 @@ class PlaybookEngine:
     async def cancel(self) -> None:
         """Cancel execution"""
         await self.state_manager.cancel()
+
+        # Force-close browser to interrupt any ongoing operations
+        if self._browser_manager:
+            try:
+                logger.info("Closing browser to force cancellation")
+                await self._browser_manager.stop()
+                self._browser_manager = None
+            except Exception as e:
+                logger.warning(f"Error closing browser during cancellation: {e}")
 
     def get_current_execution(self) -> ExecutionState | None:
         """

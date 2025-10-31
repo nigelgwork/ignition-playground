@@ -147,6 +147,78 @@ Planned Designer automation capabilities:
 - Linux: Ensure xdotool installed (`which xdotool`)
 - WSL2: Ensure X server running (`echo $DISPLAY` should show value)
 
+### launch_designer_shortcut.yaml (NEW - WSL/PowerShell Method)
+
+**Status: Production Ready (v3.44.13+)**
+
+Alternative launch method using Windows shortcut command from WSL with PowerShell automation.
+
+**How it works:**
+1. Takes Designer launcher shortcut command as parameter
+2. Launches Designer from WSL using PowerShell
+3. Waits for login window
+4. Auto-fills credentials using PowerShell SendKeys
+5. Waits for project selection window
+6. Searches and opens specified project using mouse automation
+
+**All-in-one step:** Unlike the browser-based method, this uses a single `designer.launch_shortcut` step that handles launch, login, and project opening.
+
+**Parameters:**
+- `designer_shortcut` (required) - Full Designer launcher command
+- `project_name` (required) - Project to open
+- `gateway_credential` (required) - Gateway credential from vault (dropdown selector)
+
+**Prerequisites:**
+1. Add your Designer credentials:
+   ```bash
+   ignition-toolkit credential add localgateway \
+     --username admin \
+     --password your_password
+   ```
+
+2. Get your Designer shortcut command:
+   - Right-click Designer Launcher shortcut → Properties
+   - Copy the full Target value including arguments
+   - Example: `C:\Program Files\Inductive Automation\Designer Launcher\designerlauncher.exe -Dapp.home=C:\Users\Name\.ignition\clientlauncher-data -Dapplication=LocalDocker`
+
+**Usage via CLI:**
+```bash
+ignition-toolkit playbook run playbooks/designer/launch_designer_shortcut.yaml \
+  --param designer_shortcut="C:\Program Files\Inductive Automation\Designer Launcher\designerlauncher.exe -Dapp.home=C:\Users\Name\.ignition\clientlauncher-data -Dapplication=LocalDocker" \
+  --param project_name="Test" \
+  --param gateway_credential="localgateway"
+```
+
+**Advantages over browser method:**
+- Works from WSL without native Windows Python
+- Faster (no browser overhead)
+- More reliable (direct PowerShell automation)
+- Single step instead of multiple steps
+
+### launch_local_docker_designer.yaml (Example - Pre-configured)
+
+**Status: Production Ready (v3.44.13+)**
+
+Pre-configured example specifically for LocalDocker application with sensible defaults.
+
+**Parameters:**
+- `project_name` (required) - Project to open
+- `designer_shortcut` (optional) - Defaults to LocalDocker setup
+- `gateway_credential` (required) - Gateway credential from vault (dropdown selector)
+
+**Usage via CLI:**
+```bash
+# Minimal usage
+ignition-toolkit playbook run playbooks/designer/launch_local_docker_designer.yaml \
+  --param project_name="Test" \
+  --param gateway_credential="localgateway"
+
+# Custom credential
+ignition-toolkit playbook run playbooks/designer/launch_local_docker_designer.yaml \
+  --param project_name="MyProject" \
+  --param gateway_credential="my_gateway"
+```
+
 ## Related Documentation
 
 - See `/docs/playbook_syntax.md` for full playbook syntax

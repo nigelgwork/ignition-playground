@@ -47,20 +47,41 @@ class DesignerLaunchShortcutHandler(StepHandler):
         project_name = params.get("project_name")
         username = params.get("username")
         password = params.get("password")
+        gateway_credential = params.get("gateway_credential")
+
+        # DEBUG logging
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(f"[DESIGNER HANDLER] Received params: {list(params.keys())}")
+        logger.info(f"[DESIGNER HANDLER] gateway_credential type: {type(gateway_credential)}, value: {gateway_credential}")
+        logger.info(f"[DESIGNER HANDLER] username: {username}, password: {'***' if password else None}")
 
         # Validate required parameters
         if not designer_shortcut:
             raise StepExecutionError("designer", "designer_shortcut parameter is required")
         if not project_name:
             raise StepExecutionError("designer", "project_name parameter is required")
-        if not username:
-            raise StepExecutionError("designer", "username parameter is required")
-        if not password:
-            raise StepExecutionError("designer", "password parameter is required")
 
-        # Handle credential object
+        # Handle credential object (preferred method - single credential parameter)
+        if gateway_credential:
+            # Extract username and password from credential object
+            if hasattr(gateway_credential, "username"):
+                username = gateway_credential.username
+            if hasattr(gateway_credential, "password"):
+                password = gateway_credential.password
+
+        # Fallback: handle separate username/password parameters (for backward compatibility)
+        if not username or not password:
+            if not username:
+                raise StepExecutionError("designer", "username parameter or gateway_credential is required")
+            if not password:
+                raise StepExecutionError("designer", "password parameter or gateway_credential is required")
+
+        # Handle credential object passed as password parameter (legacy compatibility)
         if hasattr(password, "password"):
             password = password.password
+        if hasattr(username, "username"):
+            username = username.username
 
         timeout = params.get("timeout", 60)
         success = await self.manager.launch_with_shortcut(

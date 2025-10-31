@@ -869,37 +869,22 @@ async def skip_back_step(execution_id: str, engine: PlaybookEngine = Depends(get
 @router.post("/{execution_id}/cancel")
 async def cancel_execution(execution_id: str):
     """Cancel execution"""
-    import asyncio
+    from ignition_toolkit.api.app import app
 
-    active_engines = get_active_engines()
-    active_tasks = get_active_tasks()
-    engine_completion_times = get_engine_completion_times()
+    # Get execution manager from app services
+    if not hasattr(app.state, "services"):
+        raise HTTPException(
+            status_code=503,
+            detail="Application services not initialized",
+        )
 
-    # Check if execution exists in active engines
-    if execution_id in active_engines:
-        engine = active_engines[execution_id]
+    execution_manager = app.state.services.execution_manager
 
-        # Set the cancel signal in the engine
-        await engine.cancel()
-        logger.info(f"Cancel signal set for execution {execution_id}")
+    # Try to cancel active execution using ExecutionManager
+    cancelled = await execution_manager.cancel_execution(execution_id)
 
-        # Also cancel the asyncio Task to immediately interrupt execution
-        if execution_id in active_tasks:
-            task = active_tasks[execution_id]
-            if not task.done():
-                logger.info(f"✅ Cancelling asyncio Task for execution {execution_id}")
-                task.cancel()
-                # Don't wait for task completion - just cancel and return immediately
-                # The task will handle CancelledError in its exception handler
-            else:
-                logger.warning(f"Task for execution {execution_id} already done, cannot cancel")
-        else:
-            logger.warning(f"❌ Execution {execution_id} NOT in active_tasks! Cannot cancel task. Keys: {list(active_tasks.keys())}")
-
-        # Mark completion time for TTL cleanup
-        engine_completion_times[execution_id] = datetime.now()
-
-        logger.info(f"Execution {execution_id} cancellation requested successfully")
+    if cancelled:
+        logger.info(f"✅ Successfully cancelled execution {execution_id}")
         return {"message": "Execution cancelled", "execution_id": execution_id}
 
     # Execution not in memory - check if it exists in database (old execution from before server restart)

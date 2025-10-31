@@ -97,18 +97,26 @@ class ExecutionManager:
         task = self._active_tasks.get(execution_id)
 
         if not engine or not task:
+            logger.warning(f"Cannot cancel {execution_id} - not found in active executions")
             return False
 
-        # Cancel engine first (graceful shutdown)
-        await engine.cancel()
+        logger.info(f"Cancelling execution {execution_id} (task done: {task.done()})")
 
-        # Then cancel the task
-        task.cancel()
+        # Cancel engine first (graceful shutdown + closes browser)
+        await engine.cancel()
+        logger.info(f"Engine cancellation complete for {execution_id}")
+
+        # Then cancel the asyncio task to interrupt execution
+        if not task.done():
+            task.cancel()
+            logger.info(f"Task cancelled for {execution_id}")
+        else:
+            logger.warning(f"Task already done for {execution_id}, skipping task.cancel()")
 
         # Mark as completed for TTL tracking
         self._mark_completed(execution_id)
 
-        logger.info(f"Cancelled execution {execution_id}")
+        logger.info(f"✅ Cancellation complete for {execution_id}")
         return True
 
     def _mark_completed(self, execution_id: str) -> None:

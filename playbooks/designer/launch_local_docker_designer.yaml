@@ -1,18 +1,19 @@
-name: "Launch Designer via Shortcut"
+name: "Launch Designer - LocalDocker"
 version: "1.0"
-description: "Launches Ignition Designer using Windows shortcut command from WSL/PowerShell (all-in-one step)"
+description: "Launches Ignition Designer for LocalDocker application with credentials from vault"
 domain: designer
 
 parameters:
-  - name: designer_shortcut
-    type: string
-    required: true
-    description: "Full Designer launcher shortcut command (e.g., 'C:\\Program Files\\Inductive Automation\\Designer Launcher\\designerlauncher.exe -Dapp.home=C:\\Users\\Name\\.ignition\\clientlauncher-data -Dapplication=LocalDocker')"
-
   - name: project_name
     type: string
     required: true
-    description: "Name of the Designer project to open"
+    description: "Name of the Designer project to open (e.g., 'Test')"
+
+  - name: designer_shortcut
+    type: string
+    required: false
+    default: "C:\\Program Files\\Inductive Automation\\Designer Launcher\\designerlauncher.exe -Dapp.home=C:\\Users\\Nigel.Gaskin\\.ignition\\clientlauncher-data -Dapplication=LocalDocker"
+    description: "Designer launcher shortcut command (default is for LocalDocker)"
 
   - name: gateway_credential
     type: credential
@@ -20,8 +21,8 @@ parameters:
     description: "Gateway credential to use for Designer login"
 
 steps:
-  # All-in-one step: Launch Designer, login, and open project
-  - id: launch_designer_shortcut
+  # Launch Designer with shortcut method
+  - id: launch_designer
     name: "Launch Designer and open project"
     type: designer.launch_shortcut
     parameters:
@@ -39,5 +40,5 @@ steps:
     name: "Log success"
     type: utility.log
     parameters:
-      message: "Designer launched successfully for project '{{ project_name }}' using shortcut method"
+      message: "Designer opened successfully for project '{{ project_name }}'"
     on_failure: continue

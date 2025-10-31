@@ -120,11 +120,18 @@ class ParameterResolver:
                 resolved = self._get_attribute(resolved, ref_attr, ref_type, ref_name)
 
             # For credentials without attribute access, return as-is (may be Credential object)
-            # For parameters/variables in template context, convert to string
+            # Also check if resolved value is a Credential object (from credential-type parameters)
             if ref_type == "credential" and not ref_attr:
                 return resolved
-            else:
-                return str(resolved)
+
+            # Check if the resolved value is a Credential object (even if ref_type is "parameter")
+            # This happens when credential-type parameters are preprocessed by the engine
+            from ignition_toolkit.credentials import Credential
+            if isinstance(resolved, Credential) and not ref_attr:
+                return resolved
+
+            # For parameters/variables in template context, convert to string
+            return str(resolved)
 
         # Multiple references or mixed content - build string
         result = value
