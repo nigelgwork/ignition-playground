@@ -66,7 +66,7 @@ export function Layout() {
       <AppBar position="fixed" sx={{ zIndex: (theme) => theme.zIndex.drawer + 1 }}>
         <Toolbar sx={{ minHeight: '51px !important', height: '51px' }}>
           <Typography variant="h6" noWrap component="div">
-            ⚡ Ignition Playground
+            ⚡ Ignition Playground <Box component="span" sx={{ color: 'primary.light', fontWeight: 300 }}>(Portable)</Box>
           </Typography>
 
           {/* Global Credential Selector */}

@@ -14,7 +14,8 @@ import type {
   HealthResponse,
 } from '../types/api';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+// Use window.location.origin to automatically connect to the correct port (v4 portability)
+const API_BASE_URL = import.meta.env.VITE_API_URL || window.location.origin;
 
 class APIError extends Error {
   status: number;

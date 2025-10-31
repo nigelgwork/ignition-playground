@@ -6,7 +6,9 @@
 import { useEffect, useRef, useCallback, useState } from 'react';
 import type { WebSocketMessage, ExecutionUpdate, ScreenshotFrame } from '../types/api';
 
-const WS_URL = import.meta.env.VITE_WS_URL || 'ws://localhost:5000/ws/executions';
+// Use dynamic WebSocket URL based on window.location (v4 portability)
+const WS_URL = import.meta.env.VITE_WS_URL ||
+  `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws/executions`;
 const WS_API_KEY = import.meta.env.VITE_WS_API_KEY || 'dev-key-change-in-production';
 const INITIAL_RECONNECT_DELAY = 1000; // 1 second
 const MAX_RECONNECT_DELAY = 30000; // 30 seconds
