@@ -171,13 +171,14 @@ steps:
       timeout: 10000
 
   # ==========================================================================
-  # STEP 10-13: Handle Module Certificate Acceptance
+  # STEP 10-13: Handle Module Certificate Acceptance (Optional)
   # ==========================================================================
   - id: step10_wait_for_cert_dialog
     name: "Step 10: Wait for Certificate Dialog"
     type: utility.sleep
     parameters:
       seconds: 2
+    on_failure: continue
 
   - id: step11_click_cert_checkbox
     name: "Step 11: Click 'I accept the module certificate'"
@@ -185,12 +186,14 @@ steps:
     parameters:
       selector: 'text=I accept the module certificate'
       timeout: 10000
+    on_failure: continue
 
   - id: step12_wait_for_accept_button
     name: "Step 12: Wait for Accept Certificate Button to Enable"
     type: utility.sleep
     parameters:
       seconds: 1
+    on_failure: continue
 
   - id: step13_click_accept_certificate
     name: "Step 13: Click Accept Certificate Button"
@@ -199,6 +202,7 @@ steps:
       selector: 'button:has-text("Accept Certificate")'
       timeout: 10000
       force: true
+    on_failure: continue
 
   # ==========================================================================
   # STEP 14-15: Wait for Installation to Complete
