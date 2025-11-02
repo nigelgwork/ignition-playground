@@ -152,7 +152,7 @@ steps:
     parameters:
       selector: 'input[type="file"][accept=".modl"]'
       file_path: "{{ variable.module_path }}"
-      timeout: 10
+      timeout: 30000
 
   - id: step8_wait_after_upload
     name: "Step 8: Wait After File Selected"
