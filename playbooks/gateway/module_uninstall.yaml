@@ -177,7 +177,7 @@ steps:
     name: "Step 16: Click Restart Gateway Button"
     type: browser.click
     parameters:
-      selector: 'div[role="dialog"] button:has-text("Restart Gateway")'
+      selector: 'text=Restart Gateway'
       timeout: 10000
 
   # ==========================================================================
