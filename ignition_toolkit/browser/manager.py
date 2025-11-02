@@ -175,17 +175,18 @@ class BrowserManager:
         logger.info(f"Navigating to: {url}")
         await page.goto(url, wait_until=wait_until)
 
-    async def click(self, selector: str, timeout: int = 30000) -> None:
+    async def click(self, selector: str, timeout: int = 30000, force: bool = False) -> None:
         """
         Click element
 
         Args:
             selector: CSS selector
             timeout: Timeout in milliseconds
+            force: Force click even if element is behind another element
         """
         page = await self.get_page()
-        logger.info(f"Clicking: {selector}")
-        await page.click(selector, timeout=timeout)
+        logger.info(f"Clicking: {selector} (force={force})")
+        await page.click(selector, timeout=timeout, force=force)
 
     async def click_at_coordinates(self, x: int, y: int) -> None:
         """

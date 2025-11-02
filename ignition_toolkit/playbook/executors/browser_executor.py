@@ -37,8 +37,9 @@ class BrowserClickHandler(StepHandler):
     async def execute(self, params: dict[str, Any]) -> dict[str, Any]:
         selector = params.get("selector")
         timeout = params.get("timeout", 30000)
-        await self.manager.click(selector, timeout=timeout)
-        return {"selector": selector, "status": "clicked"}
+        force = params.get("force", False)
+        await self.manager.click(selector, timeout=timeout, force=force)
+        return {"selector": selector, "status": "clicked", "force": force}
 
 
 class BrowserFillHandler(StepHandler):
