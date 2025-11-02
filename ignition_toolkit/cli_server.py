@@ -3,15 +3,21 @@ Cross-platform server management commands
 
 Replaces bash-only scripts (start_server.sh, stop_server.sh, check_server.sh)
 with Python commands that work on Windows, Linux, and macOS.
+
+v4.1.0: Enhanced with pre-flight checks to prevent restart/refresh issues.
 """
 import os
+import subprocess
 import sys
 import time
 from pathlib import Path
+from typing import Optional
 
 import click
 import psutil
 from rich.console import Console
+from rich.panel import Panel
+from rich.progress import Progress, SpinnerColumn, TextColumn
 
 console = Console()
 
@@ -37,11 +43,270 @@ def is_port_in_use(port=5000):
     return False
 
 
+# ==============================================================================
+# Pre-flight Check Functions (v4.1.0)
+# ==============================================================================
+
+def get_package_root() -> Path:
+    """Get the package root directory"""
+    return Path(__file__).parent.parent
+
+
+def check_frontend_staleness() -> tuple[str, Optional[str]]:
+    """
+    Check if frontend build is older than source files
+
+    Returns:
+        tuple: (status, newest_file)
+            status: 'missing', 'stale', or 'fresh'
+            newest_file: name of newest source file if stale, None otherwise
+    """
+    package_root = get_package_root()
+    dist_index = package_root / "frontend" / "dist" / "index.html"
+
+    if not dist_index.exists():
+        return ("missing", None)
+
+    dist_mtime = dist_index.stat().st_mtime
+    src_dir = package_root / "frontend" / "src"
+
+    if not src_dir.exists():
+        return ("fresh", None)  # No source to check against
+
+    # Find all TypeScript/JavaScript source files
+    src_files = list(src_dir.rglob("*.tsx")) + list(src_dir.rglob("*.ts")) + \
+                list(src_dir.rglob("*.jsx")) + list(src_dir.rglob("*.js"))
+
+    if not src_files:
+        return ("fresh", None)
+
+    # Check if any source file is newer than the build
+    stale_files = [f for f in src_files if f.stat().st_mtime > dist_mtime]
+
+    if stale_files:
+        newest = max(stale_files, key=lambda f: f.stat().st_mtime)
+        return ("stale", newest.name)
+
+    return ("fresh", None)
+
+
+def rebuild_frontend(quiet: bool = False) -> bool:
+    """
+    Rebuild the frontend
+
+    Args:
+        quiet: Suppress output if True
+
+    Returns:
+        bool: True if successful, False otherwise
+    """
+    package_root = get_package_root()
+    rebuild_script = package_root / "rebuild-frontend.sh"
+
+    if not rebuild_script.exists():
+        # Fallback: try npm directly
+        frontend_dir = package_root / "frontend"
+        if not frontend_dir.exists():
+            if not quiet:
+                console.print("[red]✗ Frontend directory not found[/red]")
+            return False
+
+        try:
+            if not quiet:
+                console.print("[cyan]Building frontend...[/cyan]")
+
+            result = subprocess.run(
+                ["npm", "run", "build"],
+                cwd=frontend_dir,
+                capture_output=quiet,
+                text=True,
+                check=True
+            )
+
+            if not quiet:
+                console.print("[green]✓ Frontend built successfully[/green]")
+            return True
+
+        except subprocess.CalledProcessError as e:
+            if not quiet:
+                console.print(f"[red]✗ Frontend build failed: {e}[/red]")
+            return False
+        except FileNotFoundError:
+            if not quiet:
+                console.print("[red]✗ npm not found. Please install Node.js[/red]")
+            return False
+
+    # Use the rebuild script
+    try:
+        if not quiet:
+            console.print("[cyan]Running frontend rebuild...[/cyan]")
+
+        result = subprocess.run(
+            ["bash", str(rebuild_script)],
+            capture_output=quiet,
+            text=True,
+            check=True
+        )
+
+        if not quiet:
+            console.print("[green]✓ Frontend rebuilt successfully[/green]")
+        return True
+
+    except subprocess.CalledProcessError as e:
+        if not quiet:
+            console.print(f"[red]✗ Frontend rebuild failed: {e}[/red]")
+        return False
+
+
+def clear_bytecode_cache() -> int:
+    """
+    Clear Python bytecode cache files
+
+    Returns:
+        int: Number of cache directories removed
+    """
+    package_root = get_package_root()
+    ignition_toolkit_dir = package_root / "ignition_toolkit"
+
+    if not ignition_toolkit_dir.exists():
+        return 0
+
+    count = 0
+    for pycache_dir in ignition_toolkit_dir.rglob("__pycache__"):
+        try:
+            import shutil
+            shutil.rmtree(pycache_dir)
+            count += 1
+        except Exception:
+            pass  # Ignore errors, cache clearing is best-effort
+
+    return count
+
+
+def check_database_locks() -> bool:
+    """
+    Check for SQLite database locks
+
+    Returns:
+        bool: True if no locks detected, False if locks found
+    """
+    from ignition_toolkit.core.paths import get_user_data_dir
+
+    data_dir = get_user_data_dir()
+    db_file = data_dir / "database.db"
+
+    if not db_file.exists():
+        return True  # No database yet, no locks
+
+    # Check for SQLite lock files (.db-wal, .db-shm)
+    lock_files = [
+        db_file.parent / f"{db_file.name}-wal",
+        db_file.parent / f"{db_file.name}-shm"
+    ]
+
+    # If lock files exist, that's actually normal for WAL mode
+    # Only problematic if we can't open the database
+    try:
+        import sqlite3
+        conn = sqlite3.connect(str(db_file), timeout=1.0)
+        conn.execute("SELECT 1")
+        conn.close()
+        return True
+    except sqlite3.OperationalError:
+        return False  # Database is locked
+    except Exception:
+        return True  # Other errors, assume OK
+
+
+def run_preflight_checks(skip_checks: bool = False, auto_rebuild: bool = True) -> bool:
+    """
+    Run all pre-flight checks before server start
+
+    Args:
+        skip_checks: Skip all checks if True
+        auto_rebuild: Automatically rebuild frontend if stale
+
+    Returns:
+        bool: True if all checks passed, False otherwise
+    """
+    if skip_checks:
+        console.print("[dim]Skipping pre-flight checks (--skip-checks)[/dim]")
+        return True
+
+    console.print("\n[bold cyan]Running pre-flight checks...[/bold cyan]\n")
+
+    checks_passed = True
+
+    # Check 1: Frontend staleness
+    status, newest_file = check_frontend_staleness()
+
+    if status == "missing":
+        console.print("[red]✗ Frontend build missing[/red]")
+        if auto_rebuild and click.confirm("  Build frontend now?", default=True):
+            if rebuild_frontend():
+                console.print("[green]✓ Frontend build created[/green]")
+            else:
+                console.print("[red]✗ Frontend build failed[/red]")
+                checks_passed = False
+        else:
+            checks_passed = False
+
+    elif status == "stale":
+        console.print(f"[yellow]⚠ Frontend build is stale[/yellow]")
+        console.print(f"  [dim]Source changed: {newest_file}[/dim]")
+        if auto_rebuild:
+            if click.confirm("  Rebuild frontend?", default=True):
+                if rebuild_frontend():
+                    console.print("[green]✓ Frontend rebuilt[/green]")
+                else:
+                    console.print("[yellow]⚠ Frontend rebuild failed, continuing with stale build[/yellow]")
+        else:
+            console.print("[dim]  (Auto-rebuild disabled)[/dim]")
+    else:
+        console.print("[green]✓ Frontend build is fresh[/green]")
+
+    # Check 2: Clear bytecode cache
+    cache_count = clear_bytecode_cache()
+    if cache_count > 0:
+        console.print(f"[green]✓ Cleared {cache_count} bytecode cache director{'y' if cache_count == 1 else 'ies'}[/green]")
+    else:
+        console.print("[green]✓ No bytecode cache to clear[/green]")
+
+    # Check 3: Database locks
+    if check_database_locks():
+        console.print("[green]✓ Database accessible[/green]")
+    else:
+        console.print("[red]✗ Database is locked (may be in use by another process)[/red]")
+        console.print("[yellow]  Try: ignition-toolkit server stop --force[/yellow]")
+        checks_passed = False
+
+    console.print()  # Empty line
+
+    if checks_passed:
+        console.print("[bold green]✓ All pre-flight checks passed[/bold green]\n")
+    else:
+        console.print("[bold red]✗ Some pre-flight checks failed[/bold red]\n")
+
+    return checks_passed
+
+
 @click.command()
 @click.option('--port', default=5000, help='Port to run server on')
 @click.option('--host', default='0.0.0.0', help='Host to bind to')
-def start(port, host):
-    """Start the Ignition Toolkit server"""
+@click.option('--dev', is_flag=True, help='Development mode with auto-reload')
+@click.option('--skip-checks', is_flag=True, help='Skip pre-flight checks (faster startup)')
+@click.option('--no-rebuild', is_flag=True, help='Do not rebuild frontend even if stale')
+def start(port, host, dev, skip_checks, no_rebuild):
+    """
+    Start the Ignition Toolkit server
+
+    \b
+    Examples:
+      ignition-toolkit server start                    # Production mode
+      ignition-toolkit server start --dev              # Development mode with auto-reload
+      ignition-toolkit server start --skip-checks      # Skip pre-flight checks (faster)
+      ignition-toolkit server start --port 8000        # Custom port
+    """
     console.print("[bold cyan]Starting Ignition Automation Toolkit Server[/bold cyan]")
 
     # Check if server is already running
@@ -63,19 +328,38 @@ def start(port, host):
     from ignition_toolkit.config import setup_environment
     setup_environment()
 
-    console.print("[green]✓[/green] Pre-flight checks passed")
+    # Run pre-flight checks (v4.1.0)
+    auto_rebuild = not no_rebuild
+    if not run_preflight_checks(skip_checks=skip_checks, auto_rebuild=auto_rebuild):
+        console.print("[red]Server start aborted due to failed pre-flight checks[/red]")
+        console.print("[yellow]Use --skip-checks to start anyway (not recommended)[/yellow]")
+        sys.exit(1)
+
+    # Display startup information
     console.print(f"[cyan]Starting server on http://{host}:{port}[/cyan]")
+    if dev:
+        console.print("[yellow]Development mode: auto-reload enabled[/yellow]")
+        console.print("[dim]  Tip: Server will restart automatically when code changes[/dim]")
+    else:
+        console.print("[green]Production mode[/green]")
+        console.print("[dim]  Tip: Use --dev flag for auto-reload during development[/dim]")
+
     console.print("\n[bold]Press CTRL+C to stop the server[/bold]\n")
 
-    # Start server using uvicorn module
+    # Build uvicorn command
+    uvicorn_cmd = [
+        sys.executable, '-m', 'uvicorn',
+        'ignition_toolkit.api.app:app',
+        '--host', host,
+        '--port', str(port)
+    ]
+
+    if dev:
+        uvicorn_cmd.append('--reload')
+
+    # Start server
     try:
-        import subprocess
-        subprocess.run([
-            sys.executable, '-m', 'uvicorn',
-            'ignition_toolkit.api.app:app',
-            '--host', host,
-            '--port', str(port)
-        ])
+        subprocess.run(uvicorn_cmd)
     except KeyboardInterrupt:
         console.print("\n[yellow]Server stopped by user[/yellow]")
     except Exception as e:

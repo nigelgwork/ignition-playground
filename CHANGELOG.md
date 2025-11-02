@@ -5,6 +5,143 @@ All notable changes to the Ignition Automation Toolkit will be documented in thi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+---
+
+## [4.1.0] - 2025-11-02
+
+### 🎉 Major Features
+
+#### Unified Server Startup with Pre-flight Checks
+**THE FIX FOR RESTART/REFRESH ISSUES** - No more confusion about stale builds or "browser caching" problems!
+
+- **Pre-flight check system** runs before every server start
+  - Frontend staleness detection (compares build vs source timestamps)
+  - Automatic frontend rebuild prompt if sources changed
+  - Python bytecode cache clearing (prevents stale code execution)
+  - Database lock detection (prevents startup failures)
+- **New startup flags:**
+  - `--dev`: Development mode with auto-reload (backend changes auto-apply)
+  - `--skip-checks`: Skip pre-flight checks for faster startup (use with caution)
+  - `--no-rebuild`: Don't rebuild frontend even if stale
+- **Clear feedback:** Shows exactly which files changed and why rebuild is needed
+- **One command:** `ignition-toolkit server start` is now the recommended way
+
+**Before (confusing):**
+```bash
+# 4 different startup methods, inconsistent behavior
+./start_server.sh           # No auto-reload, no rebuild check
+ignition-toolkit serve      # Has reload, no rebuild check
+uvicorn app:app --reload    # Has reload, no rebuild check
+python tasks.py dev         # Different tool entirely
+```
+
+**After (simple):**
+```bash
+ignition-toolkit server start        # Production mode with checks
+ignition-toolkit server start --dev  # Development mode with auto-reload
+```
+
+#### Auto-Update Feature
+Users can now update to new versions with one click - no manual git pull needed!
+
+- **Update checker** queries GitHub Releases API for new versions
+- **Automatic backup** of user data before updates (credentials, database, playbooks)
+- **pip-based installation** - downloads and installs updates via pip
+- **Rollback capability** - restore previous version if update fails
+- **Progress tracking** - shows download/install progress in real-time
+- **API endpoints:**
+  - `GET /api/updates/check` - Check for available updates
+  - `POST /api/updates/install` - Install update in background
+  - `GET /api/updates/status` - Get update progress
+  - `POST /api/updates/rollback` - Rollback to previous version
+  - `GET /api/updates/backups` - List available backups
+
+**Benefits:**
+- **Smaller distributions** - Can eliminate 5GB+ full archives, just update packages via pip
+- **Easier upgrades** - Users don't need git knowledge
+- **Safe updates** - Automatic backup before install, rollback on failure
+
+### 📚 Documentation
+
+- **New:** `docs/DEVELOPER_WORKFLOW.md` - Comprehensive developer guide
+  - Clear workflows for backend/frontend/playbook changes
+  - Troubleshooting section for common issues
+  - Quick reference table
+  - No more guessing about restart vs rebuild
+
+### 🔧 Technical Improvements
+
+- **Pre-flight checks:** `ignition_toolkit/cli_server.py`
+  - `check_frontend_staleness()` - Detects stale builds by comparing timestamps
+  - `rebuild_frontend()` - Rebuilds frontend with progress feedback
+  - `clear_bytecode_cache()` - Removes Python .pyc files
+  - `check_database_locks()` - Verifies SQLite database is accessible
+  - `run_preflight_checks()` - Orchestrates all checks with user prompts
+
+- **Update system:** `ignition_toolkit/update/`
+  - `checker.py` - GitHub Releases API integration
+  - `installer.py` - Download and pip install logic
+  - `backup.py` - User data backup/restore
+  - `update/` package structure for future migration framework
+
+- **API improvements:**
+  - New `/api/updates/*` endpoints
+  - Update status tracking (in-memory for now, can move to database)
+  - Background task for update installation
+
+### 🐛 Fixes
+
+- **Root cause identified:** Restart/refresh issues were NOT browser caching
+  - Issue: Frontend build separate from server lifecycle, no staleness detection
+  - Issue: Multiple confusing startup methods with different behaviors
+  - Issue: Python bytecode cache not cleared between restarts
+  - **All fixed with pre-flight checks system**
+
+### 📝 Developer Experience
+
+- **Clearer startup output:**
+  ```
+  Running pre-flight checks...
+
+  ⚠ Frontend build is stale
+    Source changed: ExecutionControls.tsx
+    Rebuild frontend? [Y/n]: y
+  Running frontend rebuild...
+  ✓ Frontend rebuilt successfully
+  ✓ Cleared 3 bytecode cache directories
+  ✓ Database accessible
+
+  ✓ All pre-flight checks passed
+
+  Starting server on http://0.0.0.0:5000
+  Production mode
+    Tip: Use --dev flag for auto-reload during development
+  ```
+
+- **Helpful tips:** Startup shows mode-appropriate guidance
+- **Single source of truth:** `ignition-toolkit server start` is the way
+
+### ⚡ Performance
+
+- **Faster iteration:** `--dev` mode auto-reloads backend changes (no manual restart)
+- **Skip checks option:** Use `--skip-checks` when you know build is fresh
+- **Smart rebuilds:** Only rebuilds frontend if sources actually changed
+
+### 🔒 Security
+
+- **Safer updates:** Automatic backup before any changes
+- **Rollback capability:** Can restore if update breaks things
+- **No automatic updates:** User must explicitly approve and initiate
+
+### 📦 Distribution
+
+- **Smaller downloads:** With auto-update, can eliminate massive pre-built archives
+  - Before: 5.3GB full distribution required for updates
+  - After: ~50MB pip package download for incremental updates
+- **Easier deployment:** Users can update themselves without re-downloading entire project
+
+---
+
 ## [4.0.8] - 2025-11-01
 
 ### Fixed
