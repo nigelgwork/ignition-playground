@@ -119,7 +119,7 @@ steps:
     name: "Step 10: Click Uninstall Button in Dialog"
     type: browser.click
     parameters:
-      selector: 'div[role="dialog"] >> button:has-text("Uninstall")'
+      selector: 'button:has-text("Uninstall")'
       timeout: 10000
 
   # ==========================================================================
