@@ -31,7 +31,6 @@ import {
 import {
   Settings as ConfigureIcon,
   PlayArrow as PlayIcon,
-  CheckCircle as CheckIcon,
   Warning as WarningIcon,
   Download as DownloadIcon,
   MoreVert as MoreVertIcon,

@@ -109,7 +109,7 @@ steps:
 
   - id: step9_check_confirm_box
     name: "Step 9: Check Confirmation Box"
-    type: browser.check
+    type: browser.click
     parameters:
       selector: 'input[type="checkbox"]'
       timeout: 10000

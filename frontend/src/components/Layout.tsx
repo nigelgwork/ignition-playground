@@ -36,6 +36,7 @@ const navItems = [
   { path: '/executions', label: 'Executions' },
   { path: '/credentials', label: 'Gateway Credentials' },
   { path: '/ai', label: 'AI Credentials' },
+  { path: '/about', label: 'About' },
 ];
 
 export function Layout() {
