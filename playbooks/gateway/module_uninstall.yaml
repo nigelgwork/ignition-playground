@@ -139,13 +139,23 @@ steps:
     name: "Step 12: Wait for Confirmation Dialog"
     type: utility.sleep
     parameters:
-      seconds: 2
+      seconds: 3
 
   # ==========================================================================
-  # STEP 13: Check "I understand the risks" Checkbox
+  # STEP 13: Wait for Checkbox to be Ready
   # ==========================================================================
-  - id: step13_check_risks_box
-    name: "Step 13: Check I understand the risks"
+  - id: step13_wait_for_checkbox
+    name: "Step 13: Wait for Checkbox to be Ready"
+    type: browser.wait
+    parameters:
+      selector: 'input[type="checkbox"]'
+      timeout: 10000
+
+  # ==========================================================================
+  # STEP 14: Check "I understand the risks" Checkbox
+  # ==========================================================================
+  - id: step14_check_risks_box
+    name: "Step 14: Check I understand the risks"
     type: browser.click
     parameters:
       selector: 'input[type="checkbox"]'
@@ -153,29 +163,38 @@ steps:
       force: true
 
   # ==========================================================================
-  # STEP 14: Click Confirm Button
+  # STEP 15: Wait for Confirm Button to Enable
   # ==========================================================================
-  - id: step14_click_confirm
-    name: "Step 14: Click Confirm Button"
+  - id: step15_wait_for_confirm_enable
+    name: "Step 15: Wait for Confirm Button to Enable"
+    type: utility.sleep
+    parameters:
+      seconds: 1
+
+  # ==========================================================================
+  # STEP 16: Click Confirm Button
+  # ==========================================================================
+  - id: step16_click_confirm
+    name: "Step 16: Click Confirm Button"
     type: browser.click
     parameters:
       selector: 'button:has-text("Confirm")'
       timeout: 10000
 
   # ==========================================================================
-  # STEP 15: Wait for Gateway Restart
+  # STEP 17: Wait for Gateway Restart
   # ==========================================================================
-  - id: step15_wait_for_restart
-    name: "Step 15: Wait for Gateway Restart (60 seconds)"
+  - id: step17_wait_for_restart
+    name: "Step 17: Wait for Gateway Restart (60 seconds)"
     type: utility.sleep
     parameters:
       seconds: 60
 
   # ==========================================================================
-  # STEP 16: Check if Gateway is Online
+  # STEP 18: Check if Gateway is Online
   # ==========================================================================
-  - id: step16_check_gateway_online
-    name: "Step 16: Check if Gateway is Online"
+  - id: step18_check_gateway_online
+    name: "Step 18: Check if Gateway is Online"
     type: browser.navigate
     parameters:
       url: "{{ parameter.gateway_url }}"
@@ -184,20 +203,20 @@ steps:
     on_failure: continue
 
   # ==========================================================================
-  # STEP 17: Wait After Restart
+  # STEP 19: Wait After Restart
   # ==========================================================================
-  - id: step17_wait_after_restart
-    name: "Step 17: Wait After Restart"
+  - id: step19_wait_after_restart
+    name: "Step 19: Wait After Restart"
     type: utility.sleep
     parameters:
       seconds: 5
     on_failure: continue
 
   # ==========================================================================
-  # STEP 18: Execution Summary
+  # STEP 20: Execution Summary
   # ==========================================================================
-  - id: step18_summary
-    name: "Step 18: Execution Summary"
+  - id: step20_summary
+    name: "Step 20: Execution Summary"
     type: utility.python
     parameters:
       script: |
