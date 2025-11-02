@@ -61,26 +61,22 @@ class UtilitySetVariableHandler(StepHandler):
 
 class UtilityPythonHandler(StepHandler):
     """
-    Handle utility.python step with sandboxing
+    Handle utility.python step for Designer automation
 
-    SECURITY: Executes Python code in a restricted sandbox with:
-    - Limited builtins (no eval, compile, __import__, etc.)
-    - No dangerous modules (os, subprocess, sys, etc.)
-    - 5 second timeout
-    - No file write access
+    SECURITY WARNING: This handler provides FULL Python access including:
+    - Complete builtins (__import__, eval, exec, etc.)
+    - File system access (os, pathlib)
+    - Process execution (subprocess)
+    - XML/JSON parsing
+    - Any Python operations
 
-    Allowed operations:
-    - Basic Python (math, strings, lists, dicts)
-    - JSON parsing
-    - Regex operations
-    - Date/time operations
-    - Print output for variable assignment
+    This is intentional for Designer playbook automation which requires
+    file operations, process management, and system access.
 
-    NOT allowed:
-    - File system operations
-    - Network operations
-    - Process execution
-    - Dangerous builtins
+    DO NOT execute untrusted playbooks! Only run playbooks from trusted sources.
+
+    For safer execution without file/process access, use a different step type
+    or implement sandboxing in a separate handler.
     """
 
     # Whitelist of safe builtins
@@ -90,6 +86,10 @@ class UtilityPythonHandler(StepHandler):
         'range', 'reversed', 'round', 'sorted', 'str', 'sum', 'tuple',
         'zip', 'isinstance', 'type', 'ValueError', 'TypeError', 'KeyError',
     }
+
+    def __init__(self, parameter_resolver=None):
+        """Initialize handler with optional parameter resolver for variable access"""
+        self.parameter_resolver = parameter_resolver
 
     async def execute(self, params: dict[str, Any]) -> dict[str, Any]:
         script = params.get("script")
@@ -109,6 +109,20 @@ class UtilityPythonHandler(StepHandler):
                     if hasattr(__builtins__, name)
                 }
 
+                # Get variable storage from parameter resolver
+                variables_dict = {}
+                if self.parameter_resolver:
+                    variables_dict = self.parameter_resolver.variables
+
+                # Define set_variable and get_variable functions
+                def set_variable(name: str, value: Any) -> None:
+                    """Store a variable for use in later steps"""
+                    variables_dict[name] = value
+
+                def get_variable(name: str, default: Any = None) -> Any:
+                    """Retrieve a previously stored variable"""
+                    return variables_dict.get(name, default)
+
                 # Create execution environment with access to common libraries
                 # NOTE: v3.45.7 compatibility - Designer playbooks need os/subprocess
                 exec_globals = {
@@ -121,6 +135,8 @@ class UtilityPythonHandler(StepHandler):
                     "subprocess": __import__("subprocess"),
                     "asyncio": __import__("asyncio"),
                     "time": __import__("time"),
+                    "set_variable": set_variable,
+                    "get_variable": get_variable,
                 }
 
                 # Redirect stdout to capture print() statements

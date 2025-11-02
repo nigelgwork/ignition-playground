@@ -1,8 +1,54 @@
 # Windows Launcher Issue - Troubleshooting Guide
 
 **Date**: 2025-10-31
-**Version**: 4.0.5
-**Status**: OPEN - Needs investigation
+**Version**: 4.0.5 (Issue reported)
+**Resolution Date**: 2025-11-01
+**Resolution Version**: 4.0.8 (Final fix with comprehensive logging)
+**Status**: 🔍 INVESTIGATING (Enhanced debugging added)
+
+## Resolution Summary
+
+**Issue**: Windows launcher closed immediately, preventing server from starting and showing no error messages.
+
+**Root Causes Identified**:
+1. Interactive Java prompt caused immediate exit (v4.0.5)
+2. Background server startup (`start /B`) hid all error messages (v4.0.6)
+
+**Fixes Applied**:
+
+### v4.0.6 (Partial Fix)
+- Removed interactive Java prompt
+- Replaced with informational message
+- Java check now non-blocking
+
+### v4.0.7 (Partial Fix - Still Failing)
+- **Removed `start /B` background mode** - This was hiding all startup errors
+- **Server now runs in foreground** - All errors immediately visible to user
+- **Added debug output** - Shows Python path, module, working directory
+- **Browser auto-opens after 5 seconds** - Background helper process
+- **Helpful error messages** - Shows common fixes (port conflicts, dependencies, etc.)
+- **Window stays open** - User can read error messages if server fails
+
+**Problem**: Terminal still closes immediately with no visible errors
+
+### v4.0.8 (Enhanced Debugging) 🔍
+- **Comprehensive logging system** - Creates `launcher_debug.log` IMMEDIATELY
+- **16 logging checkpoints** - Every step logged with timestamps
+- **Persistent log file** - Survives even if window closes instantly
+- **All errors captured** - Python, pip, server startup all logged
+- **Step-by-step tracing** - Can see exactly where script fails
+- **Enhanced error messages** - Points users to log file for diagnosis
+
+**Purpose**: Even if the window closes instantly, `launcher_debug.log` will show:
+1. Which step the launcher reached before failing
+2. Any error messages from Python, pip, or the server
+3. Exact directory paths and environment details
+4. Timestamps showing how long each step took
+5. Complete server output including any import errors
+
+**Next Steps**: User should run v4.0.8 and provide the contents of `launcher_debug.log`
+
+---
 
 ## Issue Description
 

@@ -24,7 +24,7 @@ from pydantic import ValidationError
 from ignition_toolkit.api.app import app
 from ignition_toolkit.api.middleware.rate_limit import RateLimitMiddleware, TokenBucket
 from ignition_toolkit.api.routers.filesystem import is_path_allowed
-from ignition_toolkit.api.routers.models import PlaybookMetadataUpdateRequest
+from ignition_toolkit.api.routers.playbooks import PlaybookMetadataUpdateRequest
 from ignition_toolkit.core.validation import PathValidator
 
 

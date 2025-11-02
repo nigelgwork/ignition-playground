@@ -120,3 +120,17 @@ class BrowserVerifyHandler(StepHandler):
             "status": "verified",
             "message": f"Element '{selector}' {verification_result} as expected",
         }
+
+
+class BrowserFileUploadHandler(StepHandler):
+    """Handle browser.file_upload step"""
+
+    def __init__(self, manager: BrowserManager):
+        self.manager = manager
+
+    async def execute(self, params: dict[str, Any]) -> dict[str, Any]:
+        selector = params.get("selector")
+        file_path = params.get("file_path")
+        timeout = params.get("timeout", 30000)
+        await self.manager.set_input_files(selector, file_path, timeout=timeout)
+        return {"selector": selector, "file_path": file_path, "status": "uploaded"}

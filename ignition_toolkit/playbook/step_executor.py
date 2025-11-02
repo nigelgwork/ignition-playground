@@ -26,6 +26,7 @@ from ignition_toolkit.playbook.executors import (
     AIValidateHandler,
     BrowserClickHandler,
     BrowserFillHandler,
+    BrowserFileUploadHandler,
     BrowserNavigateHandler,
     BrowserScreenshotHandler,
     BrowserVerifyHandler,
@@ -135,6 +136,7 @@ class StepExecutor:
             handlers[StepType.BROWSER_NAVIGATE] = BrowserNavigateHandler(self.browser_manager)
             handlers[StepType.BROWSER_CLICK] = BrowserClickHandler(self.browser_manager)
             handlers[StepType.BROWSER_FILL] = BrowserFillHandler(self.browser_manager)
+            handlers[StepType.BROWSER_FILE_UPLOAD] = BrowserFileUploadHandler(self.browser_manager)
             handlers[StepType.BROWSER_SCREENSHOT] = BrowserScreenshotHandler(self.browser_manager)
             handlers[StepType.BROWSER_WAIT] = BrowserWaitHandler(self.browser_manager)
             handlers[StepType.BROWSER_VERIFY] = BrowserVerifyHandler(self.browser_manager)
@@ -156,7 +158,7 @@ class StepExecutor:
         handlers[StepType.SLEEP] = UtilitySleepHandler()
         handlers[StepType.LOG] = UtilityLogHandler()
         handlers[StepType.SET_VARIABLE] = UtilitySetVariableHandler()
-        handlers[StepType.PYTHON] = UtilityPythonHandler()
+        handlers[StepType.PYTHON] = UtilityPythonHandler(self.parameter_resolver)
 
         # AI handlers
         handlers[StepType.AI_GENERATE] = AIGenerateHandler(self.ai_assistant)

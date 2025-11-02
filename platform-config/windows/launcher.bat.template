@@ -5,145 +5,267 @@ REM Python: {PYTHON_VERSION}
 
 setlocal enabledelayedexpansion
 
-echo ========================================
+REM CRITICAL: Create log file IMMEDIATELY to capture everything
+set LOGFILE=launcher_debug.log
+echo ========================================  > %LOGFILE%
+echo Launcher Debug Log                      >> %LOGFILE%
+echo Started: %DATE% %TIME%                  >> %LOGFILE%
+echo ========================================  >> %LOGFILE%
+echo.                                         >> %LOGFILE%
+
+REM Show startup message (and log it)
+echo ======================================== | tee -a %LOGFILE% 2>nul
+if errorlevel 1 (
+    echo ========================================
+    echo ======================================== >> %LOGFILE%
+)
 echo Ignition Automation Toolkit v{TOOLKIT_VERSION}
+echo Ignition Automation Toolkit v{TOOLKIT_VERSION} >> %LOGFILE%
 echo ========================================
+echo ======================================== >> %LOGFILE%
 echo.
+echo. >> %LOGFILE%
+
+echo [STEP 1] Starting launcher... >> %LOGFILE%
+echo [STEP 1] Starting launcher...
 
 REM Get script directory
+echo [STEP 2] Getting script directory... >> %LOGFILE%
 set SCRIPT_DIR=%~dp0
+echo [STEP 2] Script directory: %SCRIPT_DIR% >> %LOGFILE%
 cd /d "%SCRIPT_DIR%"
+echo [STEP 2] Changed to directory: %CD% >> %LOGFILE%
 
 REM Check system dependencies
+echo [STEP 3] Checking system dependencies... >> %LOGFILE%
 echo Checking system dependencies...
+echo Checking system dependencies... >> %LOGFILE%
 echo.
 
 REM Check PowerShell version
+echo [STEP 4] Checking PowerShell... >> %LOGFILE%
 powershell -Command "$version = $PSVersionTable.PSVersion; if ($version.Major -lt 5) { exit 1 }" 2>nul
 if errorlevel 1 (
     echo [ERROR] PowerShell 5.0 or higher required
+    echo [ERROR] PowerShell 5.0 or higher required >> %LOGFILE%
     echo Please update PowerShell: https://aka.ms/powershell
+    echo Please update PowerShell: https://aka.ms/powershell >> %LOGFILE%
+    echo.
+    echo Check launcher_debug.log for details
     pause
     exit /b 1
 ) else (
     echo [OK] PowerShell found
+    echo [OK] PowerShell found >> %LOGFILE%
 )
 
 REM Check .NET Framework
+echo [STEP 5] Checking .NET Framework... >> %LOGFILE%
 reg query "HKLM\SOFTWARE\Microsoft\NET Framework Setup\NDP\v4\Full" /v Version >nul 2>&1
 if errorlevel 1 (
     echo [WARNING] .NET Framework 4.5+ not detected
+    echo [WARNING] .NET Framework 4.5+ not detected >> %LOGFILE%
     echo Some features may not work correctly
+    echo Some features may not work correctly >> %LOGFILE%
 ) else (
     echo [OK] .NET Framework found
+    echo [OK] .NET Framework found >> %LOGFILE%
 )
 
 REM Check Java
+echo [STEP 6] Checking Java... >> %LOGFILE%
 java -version >nul 2>&1
 if errorlevel 1 (
-    echo [WARNING] Java Runtime Environment not found
-    echo Java is required for Ignition Designer automation
-    echo Download from: https://adoptium.net/
+    echo [INFO] Java Runtime Environment not found
+    echo [INFO] Java Runtime Environment not found >> %LOGFILE%
+    echo NOTE: Java is not required for Gateway and Perspective automation
+    echo NOTE: Java is not required for Gateway and Perspective automation >> %LOGFILE%
+    echo       Java is only needed for Designer automation
+    echo       Java is only needed for Designer automation >> %LOGFILE%
+    echo       Download from: https://adoptium.net/ if needed
+    echo       Download from: https://adoptium.net/ if needed >> %LOGFILE%
     echo.
-    set /p CONTINUE="Continue anyway? (y/N): "
-    if /i not "!CONTINUE!"=="y" exit /b 1
 ) else (
     echo [OK] Java Runtime found
+    echo [OK] Java Runtime found >> %LOGFILE%
 )
 
 echo.
+echo [STEP 6] System dependency checks complete >> %LOGFILE%
 
 REM Setup virtual environment
+echo [STEP 7] Setting up Python environment... >> %LOGFILE%
 echo Setting up Python environment...
+echo Setting up Python environment... >> %LOGFILE%
+
+echo [STEP 8] Checking for venv directory... >> %LOGFILE%
 if not exist "venv\" (
+    echo [STEP 8] venv directory NOT found, creating... >> %LOGFILE%
     echo Virtual environment not found - creating (first run only)...
     echo This may take 3-5 minutes...
     echo.
 
     REM Check Python is installed
+    echo [STEP 9] Checking for Python... >> %LOGFILE%
     python --version >nul 2>&1
     if errorlevel 1 (
         echo [ERROR] Python not found
+        echo [ERROR] Python not found >> %LOGFILE%
         echo Please install Python 3.10 or higher from https://www.python.org
+        echo Please install Python 3.10 or higher from https://www.python.org >> %LOGFILE%
         echo Make sure to check "Add Python to PATH" during installation
+        echo Make sure to check "Add Python to PATH" during installation >> %LOGFILE%
+        echo.
+        echo Check launcher_debug.log for details
         pause
         exit /b 1
     )
+    echo [STEP 9] Python found >> %LOGFILE%
 
     REM Create virtual environment
+    echo [STEP 10] Creating virtual environment... >> %LOGFILE%
     echo Creating virtual environment...
-    python -m venv venv
+    python -m venv venv >> %LOGFILE% 2>&1
     if errorlevel 1 (
         echo [ERROR] Failed to create virtual environment
+        echo [ERROR] Failed to create virtual environment >> %LOGFILE%
         echo Make sure Python 3.10+ is installed
+        echo Make sure Python 3.10+ is installed >> %LOGFILE%
+        echo.
+        echo Check launcher_debug.log for details
         pause
         exit /b 1
     )
     echo [OK] Virtual environment created
+    echo [STEP 10] Virtual environment created successfully >> %LOGFILE%
 
     REM Activate and install dependencies
-    call venv\Scripts\activate.bat
+    echo [STEP 11] Activating venv... >> %LOGFILE%
+    call venv\Scripts\activate.bat >> %LOGFILE% 2>&1
+    echo [STEP 12] Installing dependencies... >> %LOGFILE%
     echo Installing dependencies...
-    python -m pip install --upgrade pip --quiet
-    pip install -e . --quiet
+    python -m pip install --upgrade pip --quiet >> %LOGFILE% 2>&1
+    pip install -e . --quiet >> %LOGFILE% 2>&1
     if errorlevel 1 (
         echo [ERROR] Failed to install dependencies
+        echo [ERROR] Failed to install dependencies >> %LOGFILE%
+        echo.
+        echo Check launcher_debug.log for details
         pause
         exit /b 1
     )
     echo [OK] Dependencies installed
+    echo [STEP 12] Dependencies installed successfully >> %LOGFILE%
 ) else (
+    echo [STEP 8] venv directory found >> %LOGFILE%
     echo [OK] Virtual environment found
-    call venv\Scripts\activate.bat
+    echo [OK] Virtual environment found >> %LOGFILE%
+    echo [STEP 9] Activating venv... >> %LOGFILE%
+    call venv\Scripts\activate.bat >> %LOGFILE% 2>&1
     if errorlevel 1 (
         echo [ERROR] Failed to activate virtual environment
+        echo [ERROR] Failed to activate virtual environment >> %LOGFILE%
+        echo.
+        echo Check launcher_debug.log for details
         pause
         exit /b 1
     )
     echo [OK] Virtual environment activated
+    echo [STEP 9] Virtual environment activated successfully >> %LOGFILE%
 )
 echo.
 
 REM Check Playwright browsers
+echo [STEP 10] Checking Playwright browsers... >> %LOGFILE%
 echo Checking Playwright browsers...
+echo Checking Playwright browsers... >> %LOGFILE%
 if not exist ".playwright-browsers\" (
+    echo [STEP 11] Installing Playwright browsers... >> %LOGFILE%
     echo Installing Playwright browsers (first run only)...
     set PLAYWRIGHT_BROWSERS_PATH=.playwright-browsers
-    python -m playwright install chromium
+    python -m playwright install chromium >> %LOGFILE% 2>&1
     if errorlevel 1 (
         echo [ERROR] Failed to install Playwright browsers
+        echo [ERROR] Failed to install Playwright browsers >> %LOGFILE%
+        echo.
+        echo Check launcher_debug.log for details
         pause
         exit /b 1
     )
     echo [OK] Playwright browsers installed
+    echo [STEP 11] Playwright browsers installed successfully >> %LOGFILE%
 ) else (
     echo [OK] Playwright browsers already installed
+    echo [STEP 10] Playwright browsers already installed >> %LOGFILE%
 )
 echo.
 
 REM Set environment
+echo [STEP 12] Setting environment variables... >> %LOGFILE%
 set PLAYWRIGHT_BROWSERS_PATH=.playwright-browsers
+echo [STEP 12] PLAYWRIGHT_BROWSERS_PATH=%PLAYWRIGHT_BROWSERS_PATH% >> %LOGFILE%
+
+REM Create logs directory
+echo [STEP 13] Creating logs directory... >> %LOGFILE%
+if not exist "data\logs\" mkdir data\logs
+echo [STEP 13] Logs directory ready >> %LOGFILE%
 
 REM Start the toolkit
+echo [STEP 14] Starting Ignition Automation Toolkit... >> %LOGFILE%
 echo Starting Ignition Automation Toolkit...
+echo Starting Ignition Automation Toolkit... >> %LOGFILE%
 echo Server will be available at: http://localhost:5000
+echo Server will be available at: http://localhost:5000 >> %LOGFILE%
 echo.
-echo Press Ctrl+C to stop the server
+echo [DEBUG] Python: venv\Scripts\python.exe
+echo [DEBUG] Python: venv\Scripts\python.exe >> %LOGFILE%
+echo [DEBUG] Module: ignition_toolkit.cli serve
+echo [DEBUG] Module: ignition_toolkit.cli serve >> %LOGFILE%
+echo [DEBUG] Working directory: %CD%
+echo [DEBUG] Working directory: %CD% >> %LOGFILE%
+echo.
+echo ========================================
+echo SERVER OUTPUT (errors will be visible):
+echo ========================================
+echo ======================================== >> %LOGFILE%
+echo SERVER OUTPUT: >> %LOGFILE%
+echo ======================================== >> %LOGFILE%
 echo.
 
-REM Start server in background and open browser
-REM Use python -m to avoid shebang path issues with portable venvs
-start /B venv\Scripts\python.exe -m ignition_toolkit.cli serve
+REM Open browser after 5 seconds (in background)
+echo [STEP 15] Scheduling browser to open in 5 seconds... >> %LOGFILE%
+start "" cmd /c "timeout /t 5 /nobreak >nul && start http://localhost:5000"
 
-REM Wait for server to start
-timeout /t 3 /nobreak >nul
+REM Start server in FOREGROUND (not background)
+REM This way you can see any errors that occur
+REM Press Ctrl+C to stop the server
+echo [STEP 16] Starting server NOW... >> %LOGFILE%
+venv\Scripts\python.exe -m ignition_toolkit.cli serve 2>&1 | tee -a %LOGFILE% 2>nul
+if errorlevel 1 (
+    venv\Scripts\python.exe -m ignition_toolkit.cli serve 2>&1
+)
 
-REM Open browser
-start http://localhost:5000
-
-REM Wait for user to close
+REM If we get here, the server has stopped
 echo.
-echo Server is running. Browser should have opened automatically.
-echo If not, navigate to: http://localhost:5000
+echo. >> %LOGFILE%
+echo ======================================== >> %LOGFILE%
+echo SERVER STOPPED OR FAILED TO START >> %LOGFILE%
+echo Server stopped at: %DATE% %TIME% >> %LOGFILE%
+echo ======================================== >> %LOGFILE%
 echo.
-pause
+echo ========================================
+echo SERVER STOPPED OR FAILED TO START
+echo ========================================
+echo.
+echo IMPORTANT: A debug log has been created: launcher_debug.log
+echo Please check this file for details about what happened.
+echo.
+echo If the server failed immediately, common causes:
+echo   - Port 5000 already in use (check with: netstat -ano ^| findstr :5000)
+echo   - Missing dependencies (try: venv\Scripts\pip.exe install -e .)
+echo   - Database locked (delete data\ignition_toolkit.db and retry)
+echo   - Permissions issue (try running as Administrator)
+echo   - Python import error (check launcher_debug.log for details)
+echo.
+echo Press any key to exit...
+pause >nul

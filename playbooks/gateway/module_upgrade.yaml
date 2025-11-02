@@ -1,6 +1,6 @@
-name: "Module Upgrade via UI (Ignition v8.3)"
+name: "Module Upgrade"
 version: "4.0-ui"
-description: "Complete UI-based module upgrade for Ignition v8.3 - Upload, Install, and Restart"
+description: "Upgrade an existing module - Uninstall old version then install new version"
 domain: gateway
 
 parameters:
@@ -24,18 +24,18 @@ parameters:
     required: true
     description: "Path to folder containing .modl file"
 
-  - name: prefer_unsigned
+  - name: module_type
     type: boolean
     required: false
     default: false
-    description: "Prefer unsigned module version if available (default: false)"
+    description: "Module Type"
 
 steps:
   # ==========================================================================
-  # STEP 1: Detect Module File
+  # STEP 1: Detect Module Name from File
   # ==========================================================================
   - id: step1_detect_module
-    name: "Detect Module File"
+    name: "Step 1: Detect Module Name"
     type: utility.python
     parameters:
       script: |
@@ -44,8 +44,8 @@ steps:
         from pathlib import Path
 
         folder_path = """{{ parameter.module_folder }}"""
-        prefer_unsigned_str = """{{ parameter.prefer_unsigned }}"""
-        prefer_unsigned = prefer_unsigned_str.lower() in ('true', '1', 'yes')
+        module_type_str = """{{ parameter.module_type }}"""
+        prefer_unsigned = module_type_str.lower() in ('true', '1', 'yes')
         folder = Path(folder_path)
 
         if not folder.exists():
@@ -60,319 +60,61 @@ steps:
 
         # Filter based on preference
         if prefer_unsigned:
-            # Look for .unsigned.modl files first
             unsigned_files = [f for f in modl_files if 'unsigned' in f.name.lower()]
-            if unsigned_files:
-                modl_file = unsigned_files[0]
-                print(f"Found unsigned module: {modl_file.name}")
-            else:
-                modl_file = modl_files[0]
-                print(f"No unsigned version found, using: {modl_file.name}")
+            modl_file = unsigned_files[0] if unsigned_files else modl_files[0]
         else:
-            # Prefer signed (non-unsigned) files
             signed_files = [f for f in modl_files if 'unsigned' not in f.name.lower()]
-            if signed_files:
-                modl_file = signed_files[0]
-                print(f"Found signed module: {modl_file.name}")
-            else:
-                modl_file = modl_files[0]
-                print(f"No signed version found, using: {modl_file.name}")
+            modl_file = signed_files[0] if signed_files else modl_files[0]
 
-        # Extract metadata from module.xml
+        # Extract module name from module.xml
         with zipfile.ZipFile(modl_file, 'r') as zf:
             module_xml = zf.read('module.xml').decode('utf-8')
             root = ET.fromstring(module_xml)
             module_elem = root.find('module')
             module_name = module_elem.find('name').text
-            module_version = module_elem.find('version').text
-            module_id = module_elem.find('id').text
 
-        print(f"Module: {module_name}")
-        print(f"Version: {module_version}")
-        print(f"ID: {module_id}")
-
-        # Store for later use
+        print(f"Module to upgrade: {module_name}")
         set_variable('module_name', module_name)
-        set_variable('module_version', module_version)
-        set_variable('module_id', module_id)
-        set_variable('module_path', str(modl_file))
-        set_variable('module_filename', modl_file.name)
 
   # ==========================================================================
-  # STEP 2: Navigate to Gateway and Click Login
+  # STEP 2: Uninstall Existing Module
   # ==========================================================================
-  - id: step2_goto_gateway
-    name: "Navigate to Gateway"
-    type: browser.navigate
+  - id: step2_uninstall
+    name: "Step 2: Uninstall Existing Module"
+    type: playbook.run
     parameters:
-      url: "{{ parameter.gateway_url }}"
-      wait_for: "load"
-      timeout: 30
-
-  - id: step3_click_login_link
-    name: "Click Login Link"
-    type: browser.click
-    parameters:
-      selector: 'a[href*="login"]'
-      timeout: 10
-
-  - id: step4_wait_after_login_click
-    name: "Wait for Login Page"
-    type: utility.sleep
-    parameters:
-      seconds: 2
+      playbook: "gateway/module_uninstall.yaml"
+      gateway_url: "{{ parameter.gateway_url }}"
+      username: "{{ parameter.username }}"
+      password: "{{ parameter.password }}"
+      module_name: "{{ variable.module_name }}"
 
   # ==========================================================================
-  # STEP 5-8: Two-Step Login Process
+  # STEP 3: Install New Module Version
   # ==========================================================================
-  - id: step5_enter_username
-    name: "Enter Username"
-    type: browser.fill
+  - id: step3_install
+    name: "Step 3: Install New Module Version"
+    type: playbook.run
     parameters:
-      selector: 'input[name="username"]'
-      value: "{{ parameter.username }}"
-      timeout: 10
-
-  - id: step6_submit_username
-    name: "Submit Username (Press Enter)"
-    type: browser.keyboard
-    parameters:
-      action: "press"
-      key: "Enter"
-
-  - id: step7_wait_for_password_page
-    name: "Wait for Password Page"
-    type: utility.sleep
-    parameters:
-      seconds: 3
-
-  - id: step8_enter_password
-    name: "Enter Password"
-    type: browser.fill
-    parameters:
-      selector: 'input[type="password"]'
-      value: "{{ parameter.password }}"
-      timeout: 10
-
-  - id: step9_submit_password
-    name: "Submit Password (Press Enter)"
-    type: browser.keyboard
-    parameters:
-      action: "press"
-      key: "Enter"
-
-  - id: step10_wait_after_login
-    name: "Wait After Login"
-    type: utility.sleep
-    parameters:
-      seconds: 3
-
-  - id: step11_screenshot_after_login
-    name: "Screenshot: After Login"
-    type: browser.screenshot
-    parameters:
-      path: "/tmp/v83_ui_after_login.png"
-      full_page: true
+      playbook: "gateway/module_install.yaml"
+      gateway_url: "{{ parameter.gateway_url }}"
+      username: "{{ parameter.username }}"
+      password: "{{ parameter.password }}"
+      module_folder: "{{ parameter.module_folder }}"
+      module_type: "{{ parameter.module_type }}"
 
   # ==========================================================================
-  # STEP 12-14: Navigate to Modules Page
+  # STEP 4: Summary Report
   # ==========================================================================
-  - id: step12_goto_modules
-    name: "Navigate to Modules Page"
-    type: browser.navigate
-    parameters:
-      url: "{{ parameter.gateway_url }}/app/platform/system/modules"
-      wait_for: "load"
-      timeout: 30
-
-  - id: step13_wait_modules_load
-    name: "Wait for Modules Page to Load"
-    type: utility.sleep
-    parameters:
-      seconds: 3
-
-  - id: step14_screenshot_modules_page
-    name: "Screenshot: Modules Page"
-    type: browser.screenshot
-    parameters:
-      path: "/tmp/v83_ui_modules_page.png"
-      full_page: true
-
-  # ==========================================================================
-  # STEP 15-16: Click Install/Upgrade Button
-  # ==========================================================================
-  - id: step15_click_install_button
-    name: "Click 'Install or Upgrade Module' Button"
-    type: browser.click
-    parameters:
-      selector: 'button:has-text("Install")'
-      timeout: 10
-
-  - id: step16_wait_for_dialog
-    name: "Wait for Install Dialog"
-    type: utility.sleep
-    parameters:
-      seconds: 2
-
-  - id: step17_screenshot_install_dialog
-    name: "Screenshot: Install Dialog"
-    type: browser.screenshot
-    parameters:
-      path: "/tmp/v83_ui_install_dialog.png"
-      full_page: true
-
-  # ==========================================================================
-  # STEP 18: Upload Module File
-  # ==========================================================================
-  - id: step18_upload_file
-    name: "Upload Module File"
-    type: browser.file_upload
-    parameters:
-      selector: 'input[type="file"][accept=".modl"]'
-      file_path: "{{ variable.module_path }}"
-      timeout: 10
-
-  - id: step19_wait_after_upload
-    name: "Wait After File Selected"
-    type: utility.sleep
-    parameters:
-      seconds: 2
-
-  - id: step20_screenshot_file_selected
-    name: "Screenshot: File Selected"
-    type: browser.screenshot
-    parameters:
-      path: "/tmp/v83_ui_file_selected.png"
-      full_page: true
-
-  # ==========================================================================
-  # STEP 21-23: Click Install Module Button
-  # ==========================================================================
-  - id: step21_click_install_module
-    name: "Click 'Install Module' Button"
-    type: browser.click
-    parameters:
-      selector: 'button:has-text("Install Module")'
-      timeout: 10
-
-  - id: step22_wait_for_installation
-    name: "Wait for Installation to Complete"
-    type: utility.sleep
-    parameters:
-      seconds: 15
-
-  - id: step23_screenshot_after_install
-    name: "Screenshot: After Installation"
-    type: browser.screenshot
-    parameters:
-      path: "/tmp/v83_ui_after_install.png"
-      full_page: true
-
-  # ==========================================================================
-  # STEP 24: Verify Module Shows PENDING RESTART
-  # ==========================================================================
-  - id: step24_verify_pending_restart
-    name: "Verify Module Pending Restart"
-    type: browser.verify
-    parameters:
-      selector: 'text="PENDING RESTART"'
-      timeout: 10
-      should_exist: true
-    on_failure: continue
-
-  # ==========================================================================
-  # STEP 25-27: Navigate to Status Page for Restart
-  # ==========================================================================
-  - id: step25_goto_status_page
-    name: "Navigate to System Status Page"
-    type: browser.navigate
-    parameters:
-      url: "{{ parameter.gateway_url }}/app/platform/system/status"
-      wait_for: "load"
-      timeout: 30
-    on_failure: continue
-
-  - id: step26_wait_status_page
-    name: "Wait for Status Page"
-    type: utility.sleep
-    parameters:
-      seconds: 3
-
-  - id: step27_screenshot_status_page
-    name: "Screenshot: Status Page"
-    type: browser.screenshot
-    parameters:
-      path: "/tmp/v83_ui_status_page.png"
-      full_page: true
-    on_failure: continue
-
-  # ==========================================================================
-  # STEP 28: Look for Restart Button
-  # ==========================================================================
-  - id: step28_find_restart_button
-    name: "Look for Restart Button"
-    type: browser.click
-    parameters:
-      selector: 'button:has-text("Restart"), button:has-text("Restart Gateway")'
-      timeout: 10
-    on_failure: continue
-
-  - id: step29_wait_for_restart_start
-    name: "Wait for Restart to Begin"
-    type: utility.sleep
-    parameters:
-      seconds: 10
-    on_failure: continue
-
-  # ==========================================================================
-  # STEP 30-32: Wait for Gateway to Come Back Online
-  # ==========================================================================
-  - id: step30_wait_for_gateway_restart
-    name: "Wait for Gateway Restart (60 seconds)"
-    type: utility.sleep
-    parameters:
-      seconds: 60
-    on_failure: continue
-
-  - id: step31_check_gateway_online
-    name: "Check if Gateway is Online"
-    type: browser.navigate
-    parameters:
-      url: "{{ parameter.gateway_url }}"
-      wait_for: "load"
-      timeout: 30
-    on_failure: continue
-
-  - id: step32_wait_after_restart
-    name: "Wait After Restart"
-    type: utility.sleep
-    parameters:
-      seconds: 5
-    on_failure: continue
-
-  # ==========================================================================
-  # STEP 33: Summary Report
-  # ==========================================================================
-  - id: step33_summary
-    name: "Execution Summary"
+  - id: step4_summary
+    name: "Step 4: Upgrade Summary"
     type: utility.python
     parameters:
       script: |
         print("=" * 80)
-        print("MODULE UPLOAD SUMMARY")
+        print("MODULE UPGRADE COMPLETE")
         print("=" * 80)
-        print(f"Module: {get_variable('module_name')}")
-        print(f"Version: {get_variable('module_version')}")
-        print(f"File: {get_variable('module_filename')}")
-        print(f"")
-        print(f"Status: Module uploaded and installed successfully")
-        print(f"Action Required: Gateway restart may be needed")
-        print(f"")
-        print(f"Screenshots saved:")
-        print(f"  - /tmp/v83_ui_after_login.png")
-        print(f"  - /tmp/v83_ui_modules_page.png")
-        print(f"  - /tmp/v83_ui_install_dialog.png")
-        print(f"  - /tmp/v83_ui_file_selected.png")
-        print(f"  - /tmp/v83_ui_after_install.png")
-        print(f"  - /tmp/v83_ui_status_page.png")
+        print("Old version has been uninstalled")
+        print("New version has been installed")
+        print("Gateway has been restarted twice (after uninstall and after install)")
         print("=" * 80)

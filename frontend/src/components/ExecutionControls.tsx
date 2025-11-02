@@ -16,6 +16,8 @@ import {
   SkipNext as SkipIcon,
   Cancel as CancelIcon,
   Psychology as AIIcon,
+  PlayArrow as ResumeIcon,
+  Pause as PauseIcon,
 } from '@mui/icons-material';
 import { api } from '../api/client';
 
@@ -76,6 +78,28 @@ export function ExecutionControls({
     }
   };
 
+  const handlePause = async () => {
+    try {
+      setLoading('pause');
+      await api.executions.pause(executionId);
+    } catch (error) {
+      console.error('Failed to pause execution:', error);
+    } finally {
+      setLoading(null);
+    }
+  };
+
+  const handleResume = async () => {
+    try {
+      setLoading('resume');
+      await api.executions.resume(executionId);
+    } catch (error) {
+      console.error('Failed to resume execution:', error);
+    } finally {
+      setLoading(null);
+    }
+  };
+
   const isRunning = status === 'running';
   const isPaused = status === 'paused';
   const isActive = isRunning || isPaused;  // Execution is active if running or paused
@@ -117,6 +141,46 @@ export function ExecutionControls({
             </Button>
           </span>
         </Tooltip>
+
+        {/* Pause/Resume Button */}
+        {isPaused ? (
+          <Tooltip title="Resume execution">
+            <span>
+              <Button
+                onClick={handleResume}
+                disabled={loading !== null}
+                color="success"
+                startIcon={
+                  loading === 'resume' ? (
+                    <CircularProgress size={16} />
+                  ) : (
+                    <ResumeIcon />
+                  )
+                }
+              >
+                Resume
+              </Button>
+            </span>
+          </Tooltip>
+        ) : (
+          <Tooltip title="Pause execution">
+            <span>
+              <Button
+                onClick={handlePause}
+                disabled={isDisabled || loading !== null}
+                startIcon={
+                  loading === 'pause' ? (
+                    <CircularProgress size={16} />
+                  ) : (
+                    <PauseIcon />
+                  )
+                }
+              >
+                Pause
+              </Button>
+            </span>
+          </Tooltip>
+        )}
 
         {/* Cancel Button */}
         <Tooltip title="Cancel execution">

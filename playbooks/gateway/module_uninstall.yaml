@@ -1,0 +1,198 @@
+name: "Module Uninstall"
+version: "4.0-ui"
+description: "Uninstall an existing module"
+domain: gateway
+
+parameters:
+  - name: gateway_url
+    type: string
+    required: true
+    description: "Gateway URL (e.g., http://localhost:9088)"
+
+  - name: username
+    type: string
+    required: true
+    description: "Gateway admin username"
+
+  - name: password
+    type: string
+    required: true
+    description: "Gateway admin password"
+
+  - name: module_name
+    type: string
+    required: true
+    description: "Module name to uninstall (e.g., Perspective)"
+
+steps:
+  # ==========================================================================
+  # STEP 1: Login to Gateway
+  # ==========================================================================
+  - id: step1_login
+    name: "Step 1: Login to Gateway"
+    type: playbook.run
+    parameters:
+      playbook: "gateway/gateway_login.yaml"
+      gateway_url: "{{ parameter.gateway_url }}"
+      username: "{{ parameter.username }}"
+      password: "{{ parameter.password }}"
+
+  # ==========================================================================
+  # STEP 2-3: Navigate to Modules Page
+  # ==========================================================================
+  - id: step2_goto_modules
+    name: "Step 2: Navigate to Modules Page"
+    type: browser.navigate
+    parameters:
+      url: "{{ parameter.gateway_url }}/app/platform/system/modules"
+      wait_for: "load"
+      timeout: 30
+
+  - id: step3_wait_modules_load
+    name: "Step 3: Wait for Modules Page to Load"
+    type: utility.sleep
+    parameters:
+      seconds: 3
+
+  # ==========================================================================
+  # STEP 4: Search for Module
+  # ==========================================================================
+  - id: step3a_get_first_word
+    name: "Step 3a: Get First Word of Module Name"
+    type: utility.python
+    parameters:
+      script: |
+        module_name = """{{ parameter.module_name }}"""
+        first_word = module_name.split(' ')[0]
+        set_variable('module_name_first_word', first_word)
+
+  - id: step4_search_module
+    name: "Step 4: Search for Module"
+    type: browser.fill
+    parameters:
+      selector: 'input[placeholder*="Filter"]'
+      value: "{{ variable.module_name_first_word }}"
+      timeout: 10000
+
+  - id: step5_wait_for_search
+    name: "Step 5: Wait for Search Results"
+    type: utility.sleep
+    parameters:
+      seconds: 3
+
+  # ==========================================================================
+  # STEP 6: (Removed) Check if Module Exists
+  # ==========================================================================
+
+  # ==========================================================================
+  # STEP 7-9: Uninstall Module
+  # ==========================================================================
+  - id: step7_click_more_options
+    name: "Step 7: Click More Options for Module"
+    type: browser.click
+    parameters:
+      selector: 'button[aria-label*="more"]'
+      timeout: 10000
+
+  - id: step8_click_uninstall_menu_item
+    name: "Step 8: Click Uninstall Menu Item"
+    type: browser.click
+    parameters:
+      selector: 'li:has-text("Uninstall")'
+      timeout: 10000
+
+  - id: step8a_wait_for_dialog
+    name: "Step 8a: Wait for Uninstall Dialog"
+    type: utility.sleep
+    parameters:
+      seconds: 2
+
+  - id: step9_check_confirm_box
+    name: "Step 9: Check Confirmation Box"
+    type: browser.check
+    parameters:
+      selector: 'input[type="checkbox"]'
+      timeout: 10000
+
+  - id: step10_click_final_uninstall
+    name: "Step 10: Click Final Uninstall Button"
+    type: browser.click
+    parameters:
+      selector: 'div[role="dialog"] >> button:has-text("Uninstall")'
+      timeout: 10000
+
+  - id: step10a_wait_after_uninstall
+    name: "Step 10a: Wait After Uninstall"
+    type: utility.sleep
+    parameters:
+      seconds: 3
+
+  # ==========================================================================
+  # STEP 11-12: Navigate to Status Page for Restart
+  # ==========================================================================
+  - id: step11_goto_status_for_restart
+    name: "Step 11: Navigate to Status Page for Restart"
+    type: browser.navigate
+    parameters:
+      url: "{{ parameter.gateway_url }}/app/platform/system/status"
+      wait_for: "load"
+      timeout: 30
+
+  - id: step12_wait_status_page
+    name: "Step 12: Wait for Status Page"
+    type: utility.sleep
+    parameters:
+      seconds: 3
+
+  # ==========================================================================
+  # STEP 13-14: Restart Gateway
+  # ==========================================================================
+  - id: step13_click_restart_after_uninstall
+    name: "Step 13: Click Restart Gateway"
+    type: browser.click
+    parameters:
+      selector: 'button:has-text("Restart"), button:has-text("Restart Gateway")'
+      timeout: 10000
+
+  - id: step14_wait_for_restart
+    name: "Step 14: Wait for Gateway Restart (60 seconds)"
+    type: utility.sleep
+    parameters:
+      seconds: 60
+
+  # ==========================================================================
+  # STEP 15-17: Wait for Gateway to Come Back Online
+  # ==========================================================================
+  - id: step15_check_gateway_online
+    name: "Step 15: Check if Gateway is Online"
+    type: browser.navigate
+    parameters:
+      url: "{{ parameter.gateway_url }}"
+      wait_for: "load"
+      timeout: 30
+    on_failure: continue
+
+  - id: step16_wait_after_restart
+    name: "Step 16: Wait After Restart"
+    type: utility.sleep
+    parameters:
+      seconds: 5
+    on_failure: continue
+
+  # ==========================================================================
+  # STEP 17: Summary Report
+  # ==========================================================================
+  - id: step17_summary
+    name: "Step 17: Execution Summary"
+    type: utility.python
+    parameters:
+      script: |
+        module_name = """{{ parameter.module_name }}"""
+        print("=" * 80)
+        print("MODULE UNINSTALLATION SUMMARY")
+        print("=" * 80)
+        print(f"Module: {module_name}")
+        print(f"")
+        print(f"Status: Module uninstallation complete")
+        print(f"Note: Gateway has been restarted")
+        print("=" * 80)

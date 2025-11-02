@@ -30,7 +30,7 @@ class DesignerManager:
             await manager.launch(
                 gateway_url="http://localhost:8088",
                 username="admin",
-                password="password"
+                password="your-password-here"  # Use from credential vault
             )
             await manager.open_project("MyProject")
     """

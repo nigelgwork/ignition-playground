@@ -2,8 +2,8 @@
 
 Welcome to the **Ignition Automation Toolkit** project! This guide will get you up and running quickly.
 
-**Current Version:** 4.0.2 (Production Ready)
-**Last Updated:** 2025-10-31
+**Current Version:** 4.0.8 (Production Ready)
+**Last Updated:** 2025-11-02
 
 ---
 
@@ -166,7 +166,7 @@ ignition-playground/
 │   └── CLAUDE.md              # Development guide (IMPORTANT!)
 ├── Makefile                   # Common development commands
 ├── pyproject.toml             # Python package configuration
-├── VERSION                    # Current version (3.0.0)
+├── VERSION                    # Current version (4.0.8)
 └── CHANGELOG.md               # Version history
 ```
 
@@ -525,5 +525,5 @@ You now have everything you need to contribute to the Ignition Automation Toolki
 **Questions?** Check the documentation links above or review existing code for patterns.
 
 **Maintainer:** Nigel G
-**Project Status:** Production Ready (v3.0.0)
-**Last Updated:** 2025-10-28
+**Project Status:** Production Ready (v4.0.8)
+**Last Updated:** 2025-11-02

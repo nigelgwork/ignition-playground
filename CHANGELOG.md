@@ -5,6 +5,70 @@ All notable changes to the Ignition Automation Toolkit will be documented in thi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.0.8] - 2025-11-01
+
+### Fixed
+- **Critical Debugging Enhancement**: Added comprehensive logging to diagnose Windows launcher issues
+  - Creates `launcher_debug.log` immediately upon startup
+  - Logs every single step of the launcher process with timestamps
+  - Captures all error output from Python, pip, and server startup
+  - Log file persists even if window closes immediately
+  - Added 16 detailed logging checkpoints throughout the script
+  - All errors now redirected to log file for post-mortem analysis
+
+### Changed
+- Windows launcher template (`platform-config/windows/launcher.bat.template`):
+  - Lines 8-14: Immediate log file creation before any operations
+  - Every step now logs to `launcher_debug.log` with step numbers
+  - All error messages duplicated to log file
+  - Added fallback server startup without tee if tee not available
+  - Enhanced error messages pointing users to the log file
+
+### Added
+- Comprehensive step-by-step logging system:
+  - STEP 1-2: Script initialization and directory setup
+  - STEP 3-6: System dependency checks (PowerShell, .NET, Java)
+  - STEP 7-12: Virtual environment setup and activation
+  - STEP 13-14: Environment configuration and toolkit startup
+  - STEP 15-16: Browser launch and server startup
+  - All output captured with timestamps for debugging
+
+## [4.0.7] - 2025-11-01
+
+### Fixed
+- **Critical Windows Launcher Issue**: Server now runs in foreground with visible error messages
+  - Previous `start /B` background mode hid all errors, causing silent failures
+  - Server now runs in foreground so any startup errors are immediately visible
+  - Added debug output showing Python path, module, and working directory
+  - Browser auto-opens after 5 seconds using background helper process
+  - Added helpful troubleshooting tips if server fails (port conflicts, dependencies, etc.)
+  - Window stays open after server stops so users can read error messages
+
+### Changed
+- Windows launcher template (`platform-config/windows/launcher.bat.template`):
+  - Lines 142-159: Complete rewrite of server startup section
+  - Removed: `start /B` (background mode that hid errors)
+  - Added: Foreground mode with `2>&1` to show all output
+  - Added: Background browser opener with 5-second delay
+  - Added: Debug info (Python path, working directory)
+  - Added: Helpful error messages with common fixes
+  - Added: `pause >nul` to keep window open after errors
+
+## [4.0.6] - 2025-11-01
+
+### Fixed
+- **Windows Launcher Issue**: Removed interactive Java prompt that caused launcher to close immediately
+  - Changed from interactive `set /p CONTINUE="Continue anyway? (y/N): "` to informational message
+  - Java is optional (only needed for Designer automation)
+  - Launcher now continues automatically when Java is not detected
+  - Fixes issue where Windows users couldn't start the server after pressing 'y'
+
+### Changed
+- Windows launcher template (`platform-config/windows/launcher.bat.template`):
+  - Lines 44-48: Replaced interactive Java prompt with informational message
+  - Java check now displays `[INFO]` instead of `[WARNING]`
+  - Added clear note: "Java is not required for Gateway and Perspective automation"
+
 ## [4.0.2] - 2025-10-31
 
 ### Fixed

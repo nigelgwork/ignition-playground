@@ -15,6 +15,7 @@ import logging
 import os
 from collections.abc import Awaitable, Callable
 from pathlib import Path
+from typing import Any
 
 from playwright.async_api import Browser, BrowserContext, Page, async_playwright
 
@@ -211,6 +212,19 @@ class BrowserManager:
         logger.info(f"Filling {selector} with: {value}")
         await page.fill(selector, value, timeout=timeout)
 
+    async def set_input_files(self, selector: str, file_path: str, timeout: int = 30000) -> None:
+        """
+        Upload file to file input element
+
+        Args:
+            selector: CSS selector for file input
+            file_path: Path to file to upload
+            timeout: Timeout in milliseconds
+        """
+        page = await self.get_page()
+        logger.info(f"Uploading file {file_path} to {selector}")
+        await page.set_input_files(selector, file_path, timeout=timeout)
+
     async def wait_for_selector(self, selector: str, timeout: int = 30000) -> None:
         """
         Wait for selector to appear
@@ -273,13 +287,11 @@ class BrowserManager:
         Returns:
             Base64-encoded PNG screenshot
         """
-        import base64
-
         page = await self.get_page()
         screenshot_bytes = await page.screenshot(type="png")
         return base64.b64encode(screenshot_bytes).decode("utf-8")
 
-    async def evaluate(self, script: str) -> any:
+    async def evaluate(self, script: str) -> Any:
         """
         Execute JavaScript
 

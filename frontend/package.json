@@ -1,11 +1,13 @@
 {
   "name": "frontend",
   "private": true,
-  "version": "4.0.5",
+  "version": "4.0.8",
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build": "tsc -b && vite build && npm run verify",
+    "verify": "node verify-build.js",
+    "rebuild": "rm -rf dist && npm run build",
     "lint": "eslint .",
     "preview": "vite preview"
   },

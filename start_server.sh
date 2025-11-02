@@ -24,7 +24,7 @@ fi
 
 # Read port from .env or default to 5000
 if [ -f "${SCRIPT_DIR}/.env" ]; then
-    PORT=$(grep "^API_PORT=" "${SCRIPT_DIR}/.env" | cut -d'=' -f2)
+    PORT=$(grep "^API_PORT=" "${SCRIPT_DIR}/.env" | cut -d'=' -f2 | awk '{print $1}')
     PORT=${PORT:-5000}
 else
     PORT=5000

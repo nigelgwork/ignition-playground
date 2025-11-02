@@ -74,13 +74,7 @@ function getSavedConfigPreview(playbookPath: string): SavedConfig | null {
   return stored ? JSON.parse(stored) : null;
 }
 
-// Determine verification status based on playbook path
-function getVerificationStatus(path: string): 'verified' | 'unverified' | 'example' {
-  if (path.includes('/examples/')) return 'example';
-  // Gateway Login is verified
-  if (path.includes('/gateway/gateway_login')) return 'verified';
-  return 'unverified'; // Default to unverified for safety
-}
+// Verification status is now based on playbook.verified property
 
 export function PlaybookCard({ playbook, onConfigure, onExecute, onExport, onViewSteps }: PlaybookCardProps) {
   const queryClient = useQueryClient();
@@ -103,7 +97,6 @@ export function PlaybookCard({ playbook, onConfigure, onExecute, onExport, onVie
   const [editedDescription, setEditedDescription] = useState(playbook.description);
   const selectedCredential = useStore((state) => state.selectedCredential);
 
-  const verificationStatus = getVerificationStatus(playbook.path);
   const isDisabled = !playbook.enabled;
 
   // Check for saved config updates periodically
@@ -297,19 +290,9 @@ export function PlaybookCard({ playbook, onConfigure, onExecute, onExport, onVie
           )}
 
           {/* Verification Status Icon */}
-          {(verificationStatus === 'verified' || verificationStatus === 'unverified') && !playbook.verified && (
-            <Tooltip
-              title={
-                verificationStatus === 'verified'
-                  ? 'Verified playbook'
-                  : 'Unverified - use with caution'
-              }
-            >
-              {verificationStatus === 'verified' ? (
-                <CheckIcon color="success" fontSize="small" />
-              ) : (
-                <WarningIcon color="warning" fontSize="small" />
-              )}
+          {!playbook.verified && (
+            <Tooltip title="Unverified - use with caution">
+              <WarningIcon color="warning" fontSize="small" />
             </Tooltip>
           )}
         </Box>
