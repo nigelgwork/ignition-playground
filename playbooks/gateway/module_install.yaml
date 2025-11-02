@@ -168,7 +168,7 @@ steps:
     type: browser.click
     parameters:
       selector: 'button:has-text("Install Module")'
-      timeout: 10
+      timeout: 10000
 
   - id: step10_wait_for_installation
     name: "Step 10: Wait for Installation to Complete"
@@ -191,7 +191,7 @@ steps:
     type: browser.verify
     parameters:
       selector: 'text="PENDING RESTART"'
-      timeout: 10
+      timeout: 10000
       should_exist: true
     on_failure: continue
 
@@ -222,7 +222,7 @@ steps:
     type: browser.click
     parameters:
       selector: 'button:has-text("Restart"), button:has-text("Restart Gateway")'
-      timeout: 10
+      timeout: 10000
     on_failure: continue
 
   - id: step16_wait_for_restart_start
