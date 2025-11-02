@@ -113,10 +113,30 @@ steps:
       seconds: 2
 
   # ==========================================================================
-  # STEP 10: Check Confirmation Box
+  # STEP 10: Click Uninstall Button in Dialog
   # ==========================================================================
-  - id: step10_check_confirm_box
-    name: "Step 10: Check Confirmation Box"
+  - id: step10_click_uninstall_button
+    name: "Step 10: Click Uninstall Button in Dialog"
+    type: browser.click
+    parameters:
+      selector: 'div[role="dialog"] >> button:has-text("Uninstall")'
+      timeout: 10000
+
+  # ==========================================================================
+  # STEP 11: Wait for Confirmation Checkbox to Appear
+  # ==========================================================================
+  - id: step11_wait_for_checkbox
+    name: "Step 11: Wait for Confirmation Checkbox to Appear"
+    type: browser.wait
+    parameters:
+      selector: 'div[role="dialog"] input[type="checkbox"]'
+      timeout: 10000
+
+  # ==========================================================================
+  # STEP 12: Check Confirmation Box
+  # ==========================================================================
+  - id: step12_check_confirm_box
+    name: "Step 12: Check Confirmation Box"
     type: browser.click
     parameters:
       selector: 'div[role="dialog"] input[type="checkbox"]'
@@ -124,29 +144,29 @@ steps:
       force: true
 
   # ==========================================================================
-  # STEP 11: Click Final Uninstall Button
+  # STEP 13: Click Final Confirm Button
   # ==========================================================================
-  - id: step11_click_final_uninstall
-    name: "Step 11: Click Final Uninstall Button"
+  - id: step13_click_final_confirm
+    name: "Step 13: Click Final Confirm Button"
     type: browser.click
     parameters:
-      selector: 'div[role="dialog"] >> button:has-text("Uninstall")'
+      selector: 'div[role="dialog"] >> button:has-text("Uninstall"), div[role="dialog"] >> button:has-text("Confirm")'
       timeout: 10000
 
   # ==========================================================================
-  # STEP 12: Wait After Uninstall
+  # STEP 14: Wait After Uninstall
   # ==========================================================================
-  - id: step12_wait_after_uninstall
-    name: "Step 12: Wait After Uninstall"
+  - id: step14_wait_after_uninstall
+    name: "Step 14: Wait After Uninstall"
     type: utility.sleep
     parameters:
       seconds: 3
 
   # ==========================================================================
-  # STEP 13: Navigate to Status Page for Restart
+  # STEP 15: Navigate to Status Page for Restart
   # ==========================================================================
-  - id: step13_goto_status_for_restart
-    name: "Step 13: Navigate to Status Page for Restart"
+  - id: step15_goto_status_for_restart
+    name: "Step 15: Navigate to Status Page for Restart"
     type: browser.navigate
     parameters:
       url: "{{ parameter.gateway_url }}/app/platform/system/status"
@@ -154,38 +174,38 @@ steps:
       timeout: 30
 
   # ==========================================================================
-  # STEP 14: Wait for Status Page
+  # STEP 16: Wait for Status Page
   # ==========================================================================
-  - id: step14_wait_status_page
-    name: "Step 14: Wait for Status Page"
+  - id: step16_wait_status_page
+    name: "Step 16: Wait for Status Page"
     type: utility.sleep
     parameters:
       seconds: 3
 
   # ==========================================================================
-  # STEP 15: Click Restart Gateway
+  # STEP 17: Click Restart Gateway
   # ==========================================================================
-  - id: step15_click_restart_after_uninstall
-    name: "Step 15: Click Restart Gateway"
+  - id: step17_click_restart_after_uninstall
+    name: "Step 17: Click Restart Gateway"
     type: browser.click
     parameters:
       selector: 'button:has-text("Restart"), button:has-text("Restart Gateway")'
       timeout: 10000
 
   # ==========================================================================
-  # STEP 16: Wait for Gateway Restart
+  # STEP 18: Wait for Gateway Restart
   # ==========================================================================
-  - id: step16_wait_for_restart
-    name: "Step 16: Wait for Gateway Restart (60 seconds)"
+  - id: step18_wait_for_restart
+    name: "Step 18: Wait for Gateway Restart (60 seconds)"
     type: utility.sleep
     parameters:
       seconds: 60
 
   # ==========================================================================
-  # STEP 17: Check if Gateway is Online
+  # STEP 19: Check if Gateway is Online
   # ==========================================================================
-  - id: step17_check_gateway_online
-    name: "Step 17: Check if Gateway is Online"
+  - id: step19_check_gateway_online
+    name: "Step 19: Check if Gateway is Online"
     type: browser.navigate
     parameters:
       url: "{{ parameter.gateway_url }}"
@@ -194,20 +214,20 @@ steps:
     on_failure: continue
 
   # ==========================================================================
-  # STEP 18: Wait After Restart
+  # STEP 20: Wait After Restart
   # ==========================================================================
-  - id: step18_wait_after_restart
-    name: "Step 18: Wait After Restart"
+  - id: step20_wait_after_restart
+    name: "Step 20: Wait After Restart"
     type: utility.sleep
     parameters:
       seconds: 5
     on_failure: continue
 
   # ==========================================================================
-  # STEP 19: Execution Summary
+  # STEP 21: Execution Summary
   # ==========================================================================
-  - id: step19_summary
-    name: "Step 19: Execution Summary"
+  - id: step21_summary
+    name: "Step 21: Execution Summary"
     type: utility.python
     parameters:
       script: |
