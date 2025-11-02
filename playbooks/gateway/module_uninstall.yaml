@@ -179,6 +179,7 @@ steps:
     parameters:
       selector: 'text=Restart Gateway'
       timeout: 10000
+      force: true
 
   # ==========================================================================
   # STEP 17: Wait for Gateway Restart
