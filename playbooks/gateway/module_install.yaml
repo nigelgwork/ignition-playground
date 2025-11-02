@@ -32,10 +32,22 @@ parameters:
 
 steps:
   # ==========================================================================
-  # STEP 1: Detect Module File
+  # STEP 1: Login to Gateway
   # ==========================================================================
-  - id: step1_detect_module
-    name: "Step 1: Detect Module File"
+  - id: step1_login
+    name: "Step 1: Login to Gateway"
+    type: playbook.run
+    parameters:
+      playbook: "gateway/gateway_login.yaml"
+      gateway_url: "{{ parameter.gateway_url }}"
+      username: "{{ parameter.username }}"
+      password: "{{ parameter.password }}"
+
+  # ==========================================================================
+  # STEP 2: Detect Module File
+  # ==========================================================================
+  - id: step2_detect_module
+    name: "Step 2: Detect Module File"
     type: utility.python
     parameters:
       script: |
@@ -97,18 +109,6 @@ steps:
         set_variable('module_id', module_id)
         set_variable('module_path', str(modl_file))
         set_variable('module_filename', modl_file.name)
-
-  # ==========================================================================
-  # STEP 2: Login to Gateway
-  # ==========================================================================
-  - id: step2_login
-    name: "Step 2: Login to Gateway"
-    type: playbook.run
-    parameters:
-      playbook: "gateway/gateway_login.yaml"
-      gateway_url: "{{ parameter.gateway_url }}"
-      username: "{{ parameter.username }}"
-      password: "{{ parameter.password }}"
 
   # ==========================================================================
   # STEP 3-4: Navigate to Modules Page
