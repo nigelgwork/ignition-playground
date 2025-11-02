@@ -217,66 +217,35 @@ steps:
       full_page: true
 
   # ==========================================================================
-  # STEP 16: Verify Module Shows PENDING RESTART
+  # STEP 16-17: Click Restart Gateway Button
   # ==========================================================================
-  - id: step16_verify_pending_restart
-    name: "Step 16: Verify Module Pending Restart"
-    type: browser.verify
-    parameters:
-      selector: 'text="PENDING RESTART"'
-      timeout: 10000
-      should_exist: true
-    on_failure: continue
-
-  # ==========================================================================
-  # STEP 17-18: Navigate to Status Page for Final Restart
-  # ==========================================================================
-  - id: step17_goto_status_page
-    name: "Step 17: Navigate to System Status Page"
-    type: browser.navigate
-    parameters:
-      url: "{{ parameter.gateway_url }}/app/platform/system/status"
-      wait_for: "load"
-      timeout: 30
-    on_failure: continue
-
-  - id: step18_wait_status_page
-    name: "Step 18: Wait for Status Page"
-    type: utility.sleep
-    parameters:
-      seconds: 3
-    on_failure: continue
-
-  # ==========================================================================
-  # STEP 19-20: Final Restart
-  # ==========================================================================
-  - id: step19_find_restart_button
-    name: "Step 19: Click Restart Gateway Button"
+  - id: step16_click_restart_gateway
+    name: "Step 16: Click Restart Gateway Button"
     type: browser.click
     parameters:
       selector: 'button:has-text("Restart"), button:has-text("Restart Gateway")'
-      timeout: 10000
+      timeout: 30000
     on_failure: continue
 
-  - id: step20_wait_for_restart_start
-    name: "Step 20: Wait for Restart to Begin"
+  - id: step17_wait_for_restart_start
+    name: "Step 17: Wait for Restart to Begin"
     type: utility.sleep
     parameters:
       seconds: 10
     on_failure: continue
 
   # ==========================================================================
-  # STEP 21-23: Wait for Gateway to Come Back Online
+  # STEP 18-20: Wait for Gateway to Come Back Online
   # ==========================================================================
-  - id: step21_wait_for_gateway_restart
-    name: "Step 21: Wait for Gateway Restart (60 seconds)"
+  - id: step18_wait_for_gateway_restart
+    name: "Step 18: Wait for Gateway Restart (60 seconds)"
     type: utility.sleep
     parameters:
       seconds: 60
     on_failure: continue
 
-  - id: step22_check_gateway_online
-    name: "Step 22: Check if Gateway is Online"
+  - id: step19_check_gateway_online
+    name: "Step 19: Check if Gateway is Online"
     type: browser.navigate
     parameters:
       url: "{{ parameter.gateway_url }}"
@@ -284,18 +253,18 @@ steps:
       timeout: 30
     on_failure: continue
 
-  - id: step23_wait_after_restart
-    name: "Step 23: Wait After Restart"
+  - id: step20_wait_after_restart
+    name: "Step 20: Wait After Restart"
     type: utility.sleep
     parameters:
       seconds: 5
     on_failure: continue
 
   # ==========================================================================
-  # STEP 24: Summary Report
+  # STEP 21: Summary Report
   # ==========================================================================
-  - id: step24_summary
-    name: "Step 24: Execution Summary"
+  - id: step21_summary
+    name: "Step 21: Execution Summary"
     type: utility.python
     parameters:
       script: |
