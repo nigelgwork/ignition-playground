@@ -162,22 +162,22 @@ steps:
       timeout: 10000
 
   # ==========================================================================
-  # STEP 15: Wait for Confirm Button to Enable
+  # STEP 15: Wait for Restart Gateway Button to Enable
   # ==========================================================================
-  - id: step15_wait_for_confirm_enable
-    name: "Step 15: Wait for Confirm Button to Enable"
+  - id: step15_wait_for_restart_button_enable
+    name: "Step 15: Wait for Restart Gateway Button to Enable"
     type: utility.sleep
     parameters:
       seconds: 1
 
   # ==========================================================================
-  # STEP 16: Click Confirm Button
+  # STEP 16: Click Restart Gateway Button in Dialog
   # ==========================================================================
-  - id: step16_click_confirm
-    name: "Step 16: Click Confirm Button"
+  - id: step16_click_restart_in_dialog
+    name: "Step 16: Click Restart Gateway Button"
     type: browser.click
     parameters:
-      selector: 'button:has-text("Confirm")'
+      selector: 'div[role="dialog"] button:has-text("Restart Gateway")'
       timeout: 10000
 
   # ==========================================================================
