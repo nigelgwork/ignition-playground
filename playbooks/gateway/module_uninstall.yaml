@@ -158,7 +158,7 @@ steps:
     name: "Step 14: Check I understand the risks"
     type: browser.click
     parameters:
-      selector: 'input[type="checkbox"]'
+      selector: 'label:has-text("understand"), label:has-text("risks"), input[type="checkbox"]'
       timeout: 10000
       force: true
 
