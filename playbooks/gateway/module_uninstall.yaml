@@ -123,89 +123,59 @@ steps:
       timeout: 10000
 
   # ==========================================================================
-  # STEP 11: Wait for Confirmation Checkbox to Appear
+  # STEP 11: Click Restart Gateway (Bottom Right Corner)
   # ==========================================================================
-  - id: step11_wait_for_checkbox
-    name: "Step 11: Wait for Confirmation Checkbox to Appear"
-    type: browser.wait
+  - id: step11_click_restart_gateway
+    name: "Step 11: Click Restart Gateway"
+    type: browser.click
     parameters:
-      selector: 'div[role="dialog"] input[type="checkbox"]'
+      selector: 'button:has-text("Restart Gateway"), button:has-text("Restart")'
       timeout: 10000
 
   # ==========================================================================
-  # STEP 12: Check Confirmation Box
+  # STEP 12: Wait for Confirmation Dialog
   # ==========================================================================
-  - id: step12_check_confirm_box
-    name: "Step 12: Check Confirmation Box"
+  - id: step12_wait_for_confirmation
+    name: "Step 12: Wait for Confirmation Dialog"
+    type: utility.sleep
+    parameters:
+      seconds: 2
+
+  # ==========================================================================
+  # STEP 13: Check Confirmation Box
+  # ==========================================================================
+  - id: step13_check_confirm_box
+    name: "Step 13: Check Confirmation Box"
     type: browser.click
     parameters:
-      selector: 'div[role="dialog"] input[type="checkbox"]'
+      selector: 'input[type="checkbox"]'
       timeout: 10000
       force: true
 
   # ==========================================================================
-  # STEP 13: Click Final Confirm Button
+  # STEP 14: Click Final Confirm Button
   # ==========================================================================
-  - id: step13_click_final_confirm
-    name: "Step 13: Click Final Confirm Button"
-    type: browser.click
-    parameters:
-      selector: 'div[role="dialog"] >> button:has-text("Uninstall"), div[role="dialog"] >> button:has-text("Confirm")'
-      timeout: 10000
-
-  # ==========================================================================
-  # STEP 14: Wait After Uninstall
-  # ==========================================================================
-  - id: step14_wait_after_uninstall
-    name: "Step 14: Wait After Uninstall"
-    type: utility.sleep
-    parameters:
-      seconds: 3
-
-  # ==========================================================================
-  # STEP 15: Navigate to Status Page for Restart
-  # ==========================================================================
-  - id: step15_goto_status_for_restart
-    name: "Step 15: Navigate to Status Page for Restart"
-    type: browser.navigate
-    parameters:
-      url: "{{ parameter.gateway_url }}/app/platform/system/status"
-      wait_for: "load"
-      timeout: 30
-
-  # ==========================================================================
-  # STEP 16: Wait for Status Page
-  # ==========================================================================
-  - id: step16_wait_status_page
-    name: "Step 16: Wait for Status Page"
-    type: utility.sleep
-    parameters:
-      seconds: 3
-
-  # ==========================================================================
-  # STEP 17: Click Restart Gateway
-  # ==========================================================================
-  - id: step17_click_restart_after_uninstall
-    name: "Step 17: Click Restart Gateway"
+  - id: step14_click_final_confirm
+    name: "Step 14: Click Final Confirm Button"
     type: browser.click
     parameters:
       selector: 'button:has-text("Restart"), button:has-text("Restart Gateway")'
       timeout: 10000
 
   # ==========================================================================
-  # STEP 18: Wait for Gateway Restart
+  # STEP 15: Wait for Gateway Restart
   # ==========================================================================
-  - id: step18_wait_for_restart
-    name: "Step 18: Wait for Gateway Restart (60 seconds)"
+  - id: step15_wait_for_restart
+    name: "Step 15: Wait for Gateway Restart (60 seconds)"
     type: utility.sleep
     parameters:
       seconds: 60
 
   # ==========================================================================
-  # STEP 19: Check if Gateway is Online
+  # STEP 16: Check if Gateway is Online
   # ==========================================================================
-  - id: step19_check_gateway_online
-    name: "Step 19: Check if Gateway is Online"
+  - id: step16_check_gateway_online
+    name: "Step 16: Check if Gateway is Online"
     type: browser.navigate
     parameters:
       url: "{{ parameter.gateway_url }}"
@@ -214,20 +184,20 @@ steps:
     on_failure: continue
 
   # ==========================================================================
-  # STEP 20: Wait After Restart
+  # STEP 17: Wait After Restart
   # ==========================================================================
-  - id: step20_wait_after_restart
-    name: "Step 20: Wait After Restart"
+  - id: step17_wait_after_restart
+    name: "Step 17: Wait After Restart"
     type: utility.sleep
     parameters:
       seconds: 5
     on_failure: continue
 
   # ==========================================================================
-  # STEP 21: Execution Summary
+  # STEP 18: Execution Summary
   # ==========================================================================
-  - id: step21_summary
-    name: "Step 21: Execution Summary"
+  - id: step18_summary
+    name: "Step 18: Execution Summary"
     type: utility.python
     parameters:
       script: |
