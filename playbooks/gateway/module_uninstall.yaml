@@ -142,10 +142,10 @@ steps:
       seconds: 2
 
   # ==========================================================================
-  # STEP 13: Check Confirmation Box
+  # STEP 13: Check "I understand the risks" Checkbox
   # ==========================================================================
-  - id: step13_check_confirm_box
-    name: "Step 13: Check Confirmation Box"
+  - id: step13_check_risks_box
+    name: "Step 13: Check I understand the risks"
     type: browser.click
     parameters:
       selector: 'input[type="checkbox"]'
@@ -153,13 +153,13 @@ steps:
       force: true
 
   # ==========================================================================
-  # STEP 14: Click Final Confirm Button
+  # STEP 14: Click Confirm Button
   # ==========================================================================
-  - id: step14_click_final_confirm
-    name: "Step 14: Click Final Confirm Button"
+  - id: step14_click_confirm
+    name: "Step 14: Click Confirm Button"
     type: browser.click
     parameters:
-      selector: 'button:has-text("Restart"), button:has-text("Restart Gateway")'
+      selector: 'button:has-text("Confirm")'
       timeout: 10000
 
   # ==========================================================================
