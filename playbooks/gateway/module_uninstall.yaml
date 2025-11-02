@@ -213,10 +213,23 @@ steps:
     on_failure: continue
 
   # ==========================================================================
-  # STEP 20: Execution Summary
+  # STEP 20: Verify Gateway is Online by Logging In
   # ==========================================================================
-  - id: step20_summary
-    name: "Step 20: Execution Summary"
+  - id: step20_verify_login
+    name: "Step 20: Verify Gateway Online (Login)"
+    type: playbook.run
+    parameters:
+      playbook: "gateway/gateway_login.yaml"
+      gateway_url: "{{ parameter.gateway_url }}"
+      username: "{{ parameter.username }}"
+      password: "{{ parameter.password }}"
+    on_failure: continue
+
+  # ==========================================================================
+  # STEP 21: Execution Summary
+  # ==========================================================================
+  - id: step21_summary
+    name: "Step 21: Execution Summary"
     type: utility.python
     parameters:
       script: |
