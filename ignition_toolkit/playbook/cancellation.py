@@ -19,13 +19,14 @@ async def cancellable_sleep(seconds: float, check_interval: float = 0.5) -> None
     """
     Sleep that respects cancellation signals
 
-    Instead of sleeping for the full duration, sleeps in small intervals
-    and checks for cancellation between each interval. This ensures
-    cancellation is detected within check_interval seconds.
+    Instead of sleeping for the full duration, sleeps in small intervals.
+    When task.cancel() is called, asyncio.sleep() will automatically raise
+    CancelledError at the next interval, ensuring cancellation is detected
+    within check_interval seconds.
 
     Args:
         seconds: Total time to sleep in seconds
-        check_interval: How often to check for cancellation (default: 0.5s)
+        check_interval: How often to wake up and check (default: 0.5s)
 
     Raises:
         asyncio.CancelledError: If task is cancelled during sleep
@@ -39,12 +40,8 @@ async def cancellable_sleep(seconds: float, check_interval: float = 0.5) -> None
     """
     remaining = seconds
     while remaining > 0:
-        # Check if cancelled before sleeping
-        if asyncio.current_task().cancelled():
-            logger.debug("Sleep cancelled before interval")
-            raise asyncio.CancelledError()
-
         # Sleep for minimum of check_interval or remaining time
+        # asyncio.sleep() will automatically raise CancelledError if task.cancel() is called
         sleep_time = min(check_interval, remaining)
 
         try:
@@ -66,7 +63,7 @@ async def cancellable_poll(
     Poll a condition with cancellation support
 
     Checks a condition repeatedly until it returns True or timeout is reached.
-    Checks for cancellation between each poll.
+    Cancellation happens automatically through cancellable_sleep().
 
     Args:
         condition: Function that returns True when condition is met
@@ -90,16 +87,11 @@ async def cancellable_poll(
     start_time = asyncio.get_event_loop().time()
 
     while (asyncio.get_event_loop().time() - start_time) < timeout:
-        # Check for cancellation
-        if asyncio.current_task().cancelled():
-            logger.debug("Poll cancelled")
-            raise asyncio.CancelledError()
-
         # Check condition
         if condition():
             return
 
-        # Sleep with cancellation check
+        # Sleep - will raise CancelledError if task.cancel() is called
         try:
             await cancellable_sleep(poll_interval)
         except asyncio.CancelledError:
@@ -112,10 +104,11 @@ async def cancellable_poll(
 
 async def with_cancellation_check(coro: Any) -> Any:
     """
-    Wrap a coroutine with cancellation check
+    Wrap a coroutine to ensure cancellation propagates
 
-    Checks for cancellation before and after executing the coroutine.
-    Use this for operations that don't natively support cancellation.
+    Simply awaits the coroutine. If task.cancel() is called, the await
+    will automatically raise CancelledError. Use this for operations that
+    might not respond to cancellation themselves (like Playwright operations).
 
     Args:
         coro: Coroutine to execute
@@ -132,20 +125,9 @@ async def with_cancellation_check(coro: Any) -> Any:
             page.click(selector)
         )
     """
-    # Check before execution
-    if asyncio.current_task().cancelled():
-        logger.debug("Operation cancelled before execution")
-        raise asyncio.CancelledError()
-
     try:
-        # Execute the operation
+        # Execute the operation - will raise CancelledError if task.cancel() is called
         result = await coro
-
-        # Check after execution
-        if asyncio.current_task().cancelled():
-            logger.debug("Operation cancelled after execution")
-            raise asyncio.CancelledError()
-
         return result
 
     except asyncio.CancelledError:
@@ -158,25 +140,34 @@ class CancellationMixin:
     Mixin to add cancellation checking to executors
 
     Add this mixin to executor classes to get consistent cancellation
-    behavior across all step types.
+    behavior across all step types. Note: In most cases, you don't need
+    explicit cancellation checks - asyncio will automatically raise
+    CancelledError at await points when task.cancel() is called.
 
     Example:
         class BrowserExecutor(CancellationMixin):
             async def execute_click(self, params):
-                await self.check_cancelled()  # From mixin
+                # Use cancellable_sleep between operations
+                await cancellable_sleep(0.1)
                 await page.click(selector)
     """
 
     async def check_cancelled(self, message: str = "Operation cancelled") -> None:
         """
-        Check if current task is cancelled
+        Yield control to allow cancellation to propagate
+
+        This method simply yields control back to the event loop by sleeping
+        for 0 seconds, which allows CancelledError to be raised if the task
+        was cancelled.
 
         Args:
-            message: Log message if cancelled
+            message: Log message if cancelled (logged only if cancelled)
 
         Raises:
             asyncio.CancelledError: If task is cancelled
         """
-        if asyncio.current_task().cancelled():
+        try:
+            await asyncio.sleep(0)  # Yield control - will raise CancelledError if cancelled
+        except asyncio.CancelledError:
             logger.info(message)
-            raise asyncio.CancelledError()
+            raise
