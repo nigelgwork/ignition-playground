@@ -401,35 +401,46 @@ class PlaybookEngine:
 
                 await self._notify_update(execution_state)
 
-                # Execute the step
-                step_result = await executor.execute_step(step)
-                logger.debug("Step execution complete: {step.name} - status={step_result.status}")
+                # Wrap step execution in try-except to catch cancellation during step execution
+                try:
+                    # Execute the step
+                    step_result = await executor.execute_step(step)
+                    logger.debug("Step execution complete: {step.name} - status={step_result.status}")
 
-                # Find and replace the running result with the completed result
-                for i, result in enumerate(execution_state.step_results):
-                    if result.step_id == step.id and result.status == StepStatus.RUNNING:
-                        execution_state.step_results[i] = step_result
-                        break
+                    # Find and replace the running result with the completed result
+                    for i, result in enumerate(execution_state.step_results):
+                        if result.step_id == step.id and result.status == StepStatus.RUNNING:
+                            execution_state.step_results[i] = step_result
+                            break
 
-                # Store step output for {{ step.step_id.key }} references
-                if step_result.output:
-                    step_results_dict[step.id] = step_result.output
-                    logger.debug(f"Step {step.id} output stored: {list(step_result.output.keys())}")
+                    # Store step output for {{ step.step_id.key }} references
+                    if step_result.output:
+                        step_results_dict[step.id] = step_result.output
+                        logger.debug(f"Step {step.id} output stored: {list(step_result.output.keys())}")
 
-                # Handle set_variable step
-                if step.type.value == "utility.set_variable" and step_result.output:
-                    var_name = step_result.output.get("variable")
-                    var_value = step_result.output.get("value")
-                    if var_name:
-                        execution_state.variables[var_name] = var_value
-                        logger.info(f"Set variable: {var_name} = {var_value}")
+                    # Handle set_variable step
+                    if step.type.value == "utility.set_variable" and step_result.output:
+                        var_name = step_result.output.get("variable")
+                        var_value = step_result.output.get("value")
+                        if var_name:
+                            execution_state.variables[var_name] = var_value
+                            logger.info(f"Set variable: {var_name} = {var_value}")
 
-                # Notify update
-                await self._notify_update(execution_state)
+                    # Notify update
+                    await self._notify_update(execution_state)
 
-                # Save to database
-                if self.database:
-                    await self._save_step_result(execution_state, step_result)
+                    # Save to database
+                    if self.database:
+                        await self._save_step_result(execution_state, step_result)
+
+                except asyncio.CancelledError:
+                    logger.warning(f"Execution cancelled during step: {step.name}")
+                    execution_state.status = ExecutionStatus.CANCELLED
+                    execution_state.completed_at = datetime.now()
+                    await self._notify_update(execution_state)
+                    if self.database:
+                        await self._save_execution_end(execution_state)
+                    return execution_state
 
                 # Auto-pause after each step in debug mode
                 if self.state_manager.is_debug_mode_enabled():
