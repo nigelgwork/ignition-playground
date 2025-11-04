@@ -194,31 +194,59 @@ steps:
       force: true
 
   # ==========================================================================
-  # STEP 12: Brief Wait for Initial Processing
+  # STEP 12: Poll for Certificate Dialog (Check every 5s for 60s)
   # ==========================================================================
-  - id: step12_wait_for_processing
-    name: "Step 12: Wait for Initial Upload Processing"
-    type: utility.sleep
+  - id: step12_poll_for_cert_dialog
+    name: "Step 12: Poll for Certificate Dialog (every 5s for 60s)"
+    type: utility.python
     parameters:
-      seconds: 5
+      script: |
+        import asyncio
+        from ignition_toolkit.playbook.cancellation import cancellable_sleep
 
-  # ==========================================================================
-  # STEP 13: Check for Certificate Dialog (Poll up to 60s)
-  # ==========================================================================
-  - id: step13_check_cert_dialog
-    name: "Step 13: Check for Certificate Dialog (up to 60s)"
-    type: browser.verify
-    parameters:
-      selector: 'text=I accept the module certificate'
-      state: "visible"
-      timeout: 60000
+        print("Polling for certificate dialog...")
+        print("Will check every 5 seconds for up to 60 seconds")
+
+        max_attempts = 12  # 12 attempts × 5 seconds = 60 seconds
+        found = False
+
+        for attempt in range(1, max_attempts + 1):
+            try:
+                print(f"Check {attempt}/{max_attempts}: Looking for certificate dialog...")
+
+                # Try to find the certificate checkbox
+                page = get_browser().page
+                element = page.locator('text=I accept the module certificate')
+
+                # Check if visible with short timeout (1 second)
+                if element.is_visible(timeout=1000):
+                    print("✓ Certificate dialog found!")
+                    found = True
+                    break
+                else:
+                    print("  Dialog not visible yet")
+
+            except Exception as e:
+                print(f"  Dialog not present yet (attempt {attempt}/{max_attempts})")
+
+            # Don't sleep after the last attempt
+            if attempt < max_attempts:
+                print(f"  Waiting 5 seconds before next check...")
+                await cancellable_sleep(5)
+
+        if found:
+            set_variable('cert_dialog_found', 'true')
+            print("Certificate dialog appeared - will proceed with acceptance")
+        else:
+            set_variable('cert_dialog_found', 'false')
+            print("Certificate dialog did not appear after 60 seconds - continuing without it")
     on_failure: continue
 
   # ==========================================================================
-  # STEP 14: Click Certificate Checkbox
+  # STEP 13: Click Certificate Checkbox
   # ==========================================================================
-  - id: step14_click_cert_checkbox
-    name: "Step 14: Click 'I accept the module certificate'"
+  - id: step13_click_cert_checkbox
+    name: "Step 13: Click 'I accept the module certificate'"
     type: browser.click
     parameters:
       selector: 'text=I accept the module certificate'
@@ -226,10 +254,10 @@ steps:
     on_failure: continue
 
   # ==========================================================================
-  # STEP 15: Verify Accept Certificate Button is Enabled
+  # STEP 14: Verify Accept Certificate Button is Enabled
   # ==========================================================================
-  - id: step15_verify_accept_button_enabled
-    name: "Step 15: Verify Accept Certificate Button is Enabled"
+  - id: step14_verify_accept_button_enabled
+    name: "Step 14: Verify Accept Certificate Button is Enabled"
     type: browser.verify
     parameters:
       selector: 'button:has-text("Accept Certificate"):not([disabled])'
@@ -238,10 +266,10 @@ steps:
     on_failure: continue
 
   # ==========================================================================
-  # STEP 16: Click Accept Certificate Button
+  # STEP 15: Click Accept Certificate Button
   # ==========================================================================
-  - id: step16_click_accept_certificate
-    name: "Step 16: Click Accept Certificate Button"
+  - id: step15_click_accept_certificate
+    name: "Step 15: Click Accept Certificate Button"
     type: browser.click
     parameters:
       selector: 'button:has-text("Accept Certificate")'
@@ -250,10 +278,10 @@ steps:
     on_failure: continue
 
   # ==========================================================================
-  # STEP 17: Verify Certificate Dialog Closed
+  # STEP 16: Verify Certificate Dialog Closed
   # ==========================================================================
-  - id: step17_verify_cert_dialog_closed
-    name: "Step 17: Verify Certificate Dialog Closed"
+  - id: step16_verify_cert_dialog_closed
+    name: "Step 16: Verify Certificate Dialog Closed"
     type: browser.verify
     parameters:
       selector: 'button:has-text("Accept Certificate")'
@@ -262,19 +290,19 @@ steps:
     on_failure: continue
 
   # ==========================================================================
-  # STEP 18: Wait for Installation to Complete
+  # STEP 17: Wait for Installation to Complete
   # ==========================================================================
-  - id: step18_wait_for_installation
-    name: "Step 18: Wait for Installation to Complete"
+  - id: step17_wait_for_installation
+    name: "Step 17: Wait for Installation to Complete"
     type: utility.sleep
     parameters:
       seconds: 15
 
   # ==========================================================================
-  # STEP 19: Restart Gateway (Embedded Playbook)
+  # STEP 18: Restart Gateway (Embedded Playbook)
   # ==========================================================================
-  - id: step19_restart_gateway
-    name: "Step 19: Restart Gateway"
+  - id: step18_restart_gateway
+    name: "Step 18: Restart Gateway"
     type: playbook.run
     parameters:
       playbook: "gateway/gateway_restart.yaml"
@@ -283,10 +311,10 @@ steps:
       password: "{{ parameter.password }}"
 
   # ==========================================================================
-  # STEP 20: Login to Gateway After Restart
+  # STEP 19: Login to Gateway After Restart
   # ==========================================================================
-  - id: step20_login_after_restart
-    name: "Step 20: Login to Gateway After Restart"
+  - id: step19_login_after_restart
+    name: "Step 19: Login to Gateway After Restart"
     type: playbook.run
     parameters:
       playbook: "gateway/gateway_login.yaml"
@@ -295,10 +323,10 @@ steps:
       password: "{{ parameter.password }}"
 
   # ==========================================================================
-  # STEP 21: Navigate to Modules Page to Verify
+  # STEP 20: Navigate to Modules Page to Verify
   # ==========================================================================
-  - id: step21_navigate_modules
-    name: "Step 21: Navigate to Modules Page"
+  - id: step20_navigate_modules
+    name: "Step 20: Navigate to Modules Page"
     type: browser.navigate
     parameters:
       url: "{{ parameter.gateway_url }}/app/platform/system/modules"
@@ -306,19 +334,19 @@ steps:
       timeout: 30
 
   # ==========================================================================
-  # STEP 22: Wait for Modules Page to Load
+  # STEP 21: Wait for Modules Page to Load
   # ==========================================================================
-  - id: step22_wait_modules_load
-    name: "Step 22: Wait for Modules Page to Load"
+  - id: step21_wait_modules_load
+    name: "Step 21: Wait for Modules Page to Load"
     type: utility.sleep
     parameters:
       seconds: 3
 
   # ==========================================================================
-  # STEP 23: Verify Module is Installed
+  # STEP 22: Verify Module is Installed
   # ==========================================================================
-  - id: step23_verify_installed
-    name: "Step 23: Verify Module is Installed"
+  - id: step22_verify_installed
+    name: "Step 22: Verify Module is Installed"
     type: utility.python
     parameters:
       script: |
@@ -329,10 +357,10 @@ steps:
         print(f"✓ Successfully verified module '{module_name}' is installed")
 
   # ==========================================================================
-  # STEP 24: Execution Summary
+  # STEP 23: Execution Summary
   # ==========================================================================
-  - id: step24_summary
-    name: "Step 24: Execution Summary"
+  - id: step23_summary
+    name: "Step 23: Execution Summary"
     type: utility.python
     parameters:
       script: |
