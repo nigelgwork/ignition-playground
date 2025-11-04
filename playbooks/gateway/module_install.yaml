@@ -189,29 +189,29 @@ steps:
     name: "Step 11: Click Install Module Button"
     type: browser.click
     parameters:
-      selector: "text='Install Module'"
+      selector: 'button[data-label="Install Module"][data-component="web-ui.button"]'
       timeout: 30000
       force: true
 
   # ==========================================================================
-  # STEP 12: Wait for Module Processing (Large Files Take Time)
+  # STEP 12: Brief Wait for Initial Processing
   # ==========================================================================
   - id: step12_wait_for_processing
-    name: "Step 12: Wait for Module Upload and Processing"
+    name: "Step 12: Wait for Initial Upload Processing"
     type: utility.sleep
     parameters:
-      seconds: 30
+      seconds: 5
 
   # ==========================================================================
-  # STEP 13: Check for Certificate Dialog (Optional)
+  # STEP 13: Check for Certificate Dialog (Poll up to 60s)
   # ==========================================================================
   - id: step13_check_cert_dialog
-    name: "Step 13: Check for Certificate Dialog"
+    name: "Step 13: Check for Certificate Dialog (up to 60s)"
     type: browser.verify
     parameters:
       selector: 'text=I accept the module certificate'
       state: "visible"
-      timeout: 30000
+      timeout: 60000
     on_failure: continue
 
   # ==========================================================================
