@@ -247,6 +247,10 @@ async def list_playbooks():
             relative_path = str(yaml_file.relative_to(playbooks_dir))
             meta = metadata_store.get_metadata(relative_path)
 
+            # Prefer YAML verified status over database for portability
+            yaml_verified = playbook.metadata.get("verified")
+            verified_status = yaml_verified if yaml_verified is not None else meta.verified
+
             playbooks.append(
                 PlaybookInfo(
                     name=playbook.name,
@@ -260,7 +264,7 @@ async def list_playbooks():
                     domain=playbook.metadata.get("domain"),  # Extract domain from metadata
                     group=playbook.metadata.get("group"),  # Extract group for UI organization
                     revision=meta.revision,
-                    verified=meta.verified,
+                    verified=verified_status,  # Prefer YAML over database
                     enabled=meta.enabled,
                     last_modified=meta.last_modified,
                     verified_at=meta.verified_at,

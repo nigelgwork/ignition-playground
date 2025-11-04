@@ -11,6 +11,7 @@ import sys
 from contextlib import redirect_stdout
 from typing import Any
 
+from ignition_toolkit.playbook.cancellation import cancellable_sleep
 from ignition_toolkit.playbook.exceptions import StepExecutionError
 from ignition_toolkit.playbook.executors.base import StepHandler
 
@@ -18,11 +19,18 @@ logger = logging.getLogger(__name__)
 
 
 class UtilitySleepHandler(StepHandler):
-    """Handle utility.sleep step"""
+    """
+    Handle utility.sleep step with cancellation support
+
+    Uses cancellable_sleep which checks for cancellation every 0.5 seconds,
+    ensuring responsive cancellation even during long sleep periods.
+    """
 
     async def execute(self, params: dict[str, Any]) -> dict[str, Any]:
         seconds = params.get("seconds", 1)
-        await asyncio.sleep(seconds)
+        logger.info(f"Sleeping for {seconds} seconds (cancellable)")
+        await cancellable_sleep(seconds)
+        logger.debug(f"Sleep completed ({seconds}s)")
         return {"slept": seconds}
 
 

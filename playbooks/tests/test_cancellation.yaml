@@ -1,0 +1,39 @@
+name: "Test Cancellation"
+version: "1.0"
+description: "Test playbook for verifying cancellation works correctly"
+domain: gateway
+
+parameters:
+  - name: sleep_duration
+    type: integer
+    required: false
+    default: 30
+    description: "How long to sleep (default: 30 seconds - test cancel should stop within 0.5s)"
+
+steps:
+  - id: step1
+    name: "Step 1: Log Start"
+    type: utility.log
+    parameters:
+      message: "Starting cancellation test - will sleep for {{ parameter.sleep_duration }} seconds"
+      level: "info"
+
+  - id: step2
+    name: "Step 2: Long Sleep (Cancellable)"
+    type: utility.sleep
+    parameters:
+      seconds: "{{ parameter.sleep_duration }}"
+
+  - id: step3
+    name: "Step 3: This Should Not Execute"
+    type: utility.log
+    parameters:
+      message: "If you see this, cancellation failed - the sleep was not cancelled"
+      level: "error"
+
+  - id: step4
+    name: "Step 4: Log Completion"
+    type: utility.log
+    parameters:
+      message: "Test completed (cancellation failed if you see this)"
+      level: "error"

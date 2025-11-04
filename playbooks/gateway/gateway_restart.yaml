@@ -2,6 +2,7 @@ name: "Gateway Restart"
 version: "2.0"
 description: "Restart Ignition Gateway from restart notification bar (assumes already logged in)"
 domain: gateway
+verified: true
 
 parameters:
   - name: gateway_url

@@ -3,6 +3,7 @@ version: "5.0"
 description: "Download a Gateway backup file"
 domain: gateway
 group: "Gateway (Base Playbooks)"
+verified: true
 
 parameters:
   - name: gateway_url

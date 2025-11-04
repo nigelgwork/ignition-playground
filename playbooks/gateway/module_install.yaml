@@ -3,6 +3,7 @@ version: "4.0-ui"
 description: "Install a new module - Upload, Install, and Restart"
 domain: gateway
 group: "Gateway (Base Playbooks)"
+verified: true
 
 parameters:
   - name: gateway_url

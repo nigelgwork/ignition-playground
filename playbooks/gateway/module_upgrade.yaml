@@ -2,6 +2,7 @@ name: "Module Upgrade"
 version: "4.0-ui"
 description: "Upgrade an existing module - Uninstall old version then install new version"
 domain: gateway
+verified: true
 
 parameters:
   - name: gateway_url

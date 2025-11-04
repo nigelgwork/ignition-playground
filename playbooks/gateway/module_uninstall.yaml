@@ -3,6 +3,7 @@ version: "4.0-ui"
 description: "Uninstall an existing module"
 domain: gateway
 group: "Gateway (Base Playbooks)"
+verified: true
 
 parameters:
   - name: gateway_url
