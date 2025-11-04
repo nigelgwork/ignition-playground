@@ -169,7 +169,7 @@ steps:
     name: "Step 9: Verify Install Button is Enabled"
     type: browser.verify
     parameters:
-      selector: 'button:has-text("Install Module"):not([disabled])'
+      selector: 'button[data-label="Install Module"][data-component="web-ui.button"]:not([disabled])'
       state: "visible"
       timeout: 10000
 
