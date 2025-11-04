@@ -175,6 +175,8 @@ parameters:
 - Reuse common sequences (login, module upload, etc.) across playbooks
 - Maintain and update logic in one place
 - Playbook shows as single step in execution view
+- **New in v4.1.0**: Nested step progress visible in real-time
+- **New in v4.1.0**: Live Browser View works during nested execution
 
 ### Utility Steps
 

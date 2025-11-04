@@ -143,6 +143,7 @@ def print_api_key_info():
     Print API key information at startup.
 
     This helps users understand how to authenticate and where the key is stored.
+    SECURITY: API key is redacted in output to prevent exposure in logs.
     """
     if not is_auth_required():
         print("\n" + "=" * 70)
@@ -153,15 +154,24 @@ def print_api_key_info():
         print("For network deployment, set DISABLE_API_AUTH=false")
         print("=" * 70 + "\n")
     else:
+        # SECURITY: Redact API key - show only last 8 characters
+        if len(API_KEY) > 8:
+            redacted_key = "*" * (len(API_KEY) - 8) + API_KEY[-8:]
+        else:
+            redacted_key = "********"
+
         print("\n" + "=" * 70)
         print("🔒 API AUTHENTICATION ENABLED")
         print("=" * 70)
-        print(f"API Key: {API_KEY}")
+        print(f"API Key: {redacted_key} (redacted for security)")
         print(f"Stored in: {API_KEY_FILE}")
         print("")
         print("Include this key in all API requests:")
-        print(f'  X-API-Key: {API_KEY}')
+        print(f'  X-API-Key: <your-key>')
         print("")
         print("Example:")
-        print(f'  curl -H "X-API-Key: {API_KEY}" http://localhost:5000/api/playbooks')
+        print(f'  curl -H "X-API-Key: <your-key>" http://localhost:5000/api/playbooks')
+        print("")
+        print("📖 To view full API key:")
+        print(f"  cat {API_KEY_FILE}")
         print("=" * 70 + "\n")

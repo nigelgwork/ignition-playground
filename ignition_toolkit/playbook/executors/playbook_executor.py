@@ -135,6 +135,7 @@ class PlaybookRunHandler(StepHandler):
                 parameter_resolver=child_resolver,
                 base_path=self.parent_executor.base_path,
                 state_manager=self.parent_executor.state_manager,
+                parent_engine=self.parent_executor.parent_engine,  # Pass parent engine for progress updates
             )
             child_executor._execution_stack = self.parent_executor._execution_stack.copy()
 
@@ -142,8 +143,23 @@ class PlaybookRunHandler(StepHandler):
             nested_results = []
             nested_screenshots = []  # Track screenshots from nested execution
 
-            for step in nested_playbook.steps:
+            for idx, step in enumerate(nested_playbook.steps, 1):
                 logger.info(f"Executing nested step: {step.name}")
+
+                # Update parent about nested step progress
+                if self.parent_executor.parent_engine:
+                    progress_info = {
+                        "nested_playbook": playbook_path,
+                        "nested_step": f"{idx}/{len(nested_playbook.steps)}",
+                        "nested_step_name": step.name,
+                        "nested_step_id": step.id,
+                    }
+                    # Find the playbook.run step in parent's execution state and update its output
+                    try:
+                        await self.parent_executor.parent_engine._update_nested_step_progress(progress_info)
+                    except Exception as e:
+                        logger.warning(f"Failed to update parent with nested step progress: {e}")
+
                 step_result = await child_executor.execute_step(step)
 
                 # Store step output for nested playbook step references

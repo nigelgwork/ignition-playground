@@ -1,4 +1,4 @@
-name: "Reset Gateway Trial"
+name: "Gateway Trial Reset"
 version: "3.0"
 description: "Reset Gateway trial license"
 domain: gateway

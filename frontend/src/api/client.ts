@@ -116,7 +116,7 @@ export const api = {
       fetchJSON<{ name: string; path: string; version: string; description: string; domain: string; yaml_content: string; metadata: any }>(
         `/api/playbooks/${encodeURIComponent(path)}/export`
       ),
-    import: (name: string, domain: string, yamlContent: string, overwrite: boolean = false) =>
+    import: (name: string, domain: string, yamlContent: string, overwrite: boolean = false, metadata?: any) =>
       fetchJSON<{ status: string; message: string; path: string; playbook: any }>(
         '/api/playbooks/import',
         {
@@ -126,6 +126,7 @@ export const api = {
             domain,
             yaml_content: yamlContent,
             overwrite,
+            metadata,
           }),
         }
       ),

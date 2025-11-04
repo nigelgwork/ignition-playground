@@ -17,7 +17,20 @@ def execute_python_safely(code: str, context: dict[str, Any], timeout: int = 5) 
     """
     Execute Python code safely in a sandboxed environment
 
-    SECURITY: This function provides a restricted execution environment:
+    ⚠️  SECURITY WARNING ⚠️
+    This function executes arbitrary Python code with restrictions. While it attempts
+    to sandbox execution, it is NOT a complete security boundary. Use only with
+    trusted playbooks. Potential risks:
+    - Sandbox escape via Python internals
+    - Resource exhaustion (CPU/memory)
+    - ReDoS attacks via regex module
+
+    For production environments, consider:
+    - Running in isolated containers
+    - Implementing stricter process-level sandboxing
+    - Using a domain-specific language instead
+
+    SECURITY FEATURES:
     - Limited builtins (no eval, compile, __import__, etc.)
     - No dangerous modules (os, subprocess, sys)
     - Configurable timeout

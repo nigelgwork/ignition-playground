@@ -47,6 +47,7 @@ class PlaybookInfo(BaseModel):
     steps: list[StepInfo] = []
     # Metadata fields
     domain: str | None = None  # Playbook domain (gateway, designer, perspective)
+    group: str | None = None  # Playbook group for UI organization (e.g., "Gateway (Base Playbooks)")
     revision: int = 0
     verified: bool = False
     enabled: bool = True

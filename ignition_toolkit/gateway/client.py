@@ -291,6 +291,11 @@ class GatewayClient:
         start_time = asyncio.get_event_loop().time()
 
         while (asyncio.get_event_loop().time() - start_time) < timeout:
+            # Check if task was cancelled (allows immediate exit on cancel)
+            if asyncio.current_task().cancelled():
+                logger.info(f"Module installation wait cancelled for '{module_name}'")
+                raise asyncio.CancelledError()
+
             modules = await self.list_modules()
 
             for module in modules:
@@ -301,7 +306,12 @@ class GatewayClient:
                     elif module.state == ModuleState.FAILED:
                         raise ModuleInstallationError(f"Module '{module_name}' failed to install")
 
-            await asyncio.sleep(poll_interval)
+            # Use shorter sleep with cancellation check
+            try:
+                await asyncio.sleep(poll_interval)
+            except asyncio.CancelledError:
+                logger.info(f"Module installation wait cancelled during sleep for '{module_name}'")
+                raise
 
         raise TimeoutError(f"Module '{module_name}' installation timed out after {timeout}s")
 
@@ -418,15 +428,28 @@ class GatewayClient:
         start_time = asyncio.get_event_loop().time()
 
         # Wait a few seconds for Gateway to start shutting down
-        await asyncio.sleep(10)
+        try:
+            await asyncio.sleep(10)
+        except asyncio.CancelledError:
+            logger.info("Gateway restart wait cancelled during initial delay")
+            raise
 
         while (asyncio.get_event_loop().time() - start_time) < timeout:
+            # Check if task was cancelled (allows immediate exit on cancel)
+            if asyncio.current_task().cancelled():
+                logger.info("Gateway ready wait cancelled")
+                raise asyncio.CancelledError()
+
             if await self.ping():
                 logger.info("Gateway is ready")
 
                 # Re-authenticate after restart
                 if self.username and self.password:
-                    await asyncio.sleep(5)  # Give Gateway a few more seconds
+                    try:
+                        await asyncio.sleep(5)  # Give Gateway a few more seconds
+                    except asyncio.CancelledError:
+                        logger.info("Gateway restart wait cancelled during re-auth delay")
+                        raise
                     try:
                         await self.login(self.username, self.password)
                         return True
@@ -434,6 +457,11 @@ class GatewayClient:
                         # May still be initializing
                         pass
 
-            await asyncio.sleep(poll_interval)
+            # Use shorter sleep with cancellation check
+            try:
+                await asyncio.sleep(poll_interval)
+            except asyncio.CancelledError:
+                logger.info("Gateway ready wait cancelled during sleep")
+                raise
 
         raise TimeoutError(f"Gateway did not become ready within {timeout}s")

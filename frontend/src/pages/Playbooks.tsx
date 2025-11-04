@@ -175,6 +175,25 @@ function categorizePlaybooks(playbooks: PlaybookInfo[]) {
   };
 }
 
+// Group playbooks by their group field
+function groupPlaybooks(playbooks: PlaybookInfo[]) {
+  const grouped: Record<string, PlaybookInfo[]> = {};
+  const ungrouped: PlaybookInfo[] = [];
+
+  playbooks.forEach(playbook => {
+    if (playbook.group) {
+      if (!grouped[playbook.group]) {
+        grouped[playbook.group] = [];
+      }
+      grouped[playbook.group].push(playbook);
+    } else {
+      ungrouped.push(playbook);
+    }
+  });
+
+  return { grouped, ungrouped };
+}
+
 export function Playbooks() {
   const [selectedPlaybook, setSelectedPlaybook] = useState<PlaybookInfo | null>(null);
   const [dragEnabled, setDragEnabled] = useState(false);
@@ -430,12 +449,13 @@ export function Playbooks() {
 
             if (!confirmImport) return;
 
-            // Import playbook
+            // Import playbook (pass metadata to preserve verified status)
             const result = await api.playbooks.import(
               data.name,
               data.domain,
               data.yaml_content,
-              false // Don't overwrite by default
+              false, // Don't overwrite by default
+              data.metadata // Pass metadata to preserve verified status
             );
 
             alert(`Success! Playbook imported to:\n${result.path}\n\nRefreshing playbook list...`);
@@ -609,35 +629,82 @@ metadata:
             </AccordionSummary>
             <AccordionDetails>
               {gatewayPlaybooks.length > 0 ? (
-                <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleGatewayDragEnd}>
-                  <SortableContext items={gatewayPlaybooks.map(p => p.path)} strategy={verticalListSortingStrategy}>
-                    <Box
-                      sx={{
-                        display: 'grid',
-                        gridTemplateColumns: {
-                          xs: '1fr',
-                          sm: 'repeat(2, 1fr)',
-                          md: 'repeat(3, 1fr)',
-                          lg: 'repeat(3, 1fr)',
-                          xl: 'repeat(4, 1fr)',
-                        },
-                        gap: 4,
-                      }}
-                    >
-                      {gatewayPlaybooks.map((playbook) => (
-                        <SortablePlaybookCard
-                          key={playbook.path}
-                          playbook={playbook}
-                          onConfigure={handleConfigure}
-                          onExecute={handleExecute}
-                          onExport={handleExport}
-                          onViewSteps={handleViewSteps}
-                          dragEnabled={dragEnabled}
-                        />
+                (() => {
+                  const { grouped, ungrouped } = groupPlaybooks(gatewayPlaybooks);
+                  return (
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                      {/* Ungrouped playbooks */}
+                      {ungrouped.length > 0 && (
+                        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleGatewayDragEnd}>
+                          <SortableContext items={ungrouped.map(p => p.path)} strategy={verticalListSortingStrategy}>
+                            <Box
+                              sx={{
+                                display: 'grid',
+                                gridTemplateColumns: {
+                                  xs: '1fr',
+                                  sm: 'repeat(2, 1fr)',
+                                  md: 'repeat(3, 1fr)',
+                                  lg: 'repeat(3, 1fr)',
+                                  xl: 'repeat(4, 1fr)',
+                                },
+                                gap: 4,
+                              }}
+                            >
+                              {ungrouped.map((playbook) => (
+                                <SortablePlaybookCard
+                                  key={playbook.path}
+                                  playbook={playbook}
+                                  onConfigure={handleConfigure}
+                                  onExecute={handleExecute}
+                                  onExport={handleExport}
+                                  onViewSteps={handleViewSteps}
+                                  dragEnabled={dragEnabled}
+                                />
+                              ))}
+                            </Box>
+                          </SortableContext>
+                        </DndContext>
+                      )}
+
+                      {/* Grouped playbooks */}
+                      {Object.entries(grouped).map(([groupName, groupPlaybooks]) => (
+                        <Accordion key={groupName} defaultExpanded={false} sx={{ bgcolor: 'background.paper', boxShadow: 1 }}>
+                          <AccordionSummary expandIcon={<ExpandMoreIcon />} sx={{ minHeight: '32px !important', '& .MuiAccordionSummary-content': { my: '6px !important' } }}>
+                            <Typography variant="subtitle1" sx={{ fontSize: '0.95rem', fontWeight: 500 }}>
+                              📂 {groupName} ({groupPlaybooks.length})
+                            </Typography>
+                          </AccordionSummary>
+                          <AccordionDetails>
+                            <Box
+                              sx={{
+                                display: 'grid',
+                                gridTemplateColumns: {
+                                  xs: '1fr',
+                                  sm: 'repeat(2, 1fr)',
+                                  md: 'repeat(3, 1fr)',
+                                  lg: 'repeat(3, 1fr)',
+                                  xl: 'repeat(4, 1fr)',
+                                },
+                                gap: 4,
+                              }}
+                            >
+                              {groupPlaybooks.map((playbook) => (
+                                <PlaybookCard
+                                  key={playbook.path}
+                                  playbook={playbook}
+                                  onConfigure={handleConfigure}
+                                  onExecute={handleExecute}
+                                  onExport={handleExport}
+                                  onViewSteps={handleViewSteps}
+                                />
+                              ))}
+                            </Box>
+                          </AccordionDetails>
+                        </Accordion>
                       ))}
                     </Box>
-                  </SortableContext>
-                </DndContext>
+                  );
+                })()
               ) : (
                 <Alert severity="info">
                   No Gateway playbooks found. Add YAML playbooks to ./playbooks/gateway/

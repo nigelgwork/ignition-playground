@@ -7,6 +7,101 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [4.1.1] - 2025-11-04
+
+### ✨ New Features
+
+#### Playbook Grouping System
+Organize playbooks into collapsible groups for better UI organization!
+
+- **Playbook groups** - Add `group` metadata field to YAML playbooks
+- **Collapsible submenus** - Groups display as nested accordions (collapsed by default)
+- **Gateway Base Playbooks** - Gateway Login, Gateway Backup, Module Install, and Module Uninstall now grouped under "Gateway (Base Playbooks)"
+- **Space saving** - Collapsed groups free up space for frequently-used playbooks
+- **Flexible organization** - Any playbook can be assigned to a group
+
+**Example:**
+```yaml
+name: "Gateway Login"
+domain: gateway
+group: "Gateway (Base Playbooks)"  # ← New field for UI grouping
+```
+
+### 🐛 Bug Fixes
+
+#### Cancel Button Now Works During Long Operations
+Fixed cancel button not responding during module installations and gateway restarts.
+
+- **Immediate cancellation** - Cancel now exits immediately instead of waiting up to 5 minutes
+- **Explicit checks** - Added cancellation checks to polling loops in `wait_for_module_installation` and `wait_for_ready`
+- **Better UX** - Users can now stop long-running operations instantly
+
+**Files Modified:**
+- `ignition_toolkit/gateway/client.py:294-314` - Added cancellation checks to wait_for_module_installation
+- `ignition_toolkit/gateway/client.py:438-465` - Added cancellation checks to wait_for_ready
+
+#### Module Type Slider Restored
+Fixed boolean slider for signed/unsigned module selection.
+
+- **Boolean parameter** - Changed `module_type` from string to boolean for proper slider rendering
+- **Module Install** - `prefer_unsigned` parameter with slider UI (Signed ← → Unsigned)
+- **Module Upgrade** - Added missing `prefer_unsigned` parameter (previously absent)
+- **Consistent UI** - Both playbooks now have the same slider configuration
+
+**Files Modified:**
+- `playbooks/gateway/module_install.yaml:27-31` - Changed to boolean type
+- `playbooks/gateway/module_upgrade.yaml:27-31` - Added boolean parameter
+
+#### Default Parameter Values Applied
+Fixed system-wide issue where optional parameters with default values weren't being applied.
+
+- **Automatic defaults** - Optional parameters with defaults are now always present in parameter resolver
+- **No more "parameter not found" errors** - Users no longer need to explicitly set optional parameters
+- **Better DX** - Playbooks work as expected without manual configuration
+
+**Files Modified:**
+- `ignition_toolkit/playbook/engine.py:239-245` - Apply defaults before creating ParameterResolver
+
+#### Playbook Loader Group Field Extraction
+Fixed playbook loader not extracting `group` field from YAML.
+
+- **Root level extraction** - Loader now extracts `group` field from YAML root (similar to `domain`)
+- **Metadata population** - Group field properly added to playbook metadata dictionary
+- **API response** - Group field now correctly appears in `/api/playbooks` response
+
+**Files Modified:**
+- `ignition_toolkit/playbook/loader.py:159-160` - Added group field extraction
+
+### 🔧 Backend Changes
+
+- Added `group` field to `PlaybookInfo` model (backend + frontend types)
+- Updated playbook API serialization to extract group from metadata
+- Fixed playbook loader to extract group from YAML root level
+- Modified frontend grouping logic to handle nested accordions
+
+### 📦 Files Changed
+
+**Playbooks:**
+- `playbooks/gateway/gateway_login.yaml` - Added group field
+- `playbooks/gateway/backup_gateway.yaml` - Added group field
+- `playbooks/gateway/module_install.yaml` - Added group field + Fixed prefer_unsigned parameter
+- `playbooks/gateway/module_uninstall.yaml` - Added group field
+- `playbooks/gateway/module_upgrade.yaml` - Added prefer_unsigned parameter
+
+**Backend:**
+- `ignition_toolkit/__init__.py` - Updated version to 4.1.1
+- `ignition_toolkit/gateway/client.py` - Cancel button fixes
+- `ignition_toolkit/playbook/engine.py` - Default parameter application
+- `ignition_toolkit/playbook/loader.py` - Extract group field from YAML
+- `ignition_toolkit/api/routers/models.py` - Added group field
+- `ignition_toolkit/api/routers/playbooks.py` - Extract group from metadata
+
+**Frontend:**
+- `frontend/src/types/api.ts` - Added group field to TypeScript types
+- `frontend/src/pages/Playbooks.tsx` - Implemented grouping UI with nested accordions
+
+---
+
 ## [4.1.0] - 2025-11-02
 
 ### 🎉 Major Features
@@ -96,6 +191,38 @@ Users can now update to new versions with one click - no manual git pull needed!
   - Issue: Multiple confusing startup methods with different behaviors
   - Issue: Python bytecode cache not cleared between restarts
   - **All fixed with pre-flight checks system**
+- **Nested playbook visibility:** Step 2 now shows "running" status during nested execution
+- **Live Browser View:** Now works correctly during nested playbook execution (gateway domain support)
+- **Private attribute access:** Replaced direct `._attribute` access with public getter methods
+- **CRITICAL: Verified playbook persistence:** Verified status now properly preserved across imports/exports
+  - Export now includes `verified_at` and `verified_by` metadata
+  - Import now restores verified status from export metadata
+  - Fixes issue where playbooks lost verification when imported to new machines
+  - Backend: `/api/playbooks/import` accepts optional `metadata` parameter
+  - Frontend: Import dialog automatically passes metadata from export file
+  - Files: `ignition_toolkit/api/routers/playbooks.py:725,759-767,827-833`, `frontend/src/api/client.ts:119`, `frontend/src/pages/Playbooks.tsx:433-440`
+- **CRITICAL: Cancel button now responsive during long operations:**
+  - Cancel button immediately stops execution during module installation waits
+  - Cancel button immediately stops execution during gateway restart waits
+  - Added explicit cancellation checks in polling loops
+  - Fixed issue where cancel button appeared unresponsive during 5-minute module install waits
+  - Files: `ignition_toolkit/gateway/client.py:294-314,438-465`
+- **CRITICAL: Optional parameters with default values now work correctly:**
+  - Default values from playbook definitions are now applied to missing optional parameters
+  - Fixes "Parameter not found" errors for boolean slider parameters (prefer_unsigned)
+  - Module Install and Module Upgrade now have working signed/unsigned slider
+  - File: `ignition_toolkit/playbook/engine.py:239-245`
+
+### 🔒 Security Enhancements
+
+- **API Key Protection:** API key now redacted in console logs (shows only last 8 characters)
+- **WebSocket Authentication:**
+  - Added constant-time comparison to prevent timing attacks
+  - Warns when using default development key
+- **Security Warnings:** Added prominent warnings to dangerous features:
+  - Shell terminal endpoints (`/ws/shell`, `/ws/claude-code`)
+  - Python code execution (`utility.python` steps)
+- **Code Quality:** Added public getter methods for better encapsulation
 
 ### 📝 Developer Experience
 
@@ -142,7 +269,7 @@ Users can now update to new versions with one click - no manual git pull needed!
 
 ---
 
-## [4.0.8] - 2025-11-01
+## [4.1.0] - 2025-11-01
 
 ### Fixed
 - **Critical Debugging Enhancement**: Added comprehensive logging to diagnose Windows launcher issues

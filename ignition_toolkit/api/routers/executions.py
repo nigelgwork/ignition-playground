@@ -201,8 +201,9 @@ def _create_execution_status_from_engine(
 
     # Extract domain from execution state (preferred) or playbook metadata (fallback)
     domain = state.domain
-    if domain is None and engine._current_playbook:
-        domain = engine._current_playbook.metadata.get("domain")
+    current_playbook = engine.get_current_playbook()
+    if domain is None and current_playbook:
+        domain = current_playbook.metadata.get("domain")
 
     return ExecutionStatusResponse(
         execution_id=execution_id,
@@ -211,7 +212,7 @@ def _create_execution_status_from_engine(
         started_at=state.started_at,
         completed_at=state.completed_at,
         current_step_index=state.current_step_index,
-        total_steps=len(engine._current_playbook.steps) if engine._current_playbook else 0,
+        total_steps=len(current_playbook.steps) if current_playbook else 0,
         error=state.error,
         debug_mode=engine.state_manager.is_debug_mode_enabled(),
         step_results=step_results,
@@ -828,7 +829,7 @@ async def cancel_execution(execution_id: str):
 async def get_playbook_code(execution_id: str, engine: PlaybookEngine = Depends(get_engine_or_404)):
     """Get the YAML code for the playbook being executed"""
     # Read the original playbook file
-    playbook_path = engine._playbook_path
+    playbook_path = engine.get_playbook_path()
     if not playbook_path or not playbook_path.exists():
         raise HTTPException(status_code=404, detail="Playbook file not found")
 
@@ -854,7 +855,7 @@ async def update_playbook_code(
     """Update the playbook YAML during execution (for AI fixes)"""
 
     # Get playbook path
-    playbook_path = engine._playbook_path
+    playbook_path = engine.get_playbook_path()
     if not playbook_path or not playbook_path.exists():
         raise HTTPException(status_code=404, detail="Playbook file not found")
 
@@ -1041,14 +1042,14 @@ async def click_in_browser(
         HTTPException: If no browser available or click fails
     """
     # Check if browser manager exists
-    if not engine._browser_manager:
+    if not engine.get_browser_manager():
         raise HTTPException(
             status_code=400, detail="No browser manager available for this execution"
         )
 
     try:
         # Perform click at coordinates
-        await engine._browser_manager.click_at_coordinates(request.x, request.y)
+        await engine.get_browser_manager().click_at_coordinates(request.x, request.y)
 
         # Get execution state for execution_id
         state = engine.get_current_execution()

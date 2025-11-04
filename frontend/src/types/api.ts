@@ -31,6 +31,7 @@ export interface PlaybookInfo {
   steps: StepInfo[];
   // Metadata fields
   domain: string | null;  // Playbook domain (gateway, designer, perspective)
+  group: string | null;  // Playbook group for UI organization (e.g., "Gateway (Base Playbooks)")
   revision: number;
   verified: boolean;
   enabled: boolean;

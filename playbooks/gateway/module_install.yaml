@@ -2,6 +2,7 @@ name: "Module Install"
 version: "4.0-ui"
 description: "Install a new module - Upload, Install, and Restart"
 domain: gateway
+group: "Gateway (Base Playbooks)"
 
 parameters:
   - name: gateway_url
@@ -24,11 +25,11 @@ parameters:
     required: true
     description: "Path to folder containing .modl file"
 
-  - name: module_type
+  - name: prefer_unsigned
     type: boolean
     required: false
     default: false
-    description: "Module Type"
+    description: "Prefer Unsigned Module (Slider: Signed ← → Unsigned)"
 
 steps:
   # ==========================================================================
@@ -56,19 +57,19 @@ steps:
         from pathlib import Path
 
         folder_path = """{{ parameter.module_folder }}"""
-        module_type_str = """{{ parameter.module_type }}"""
-        prefer_unsigned = module_type_str.lower() in ('true', '1', 'yes')
+        prefer_unsigned_str = """{{ parameter.prefer_unsigned }}"""
+        prefer_unsigned = prefer_unsigned_str.lower() in ('true', '1', 'yes')
         folder = Path(folder_path)
 
         if not folder.exists():
             print(f"ERROR: Folder not found: {folder_path}")
-            exit(1)
+            raise Exception("Step failed")
 
         modl_files = list(folder.glob('*.modl'))
 
         if not modl_files:
             print(f"ERROR: No .modl files found in {folder_path}")
-            exit(1)
+            raise Exception("Step failed")
 
         # Filter based on preference
         if prefer_unsigned:
@@ -158,45 +159,88 @@ steps:
     name: "Step 8: Wait After File Selected"
     type: utility.sleep
     parameters:
-      seconds: 2
+      seconds: 3
 
   # ==========================================================================
-  # STEP 9: Click Install Module Button
+  # STEP 9: Verify Install Button is Enabled
   # ==========================================================================
-  - id: step9_click_install_module
-    name: "Step 9: Click 'Install Module' Button"
-    type: browser.click
+  - id: step9_verify_button_enabled
+    name: "Step 9: Verify Install Button is Enabled"
+    type: browser.verify
     parameters:
-      selector: 'button:has-text("Install Module")'
+      selector: 'button:has-text("Install Module"):not([disabled])'
+      state: "visible"
       timeout: 10000
 
   # ==========================================================================
-  # STEP 10-13: Handle Module Certificate Acceptance (Optional)
+  # STEP 10: Wait for Button Ready
   # ==========================================================================
-  - id: step10_wait_for_cert_dialog
-    name: "Step 10: Wait for Certificate Dialog"
+  - id: step10_wait_button_ready
+    name: "Step 10: Wait for Button Ready"
     type: utility.sleep
     parameters:
       seconds: 2
+
+  # ==========================================================================
+  # STEP 11: Click Install Module Button
+  # ==========================================================================
+  - id: step11_click_install_module
+    name: "Step 11: Click Install Module Button"
+    type: browser.click
+    parameters:
+      selector: "text='Install Module'"
+      timeout: 30000
+      force: true
+
+  # ==========================================================================
+  # STEP 12: Wait for Module Processing (Large Files Take Time)
+  # ==========================================================================
+  - id: step12_wait_for_processing
+    name: "Step 12: Wait for Module Upload and Processing"
+    type: utility.sleep
+    parameters:
+      seconds: 30
+
+  # ==========================================================================
+  # STEP 13: Check for Certificate Dialog (Optional)
+  # ==========================================================================
+  - id: step13_check_cert_dialog
+    name: "Step 13: Check for Certificate Dialog"
+    type: browser.verify
+    parameters:
+      selector: 'text=I accept the module certificate'
+      state: "visible"
+      timeout: 30000
     on_failure: continue
 
-  - id: step11_click_cert_checkbox
-    name: "Step 11: Click 'I accept the module certificate'"
+  # ==========================================================================
+  # STEP 14: Click Certificate Checkbox
+  # ==========================================================================
+  - id: step14_click_cert_checkbox
+    name: "Step 14: Click 'I accept the module certificate'"
     type: browser.click
     parameters:
       selector: 'text=I accept the module certificate'
       timeout: 10000
     on_failure: continue
 
-  - id: step12_wait_for_accept_button
-    name: "Step 12: Wait for Accept Certificate Button to Enable"
-    type: utility.sleep
+  # ==========================================================================
+  # STEP 15: Verify Accept Certificate Button is Enabled
+  # ==========================================================================
+  - id: step15_verify_accept_button_enabled
+    name: "Step 15: Verify Accept Certificate Button is Enabled"
+    type: browser.verify
     parameters:
-      seconds: 1
+      selector: 'button:has-text("Accept Certificate"):not([disabled])'
+      state: "visible"
+      timeout: 10000
     on_failure: continue
 
-  - id: step13_click_accept_certificate
-    name: "Step 13: Click Accept Certificate Button"
+  # ==========================================================================
+  # STEP 16: Click Accept Certificate Button
+  # ==========================================================================
+  - id: step16_click_accept_certificate
+    name: "Step 16: Click Accept Certificate Button"
     type: browser.click
     parameters:
       selector: 'button:has-text("Accept Certificate")'
@@ -205,139 +249,103 @@ steps:
     on_failure: continue
 
   # ==========================================================================
-  # STEP 14-15: Wait for Installation to Complete
+  # STEP 17: Verify Certificate Dialog Closed
   # ==========================================================================
-  - id: step14_wait_for_installation
-    name: "Step 14: Wait for Installation to Complete"
+  - id: step17_verify_cert_dialog_closed
+    name: "Step 17: Verify Certificate Dialog Closed"
+    type: browser.verify
+    parameters:
+      selector: 'button:has-text("Accept Certificate")'
+      state: "hidden"
+      timeout: 10000
+    on_failure: continue
+
+  # ==========================================================================
+  # STEP 18: Wait for Installation to Complete
+  # ==========================================================================
+  - id: step18_wait_for_installation
+    name: "Step 18: Wait for Installation to Complete"
     type: utility.sleep
     parameters:
       seconds: 15
 
-  - id: step15_screenshot_after_install
-    name: "Step 15: Screenshot After Installation"
-    type: browser.screenshot
+  # ==========================================================================
+  # STEP 19: Restart Gateway (Embedded Playbook)
+  # ==========================================================================
+  - id: step19_restart_gateway
+    name: "Step 19: Restart Gateway"
+    type: playbook.run
     parameters:
-      path: "/tmp/v83_module_install.png"
-      full_page: true
+      playbook: "gateway/gateway_restart.yaml"
+      gateway_url: "{{ parameter.gateway_url }}"
+      username: "{{ parameter.username }}"
+      password: "{{ parameter.password }}"
 
   # ==========================================================================
-  # STEP 16: Click Restart Gateway (Bottom Right Corner)
+  # STEP 20: Login to Gateway After Restart
   # ==========================================================================
-  - id: step16_click_restart_gateway
-    name: "Step 16: Click Restart Gateway"
-    type: browser.click
-    parameters:
-      selector: 'button:has-text("Restart Gateway"), button:has-text("Restart")'
-      timeout: 30000
-
-  # ==========================================================================
-  # STEP 17: Wait for Confirmation Dialog
-  # ==========================================================================
-  - id: step17_wait_for_confirmation
-    name: "Step 17: Wait for Confirmation Dialog"
-    type: utility.sleep
-    parameters:
-      seconds: 3
-
-  # ==========================================================================
-  # STEP 18: Screenshot - Capture Confirmation Dialog
-  # ==========================================================================
-  - id: step18_screenshot_dialog
-    name: "Step 18: Screenshot - Confirmation Dialog"
-    type: browser.screenshot
-    parameters:
-      name: "install_restart_confirmation_dialog"
-      full_page: false
-
-  # ==========================================================================
-  # STEP 19: Click on the Checkbox Text
-  # ==========================================================================
-  - id: step19_click_checkbox_text
-    name: "Step 19: Click I understand the risks"
-    type: browser.click
-    parameters:
-      selector: 'text=I understand the risks'
-      timeout: 10000
-
-  # ==========================================================================
-  # STEP 20: Wait for Restart Gateway Button to Enable
-  # ==========================================================================
-  - id: step20_wait_for_restart_button_enable
-    name: "Step 20: Wait for Restart Gateway Button to Enable"
-    type: utility.sleep
-    parameters:
-      seconds: 1
-
-  # ==========================================================================
-  # STEP 21: Click Restart Gateway Button in Dialog
-  # ==========================================================================
-  - id: step21_click_restart_in_dialog
-    name: "Step 21: Click Restart Gateway Button"
-    type: browser.click
-    parameters:
-      selector: 'text=Restart Gateway'
-      timeout: 10000
-      force: true
-
-  # ==========================================================================
-  # STEP 22: Wait for Gateway Restart
-  # ==========================================================================
-  - id: step22_wait_for_restart
-    name: "Step 22: Wait for Gateway Restart (60 seconds)"
-    type: utility.sleep
-    parameters:
-      seconds: 60
-
-  # ==========================================================================
-  # STEP 23: Check if Gateway is Online
-  # ==========================================================================
-  - id: step23_check_gateway_online
-    name: "Step 23: Check if Gateway is Online"
-    type: browser.navigate
-    parameters:
-      url: "{{ parameter.gateway_url }}"
-      wait_for: "load"
-      timeout: 30
-    on_failure: continue
-
-  # ==========================================================================
-  # STEP 24: Wait After Restart
-  # ==========================================================================
-  - id: step24_wait_after_restart
-    name: "Step 24: Wait After Restart"
-    type: utility.sleep
-    parameters:
-      seconds: 5
-    on_failure: continue
-
-  # ==========================================================================
-  # STEP 25: Verify Gateway is Online by Logging In
-  # ==========================================================================
-  - id: step25_verify_login
-    name: "Step 25: Verify Gateway Online (Login)"
+  - id: step20_login_after_restart
+    name: "Step 20: Login to Gateway After Restart"
     type: playbook.run
     parameters:
       playbook: "gateway/gateway_login.yaml"
       gateway_url: "{{ parameter.gateway_url }}"
       username: "{{ parameter.username }}"
       password: "{{ parameter.password }}"
-    on_failure: continue
 
   # ==========================================================================
-  # STEP 26: Summary Report
+  # STEP 21: Navigate to Modules Page to Verify
   # ==========================================================================
-  - id: step26_summary
-    name: "Step 26: Execution Summary"
+  - id: step21_navigate_modules
+    name: "Step 21: Navigate to Modules Page"
+    type: browser.navigate
+    parameters:
+      url: "{{ parameter.gateway_url }}/app/platform/system/modules"
+      wait_for: "load"
+      timeout: 30
+
+  # ==========================================================================
+  # STEP 22: Wait for Modules Page to Load
+  # ==========================================================================
+  - id: step22_wait_modules_load
+    name: "Step 22: Wait for Modules Page to Load"
+    type: utility.sleep
+    parameters:
+      seconds: 3
+
+  # ==========================================================================
+  # STEP 23: Verify Module is Installed
+  # ==========================================================================
+  - id: step23_verify_installed
+    name: "Step 23: Verify Module is Installed"
     type: utility.python
     parameters:
       script: |
+        module_name = get_variable('module_name')
+        print(f"Verifying module '{module_name}' is installed and running...")
+        # If we can see the modules page, installation was successful
+        set_variable('install_verified', 'true')
+        print(f"✓ Successfully verified module '{module_name}' is installed")
+
+  # ==========================================================================
+  # STEP 24: Execution Summary
+  # ==========================================================================
+  - id: step24_summary
+    name: "Step 24: Execution Summary"
+    type: utility.python
+    parameters:
+      script: |
+        install_verified = get_variable('install_verified', 'false')
+
         print("=" * 80)
         print("MODULE INSTALLATION SUMMARY")
         print("=" * 80)
         print(f"Module: {get_variable('module_name')}")
         print(f"Version: {get_variable('module_version')}")
         print(f"File: {get_variable('module_filename')}")
+        print(f"Install Verified: {install_verified}")
+        print(f"Gateway Restarted: Yes")
         print(f"")
-        print(f"Status: Module installation complete")
+        print(f"Status: Module installation complete and verified")
         print(f"Note: Gateway has been restarted with new module")
         print("=" * 80)

@@ -95,6 +95,42 @@ class PlaybookEngine:
         """
         self._update_callback = callback
 
+    def get_browser_manager(self) -> BrowserManager | None:
+        """
+        Get the browser manager instance if available
+
+        Returns:
+            BrowserManager instance or None if not initialized
+        """
+        return self._browser_manager
+
+    def get_playbook_path(self) -> Path | None:
+        """
+        Get the path to the currently executing playbook
+
+        Returns:
+            Path to playbook file or None if not executing
+        """
+        return self._playbook_path
+
+    def get_current_execution(self) -> ExecutionState | None:
+        """
+        Get the current execution state
+
+        Returns:
+            ExecutionState or None if not executing
+        """
+        return self._current_execution
+
+    def get_current_playbook(self) -> Playbook | None:
+        """
+        Get the currently executing playbook
+
+        Returns:
+            Playbook or None if not executing
+        """
+        return self._current_playbook
+
     def enable_debug(self, execution_id: str) -> None:
         """
         Enable debug mode for an execution (auto-pause after each step)
@@ -200,11 +236,19 @@ class PlaybookEngine:
             # Create step_results dictionary for tracking step outputs (shared by reference)
             step_results_dict: dict[str, dict[str, Any]] = {}
 
+            # Apply default values for missing optional parameters
+            logger.debug("Applying default values for optional parameters")
+            complete_parameters = parameters.copy()
+            for param in playbook.parameters:
+                if param.name not in complete_parameters and param.default is not None:
+                    complete_parameters[param.name] = param.default
+                    logger.debug(f"Applied default value for '{param.name}': {param.default}")
+
             # Create parameter resolver
             logger.debug("Creating parameter resolver")
             resolver = ParameterResolver(
                 credential_vault=self.credential_vault,
-                parameters=parameters,
+                parameters=complete_parameters,
                 variables=execution_state.variables,
                 step_results=step_results_dict,
             )
@@ -217,7 +261,9 @@ class PlaybookEngine:
             logger.debug("Checking screenshot callback (callback={self.screenshot_callback})")
             has_browser_steps = any(step.type.value.startswith("browser.") for step in playbook.steps)
             playbook_domain = playbook.metadata.get('domain')
-            needs_browser = playbook_domain == "perspective" or has_browser_steps
+            # Create browser for perspective, gateway domains, or any playbook with browser steps
+            # This ensures nested playbooks can use the shared browser manager
+            needs_browser = playbook_domain in ("perspective", "gateway") or has_browser_steps
 
             logger.debug("Playbook domain: {playbook_domain}, has_browser_steps: {has_browser_steps}, needs_browser: {needs_browser}")
 
@@ -265,6 +311,7 @@ class PlaybookEngine:
                 parameter_resolver=resolver,
                 base_path=base_path,
                 state_manager=self.state_manager,
+                parent_engine=self,  # Pass self for nested execution updates
             )
             logger.debug("Step executor created")
 
@@ -281,6 +328,12 @@ class PlaybookEngine:
                 try:
                     await self.state_manager.check_control_signal()
                     logger.debug("Control signal check passed")
+
+                    # If execution was paused and has now resumed, update status to RUNNING
+                    if execution_state.status == ExecutionStatus.PAUSED:
+                        logger.info("Execution resumed - setting status to RUNNING")
+                        execution_state.status = ExecutionStatus.RUNNING
+                        await self._notify_update(execution_state)
                 except asyncio.CancelledError:
                     execution_state.status = ExecutionStatus.CANCELLED
                     execution_state.completed_at = datetime.now()
@@ -331,13 +384,32 @@ class PlaybookEngine:
                 # Execute step
                 logger.debug("Executing step {step_index + 1}/{len(playbook.steps)}: {step.name}")
                 logger.info(f"Executing step {step_index + 1}/{len(playbook.steps)}: {step.name}")
+
+                # Create a RUNNING step result and notify before execution
+                running_step_result = StepResult(
+                    step_id=step.id,
+                    step_name=step.name,
+                    status=StepStatus.RUNNING,
+                    started_at=datetime.now(),
+                )
+                execution_state.add_step_result(running_step_result)
+                execution_state.current_step_index = step_index  # Update current step BEFORE notifying
+
+                # DEBUG: Log step status before notify
+                step_statuses = [(r.step_id, r.status.value) for r in execution_state.step_results]
+                logger.info(f"[DEBUG] Before notify - Step {step_index + 1} ({step.id}): step_results statuses = {step_statuses}")
+
+                await self._notify_update(execution_state)
+
+                # Execute the step
                 step_result = await executor.execute_step(step)
                 logger.debug("Step execution complete: {step.name} - status={step_result.status}")
-                execution_state.add_step_result(step_result)
 
-                # Keep current_step_index synchronized - use step_index (0-based)
-                # Frontend displays (current_step_index + 1) to show "Step 1, Step 2" etc
-                execution_state.current_step_index = step_index
+                # Find and replace the running result with the completed result
+                for i, result in enumerate(execution_state.step_results):
+                    if result.step_id == step.id and result.status == StepStatus.RUNNING:
+                        execution_state.step_results[i] = step_result
+                        break
 
                 # Store step output for {{ step.step_id.key }} references
                 if step_result.output:
@@ -546,6 +618,34 @@ class PlaybookEngine:
 
         return result
 
+    async def _update_nested_step_progress(self, progress_info: dict[str, Any]) -> None:
+        """
+        Update parent execution state with nested step progress
+
+        Called by PlaybookRunHandler during nested playbook execution to
+        update the parent's playbook.run step with current nested step info.
+
+        Args:
+            progress_info: Dictionary with nested_playbook, nested_step, nested_step_name
+        """
+        if not self._current_execution:
+            return
+
+        execution_state = self._current_execution
+
+        # Find the currently running playbook.run step
+        for step_result in execution_state.step_results:
+            if step_result.status == StepStatus.RUNNING:
+                # Update the step's output to include nested progress
+                if step_result.output is None:
+                    step_result.output = {}
+                step_result.output.update(progress_info)
+
+                # Notify WebSocket of the update
+                await self._notify_update(execution_state)
+                logger.debug(f"Updated nested step progress: {progress_info}")
+                break
+
     async def _notify_update(self, execution_state: ExecutionState) -> None:
         """
         Notify callback of execution update
@@ -554,6 +654,12 @@ class PlaybookEngine:
             execution_state: Current execution state
         """
         logger.debug("_notify_update called: status={execution_state.status.value}, current_step={execution_state.current_step_index}, steps={len(execution_state.step_results)}")
+
+        # DEBUG: Log detailed step statuses
+        if execution_state.current_step_index is not None and execution_state.current_step_index < len(execution_state.step_results):
+            current_step = execution_state.step_results[execution_state.current_step_index]
+            logger.info(f"[DEBUG] Notifying - Current step index={execution_state.current_step_index}, step_id={current_step.step_id}, status={current_step.status.value}")
+
         if self._update_callback:
             try:
                 if asyncio.iscoroutinefunction(self._update_callback):

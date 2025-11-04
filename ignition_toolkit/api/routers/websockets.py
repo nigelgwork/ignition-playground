@@ -56,13 +56,24 @@ def get_claude_code_processes() -> dict[str, subprocess.Popen]:
 
 @router.websocket("/ws/executions")
 async def websocket_endpoint(websocket: WebSocket):
-    """WebSocket for real-time execution updates with heartbeat support"""
+    """
+    WebSocket for real-time execution updates with heartbeat support
+
+    SECURITY WARNING: Uses API key authentication. Set WEBSOCKET_API_KEY
+    environment variable in production. Default key is for development only.
+    """
+    import hmac
+
     # Simple authentication: check for API key in query params
-    # In production, use proper token-based auth
     api_key = websocket.query_params.get("api_key")
     expected_key = os.getenv("WEBSOCKET_API_KEY", "dev-key-change-in-production")
 
-    if api_key != expected_key:
+    # SECURITY: Warn if using default key (development only)
+    if expected_key == "dev-key-change-in-production":
+        logger.warning("Using default WebSocket API key - set WEBSOCKET_API_KEY in production!")
+
+    # SECURITY: Use constant-time comparison to prevent timing attacks
+    if not api_key or not hmac.compare_digest(api_key, expected_key):
         logger.warning(f"Unauthorized WebSocket connection attempt from {websocket.client}")
         await websocket.close(code=1008, reason="Unauthorized")
         return
@@ -120,6 +131,11 @@ async def claude_code_terminal(websocket: WebSocket, execution_id: str):
     """
     WebSocket endpoint for embedded Claude Code terminal.
     Spawns a Claude Code process with PTY and proxies stdin/stdout.
+
+    ⚠️  SECURITY WARNING ⚠️
+    This endpoint spawns an interactive bash shell for Claude Code debugging.
+    While scoped to the playbook directory, it still provides shell access.
+    Use only in development or with trusted playbooks.
     """
     logger.info(f"[TERMINAL DEBUG] WebSocket connection request for execution: {execution_id}")
     await websocket.accept()
@@ -389,6 +405,25 @@ async def shell_terminal(websocket: WebSocket):
     """
     WebSocket endpoint for embedded bash shell terminal.
     Spawns a bash shell with PTY in the specified directory (default: playbooks).
+
+    ⚠️  CRITICAL SECURITY WARNING ⚠️
+    This endpoint provides FULL SHELL ACCESS with unrestricted command execution.
+    It should ONLY be used in:
+    - Development environments
+    - Trusted, isolated networks
+    - Localhost-only deployments
+
+    NEVER expose this endpoint to:
+    - Public networks
+    - Untrusted users
+    - Production environments without strict authentication
+
+    Security recommendations:
+    - Add IP whitelisting
+    - Implement command whitelisting
+    - Run in containerized environment
+    - Add comprehensive audit logging
+    - Consider disabling entirely in production
     """
     # Get working directory from query params
     working_dir = websocket.query_params.get("path", str(get_playbooks_dir().resolve()))

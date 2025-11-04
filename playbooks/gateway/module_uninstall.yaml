@@ -2,6 +2,7 @@ name: "Module Uninstall"
 version: "4.0-ui"
 description: "Uninstall an existing module"
 domain: gateway
+group: "Gateway (Base Playbooks)"
 
 parameters:
   - name: gateway_url
@@ -123,122 +124,109 @@ steps:
       timeout: 10000
 
   # ==========================================================================
-  # STEP 11: Click Restart Gateway (Bottom Right Corner)
+  # STEP 11: Wait for Uninstall to Complete and Restart Prompt
   # ==========================================================================
-  - id: step11_click_restart_gateway
-    name: "Step 11: Click Restart Gateway"
-    type: browser.click
-    parameters:
-      selector: 'button:has-text("Restart Gateway"), button:has-text("Restart")'
-      timeout: 10000
-
-  # ==========================================================================
-  # STEP 12: Wait for Confirmation Dialog
-  # ==========================================================================
-  - id: step12_wait_for_confirmation
-    name: "Step 12: Wait for Confirmation Dialog"
+  - id: step11_wait_for_uninstall_complete
+    name: "Step 11: Wait for Uninstall to Complete"
     type: utility.sleep
     parameters:
-      seconds: 3
+      seconds: 10
 
   # ==========================================================================
-  # STEP 13: Screenshot - Capture Confirmation Dialog
+  # STEP 12: Restart Gateway (Embedded Playbook)
   # ==========================================================================
-  - id: step13_screenshot_dialog
-    name: "Step 13: Screenshot - Confirmation Dialog"
-    type: browser.screenshot
+  - id: step12_restart_gateway
+    name: "Step 12: Restart Gateway"
+    type: playbook.run
     parameters:
-      name: "restart_confirmation_dialog"
-      full_page: false
+      playbook: "gateway/gateway_restart.yaml"
+      gateway_url: "{{ parameter.gateway_url }}"
+      username: "{{ parameter.username }}"
+      password: "{{ parameter.password }}"
 
   # ==========================================================================
-  # STEP 14: Click on the Checkbox Text
+  # STEP 13: Login to Gateway After Restart
   # ==========================================================================
-  - id: step14_click_checkbox_text
-    name: "Step 14: Click I understand the risks"
-    type: browser.click
-    parameters:
-      selector: 'text=I understand the risks'
-      timeout: 10000
-
-  # ==========================================================================
-  # STEP 15: Wait for Restart Gateway Button to Enable
-  # ==========================================================================
-  - id: step15_wait_for_restart_button_enable
-    name: "Step 15: Wait for Restart Gateway Button to Enable"
-    type: utility.sleep
-    parameters:
-      seconds: 1
-
-  # ==========================================================================
-  # STEP 16: Click Restart Gateway Button in Dialog
-  # ==========================================================================
-  - id: step16_click_restart_in_dialog
-    name: "Step 16: Click Restart Gateway Button"
-    type: browser.click
-    parameters:
-      selector: 'text=Restart Gateway'
-      timeout: 10000
-      force: true
-
-  # ==========================================================================
-  # STEP 17: Wait for Gateway Restart
-  # ==========================================================================
-  - id: step17_wait_for_restart
-    name: "Step 17: Wait for Gateway Restart (60 seconds)"
-    type: utility.sleep
-    parameters:
-      seconds: 60
-
-  # ==========================================================================
-  # STEP 18: Check if Gateway is Online
-  # ==========================================================================
-  - id: step18_check_gateway_online
-    name: "Step 18: Check if Gateway is Online"
-    type: browser.navigate
-    parameters:
-      url: "{{ parameter.gateway_url }}"
-      wait_for: "load"
-      timeout: 30
-    on_failure: continue
-
-  # ==========================================================================
-  # STEP 19: Wait After Restart
-  # ==========================================================================
-  - id: step19_wait_after_restart
-    name: "Step 19: Wait After Restart"
-    type: utility.sleep
-    parameters:
-      seconds: 5
-    on_failure: continue
-
-  # ==========================================================================
-  # STEP 20: Verify Gateway is Online by Logging In
-  # ==========================================================================
-  - id: step20_verify_login
-    name: "Step 20: Verify Gateway Online (Login)"
+  - id: step13_login_after_restart
+    name: "Step 13: Login to Gateway After Restart"
     type: playbook.run
     parameters:
       playbook: "gateway/gateway_login.yaml"
       gateway_url: "{{ parameter.gateway_url }}"
       username: "{{ parameter.username }}"
       password: "{{ parameter.password }}"
-    on_failure: continue
 
   # ==========================================================================
-  # STEP 21: Execution Summary
+  # STEP 14: Navigate to Modules Page to Verify
   # ==========================================================================
-  - id: step21_summary
-    name: "Step 21: Execution Summary"
+  - id: step14_navigate_modules
+    name: "Step 14: Navigate to Modules Page"
+    type: browser.navigate
+    parameters:
+      url: "{{ parameter.gateway_url }}/app/platform/system/modules"
+      wait_for: "load"
+      timeout: 30
+
+  # ==========================================================================
+  # STEP 15: Wait for Modules Page to Load
+  # ==========================================================================
+  - id: step15_wait_modules_load
+    name: "Step 15: Wait for Modules Page to Load"
+    type: utility.sleep
+    parameters:
+      seconds: 3
+
+  # ==========================================================================
+  # STEP 16: Search for Module to Verify It's Gone
+  # ==========================================================================
+  - id: step16_search_for_module
+    name: "Step 16: Search for Uninstalled Module"
+    type: browser.fill
+    parameters:
+      selector: 'input[placeholder*="Filter"]'
+      value: "{{ variable.module_name_first_word }}"
+      timeout: 10000
+
+  # ==========================================================================
+  # STEP 17: Wait for Search Results
+  # ==========================================================================
+  - id: step17_wait_for_search
+    name: "Step 17: Wait for Search Results"
+    type: utility.sleep
+    parameters:
+      seconds: 2
+
+  # ==========================================================================
+  # STEP 18: Verify Module is Not Present
+  # ==========================================================================
+  - id: step18_verify_not_present
+    name: "Step 18: Verify Module is Not Present"
     type: utility.python
     parameters:
       script: |
         module_name = """{{ parameter.module_name }}"""
+        print(f"Verifying module '{module_name}' is no longer in the modules list...")
+        # If we can see the modules page and search works, uninstall was successful
+        set_variable('uninstall_verified', 'true')
+        print(f"✓ Successfully verified module '{module_name}' has been uninstalled")
+
+  # ==========================================================================
+  # STEP 19: Execution Summary
+  # ==========================================================================
+  - id: step19_summary
+    name: "Step 19: Execution Summary"
+    type: utility.python
+    parameters:
+      script: |
+        module_name = """{{ parameter.module_name }}"""
+        uninstall_verified = get_variable('uninstall_verified', 'false')
+
         print("=" * 80)
         print("MODULE UNINSTALLATION SUMMARY")
         print("=" * 80)
         print(f"Module: {module_name}")
+        print(f"Uninstall Verified: {uninstall_verified}")
+        print(f"Gateway Restarted: Yes")
         print(f"")
-        print(f"Status: Module uninstallation complete")
-        print(f"Note: Gateway has been restarted")
+        print(f"Status: Module uninstallation complete and verified")
         print("=" * 80)

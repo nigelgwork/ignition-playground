@@ -51,6 +51,7 @@ export function ExecutionDetail() {
   const executionUpdates = useStore((state) => state.executionUpdates);
   const [debugMode, setDebugMode] = useState(false);
   const [debugModeUserOverride, setDebugModeUserOverride] = useState(false);
+  const [debugModeToggling, setDebugModeToggling] = useState(false);
   const [aiDialogOpen, setAiDialogOpen] = useState(false);
   const [showDebugPanel, setShowDebugPanel] = useState(false);
   const [showCodeViewer, setShowCodeViewer] = useState(false);
@@ -75,6 +76,24 @@ export function ExecutionDetail() {
   // Use WebSocket update if available, otherwise use API data
   const wsUpdate = executionUpdates.get(executionId);
   const execution = wsUpdate || executionFromAPI;
+
+  // Deduplicate step results by step_id (keep the most recent - completed over pending)
+  const deduplicatedStepResults = execution?.step_results
+    ? Array.from(
+        execution.step_results.reduce((map, step) => {
+          const existing = map.get(step.step_id);
+          // Keep the step with higher priority: completed > running > failed > skipped > pending
+          const priorityOrder = { completed: 5, running: 4, failed: 3, skipped: 2, pending: 1 };
+          const existingPriority = existing ? priorityOrder[existing.status as keyof typeof priorityOrder] || 0 : 0;
+          const newPriority = priorityOrder[step.status as keyof typeof priorityOrder] || 0;
+
+          if (!existing || newPriority > existingPriority || (newPriority === existingPriority && step.completed_at)) {
+            map.set(step.step_id, step);
+          }
+          return map;
+        }, new Map()).values()
+      )
+    : [];
 
   // Sync debug mode from execution data (only if user hasn't manually overridden it)
   useEffect(() => {
@@ -128,8 +147,8 @@ export function ExecutionDetail() {
     execution &&
     debugMode &&
     execution.status === 'running' &&
-    execution.step_results &&
-    execution.step_results.some((s) => s.status === 'failed')
+    deduplicatedStepResults.length > 0 &&
+    deduplicatedStepResults.some((s) => s.status === 'failed')
   ) {
     if (!showDebugPanel) {
       setShowDebugPanel(true);
@@ -199,9 +218,9 @@ export function ExecutionDetail() {
     }
   };
 
-  const progress = execution.step_results
-    ? (execution.step_results.filter((s) => s.status === 'completed').length /
-        execution.step_results.length) *
+  const progress = deduplicatedStepResults.length > 0
+    ? (deduplicatedStepResults.filter((s) => s.status === 'completed').length /
+        deduplicatedStepResults.length) *
       100
     : 0;
 
@@ -245,15 +264,17 @@ export function ExecutionDetail() {
           sx={{ height: '24px', fontSize: '0.7rem' }}
         />
 
-        <Tooltip title="Auto-pause on failures for debugging">
+        <Tooltip title={debugModeToggling ? "Updating debug mode..." : "Auto-pause after each step for debugging"}>
           <FormControlLabel
             control={
               <Switch
                 checked={debugMode}
+                disabled={debugModeToggling}
                 onChange={async (e) => {
                   const enabled = e.target.checked;
                   setDebugMode(enabled);
                   setDebugModeUserOverride(true);
+                  setDebugModeToggling(true);
                   try {
                     if (enabled) {
                       await api.executions.enableDebug(executionId);
@@ -264,13 +285,18 @@ export function ExecutionDetail() {
                         await api.executions.resume(executionId);
                       }
                     }
-                    // Clear override after 3 seconds to allow WebSocket sync
-                    setTimeout(() => setDebugModeUserOverride(false), 3000);
+                    // Clear override after 10 seconds to allow WebSocket sync (increased from 3s)
+                    setTimeout(() => {
+                      setDebugModeUserOverride(false);
+                      setDebugModeToggling(false);
+                    }, 10000);
                   } catch (error) {
                     console.error('Failed to toggle debug mode:', error);
+                    alert(`Failed to toggle debug mode: ${error instanceof Error ? error.message : String(error)}`);
                     // Revert on error
                     setDebugMode(!enabled);
                     setDebugModeUserOverride(false);
+                    setDebugModeToggling(false);
                   }
                 }}
                 size="small"
@@ -279,7 +305,9 @@ export function ExecutionDetail() {
             label={
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                 <DebugIcon fontSize="small" />
-                <Typography variant="body2">Debug</Typography>
+                <Typography variant="body2">
+                  Debug {debugModeToggling && '(updating...)'}
+                </Typography>
               </Box>
             }
           />
@@ -360,8 +388,8 @@ export function ExecutionDetail() {
           </Box>
 
           <List sx={{ py: 0 }}>
-            {execution.step_results && execution.step_results.length > 0 ? (
-              execution.step_results.map((step, index) => (
+            {deduplicatedStepResults.length > 0 ? (
+              deduplicatedStepResults.map((step, index) => (
                 <Box key={step.step_id || index}>
                   <ListItem
                     sx={{
@@ -426,7 +454,7 @@ export function ExecutionDetail() {
                       sx={{ height: '20px', fontSize: '0.65rem', '& .MuiChip-label': { px: 1, py: 0 } }}
                     />
                   </ListItem>
-                  {execution.step_results && index < execution.step_results.length - 1 && <Divider />}
+                  {index < deduplicatedStepResults.length - 1 && <Divider />}
                 </Box>
               ))
             ) : (

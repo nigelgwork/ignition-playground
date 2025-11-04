@@ -24,11 +24,11 @@ parameters:
     required: true
     description: "Path to folder containing .modl file"
 
-  - name: module_type
+  - name: prefer_unsigned
     type: boolean
     required: false
     default: false
-    description: "Module Type"
+    description: "Prefer Unsigned Module (Slider: Signed ← → Unsigned)"
 
 steps:
   # ==========================================================================
@@ -44,19 +44,19 @@ steps:
         from pathlib import Path
 
         folder_path = """{{ parameter.module_folder }}"""
-        module_type_str = """{{ parameter.module_type }}"""
-        prefer_unsigned = module_type_str.lower() in ('true', '1', 'yes')
+        prefer_unsigned_str = """{{ parameter.prefer_unsigned }}"""
+        prefer_unsigned = prefer_unsigned_str.lower() in ('true', '1', 'yes')
         folder = Path(folder_path)
 
         if not folder.exists():
             print(f"ERROR: Folder not found: {folder_path}")
-            exit(1)
+            raise Exception("Step failed")
 
         modl_files = list(folder.glob('*.modl'))
 
         if not modl_files:
             print(f"ERROR: No .modl files found in {folder_path}")
-            exit(1)
+            raise Exception("Step failed")
 
         # Filter based on preference
         if prefer_unsigned:
@@ -101,7 +101,7 @@ steps:
       username: "{{ parameter.username }}"
       password: "{{ parameter.password }}"
       module_folder: "{{ parameter.module_folder }}"
-      module_type: "{{ parameter.module_type }}"
+      module_type: "false"
 
   # ==========================================================================
   # STEP 4: Summary Report

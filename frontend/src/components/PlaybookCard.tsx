@@ -390,7 +390,6 @@ export function PlaybookCard({ playbook, onConfigure, onExecute, onExport, onVie
                   checked={debugMode}
                   onChange={handleDebugModeToggle}
                   size="small"
-                  disabled={isDisabled}
                   color="primary"
                 />
               }
@@ -411,7 +410,6 @@ export function PlaybookCard({ playbook, onConfigure, onExecute, onExport, onVie
                   checked={scheduleMode}
                   onChange={handleScheduleModeToggle}
                   size="small"
-                  disabled={isDisabled}
                   color="secondary"
                 />
               }

@@ -81,6 +81,7 @@ class StepExecutor:
         parameter_resolver: ParameterResolver | None = None,
         base_path: Path | None = None,
         state_manager: Any | None = None,  # StateManager type hint causes circular import
+        parent_engine: Any | None = None,  # Parent PlaybookEngine for nested execution
     ):
         """
         Initialize step executor with handler registry
@@ -93,6 +94,7 @@ class StepExecutor:
             parameter_resolver: Parameter resolver for resolving references
             base_path: Base path for resolving relative file paths
             state_manager: State manager for pause/resume and debug mode
+            parent_engine: Parent PlaybookEngine instance for nested execution updates
         """
         self.gateway_client = gateway_client
         self.browser_manager = browser_manager
@@ -101,6 +103,7 @@ class StepExecutor:
         self.parameter_resolver = parameter_resolver
         self.base_path = base_path or Path.cwd()
         self.state_manager = state_manager
+        self.parent_engine = parent_engine
 
         # Initialize handler registry
         self._handlers = self._create_handler_registry()

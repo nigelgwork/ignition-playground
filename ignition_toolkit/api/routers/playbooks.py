@@ -258,6 +258,7 @@ async def list_playbooks():
                     parameters=parameters,
                     steps=steps,
                     domain=playbook.metadata.get("domain"),  # Extract domain from metadata
+                    group=playbook.metadata.get("group"),  # Extract group for UI organization
                     revision=meta.revision,
                     verified=meta.verified,
                     enabled=meta.enabled,
@@ -326,6 +327,7 @@ async def get_playbook(playbook_path: str):
             parameters=parameters,
             steps=steps,
             domain=playbook.metadata.get("domain"),  # Extract domain from metadata
+            group=playbook.metadata.get("group"),  # Extract group for UI organization
             revision=meta.revision,
             verified=meta.verified,
             enabled=meta.enabled,
@@ -722,6 +724,7 @@ class PlaybookImportRequest(BaseModel):
     domain: str  # gateway, perspective, or designer
     yaml_content: str
     overwrite: bool = False
+    metadata: dict[str, Any] | None = None  # Optional metadata from export (includes verified status)
 
 
 @router.get("/{playbook_path:path}/export", response_model=PlaybookExportResponse)
@@ -759,6 +762,8 @@ async def export_playbook(playbook_path: str):
             metadata={
                 'revision': meta.revision,
                 'verified': meta.verified,
+                'verified_at': meta.verified_at,
+                'verified_by': meta.verified_by,
                 'origin': meta.origin,
                 'created_at': meta.created_at,
                 'exported_at': datetime.now().isoformat(),
@@ -819,9 +824,17 @@ async def import_playbook(request: PlaybookImportRequest):
 
         logger.info(f"Imported playbook to: {target_file}")
 
-        # Create metadata
+        # Create metadata and restore verified status if provided
         relative_path = str(target_file.relative_to(playbooks_dir))
         metadata_store.mark_as_imported(relative_path)
+
+        # Restore verified status from export metadata if available
+        if request.metadata and request.metadata.get('verified'):
+            metadata_store.mark_verified(
+                relative_path,
+                verified_by=request.metadata.get('verified_by', 'imported')
+            )
+            logger.info(f"Restored verified status for imported playbook: {relative_path}")
 
         # Load and return playbook info
         loader = PlaybookLoader()
