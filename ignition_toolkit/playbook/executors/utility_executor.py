@@ -27,7 +27,10 @@ class UtilitySleepHandler(StepHandler):
     """
 
     async def execute(self, params: dict[str, Any]) -> dict[str, Any]:
-        seconds = params.get("seconds", 1)
+        # Convert to float in case it comes as string from parameter resolution
+        seconds_param = params.get("seconds", 1)
+        seconds = float(seconds_param) if isinstance(seconds_param, (str, int, float)) else 1.0
+
         logger.info(f"Sleeping for {seconds} seconds (cancellable)")
         await cancellable_sleep(seconds)
         logger.debug(f"Sleep completed ({seconds}s)")
