@@ -658,6 +658,9 @@ async def duplicate_playbook(playbook_path: str, new_name: str | None = None):
         loader = PlaybookLoader()
         new_playbook = loader.load_from_file(new_path)
 
+        # Get domain from metadata (may be None for older playbooks)
+        domain = new_playbook.metadata.get("domain")
+
         return {
             "status": "success",
             "message": f"Playbook duplicated successfully",
@@ -668,7 +671,7 @@ async def duplicate_playbook(playbook_path: str, new_name: str | None = None):
                 "name": new_playbook.name,
                 "description": new_playbook.description,
                 "version": new_playbook.version,
-                "domain": new_playbook.domain.value,
+                "domain": domain,
             }
         }
 
@@ -756,12 +759,15 @@ async def export_playbook(playbook_path: str):
         metadata_store = get_metadata_store()
         meta = metadata_store.get_metadata(relative_path)
 
+        # Get domain from metadata (defaults to 'gateway' for older playbooks)
+        domain = playbook.metadata.get('domain', 'gateway')
+
         return PlaybookExportResponse(
             name=playbook.name,
             path=relative_path,
             version=playbook.version,
             description=playbook.description,
-            domain=playbook.domain.value if hasattr(playbook, 'domain') else 'gateway',
+            domain=domain,
             yaml_content=yaml_content,
             metadata={
                 'revision': meta.revision,
