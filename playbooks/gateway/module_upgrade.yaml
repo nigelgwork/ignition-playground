@@ -33,10 +33,10 @@ parameters:
 
 steps:
   # ==========================================================================
-  # STEP 1: Detect Module Name from File
+  # STEP 1: Detect Module File and Metadata
   # ==========================================================================
   - id: step1_detect_module
-    name: "Step 1: Detect Module Name"
+    name: "Step 1: Detect Module File and Metadata"
     type: utility.python
     parameters:
       script: |
@@ -61,21 +61,44 @@ steps:
 
         # Filter based on preference
         if prefer_unsigned:
+            # Look for .unsigned.modl files first
             unsigned_files = [f for f in modl_files if 'unsigned' in f.name.lower()]
-            modl_file = unsigned_files[0] if unsigned_files else modl_files[0]
+            if unsigned_files:
+                modl_file = unsigned_files[0]
+                print(f"Found unsigned module: {modl_file.name}")
+            else:
+                modl_file = modl_files[0]
+                print(f"No unsigned version found, using: {modl_file.name}")
         else:
+            # Prefer signed (non-unsigned) files
             signed_files = [f for f in modl_files if 'unsigned' not in f.name.lower()]
-            modl_file = signed_files[0] if signed_files else modl_files[0]
+            if signed_files:
+                modl_file = signed_files[0]
+                print(f"Found signed module: {modl_file.name}")
+            else:
+                modl_file = modl_files[0]
+                print(f"No signed version found, using: {modl_file.name}")
 
-        # Extract module name from module.xml
+        # Extract metadata from module.xml
         with zipfile.ZipFile(modl_file, 'r') as zf:
             module_xml = zf.read('module.xml').decode('utf-8')
             root = ET.fromstring(module_xml)
             module_elem = root.find('module')
             module_name = module_elem.find('name').text
+            module_version = module_elem.find('version').text
+            module_id = module_elem.find('id').text
 
         print(f"Module to upgrade: {module_name}")
+        print(f"Version: {module_version}")
+        print(f"ID: {module_id}")
+        print(f"File: {modl_file.name}")
+
+        # Store for later use
         set_variable('module_name', module_name)
+        set_variable('module_version', module_version)
+        set_variable('module_id', module_id)
+        set_variable('module_path', str(modl_file))
+        set_variable('module_filename', modl_file.name)
 
   # ==========================================================================
   # STEP 2: Uninstall Existing Module
@@ -102,7 +125,7 @@ steps:
       username: "{{ parameter.username }}"
       password: "{{ parameter.password }}"
       module_folder: "{{ parameter.module_folder }}"
-      module_type: "false"
+      prefer_unsigned: "{{ parameter.prefer_unsigned }}"
 
   # ==========================================================================
   # STEP 4: Summary Report

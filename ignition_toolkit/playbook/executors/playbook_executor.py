@@ -105,6 +105,13 @@ class PlaybookRunHandler(StepHandler):
             # Extract parameters for child playbook (remove 'playbook' key)
             child_params = {k: v for k, v in params.items() if k != "playbook"}
 
+            # Apply default values for missing optional parameters (Bug fix: nested playbooks need defaults)
+            # This mirrors the logic in engine.py lines 239-245
+            for param in nested_playbook.parameters:
+                if param.name not in child_params and param.default is not None:
+                    child_params[param.name] = param.default
+                    logger.info(f"Applied default value for nested parameter '{param.name}': {param.default}")
+
             # Execute nested playbook using EXISTING browser and gateway from parent
             # This allows browser context to persist across nested calls
             logger.info(f"Executing nested playbook: {playbook_path}")

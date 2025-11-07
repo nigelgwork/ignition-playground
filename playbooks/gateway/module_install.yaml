@@ -194,59 +194,129 @@ steps:
       force: true
 
   # ==========================================================================
-  # STEP 12: Wait for Certificate Dialog (up to 30s)
+  # STEP 12: Wait for First Acceptance Dialog - Certificate or License (up to 30s)
   # ==========================================================================
-  - id: step12_wait_for_cert_dialog
-    name: "Step 12: Wait for Certificate Dialog (timeout: 30s)"
+  - id: step12_wait_for_first_dialog
+    name: "Step 12: Wait for First Acceptance Dialog (timeout: 30s)"
     type: browser.verify
     parameters:
-      selector: 'text=I accept the module certificate'
+      selector: 'text=I accept'
       state: "visible"
       timeout: 30000
 
   # ==========================================================================
-  # STEP 13: Click Certificate Checkbox
+  # STEP 13: Click Certificate Checkbox (if present in first dialog)
   # ==========================================================================
   - id: step13_click_cert_checkbox
-    name: "Step 13: Click 'I accept the module certificate'"
+    name: "Step 13: Click 'I accept the module certificate' (if present)"
     type: browser.click
     parameters:
       selector: 'text=I accept the module certificate'
-      timeout: 10000
+      timeout: 5000
     on_failure: continue
 
   # ==========================================================================
-  # STEP 14: Verify Accept Certificate Button is Enabled
+  # STEP 13b: Click License Checkbox (if first dialog is license)
+  # ==========================================================================
+  - id: step13b_click_license_checkbox
+    name: "Step 13b: Click 'I accept' for license (if present)"
+    type: browser.click
+    parameters:
+      selector: 'label:has-text("I accept"):not(:has-text("certificate"))'
+      timeout: 5000
+    on_failure: continue
+
+  # ==========================================================================
+  # STEP 14: Verify Accept Button is Enabled (First Dialog)
   # ==========================================================================
   - id: step14_verify_accept_button_enabled
-    name: "Step 14: Verify Accept Certificate Button is Enabled"
+    name: "Step 14: Verify Accept Button is Enabled"
     type: browser.verify
     parameters:
-      selector: 'button:has-text("Accept Certificate"):not([disabled])'
+      selector: 'button[data-component="web-ui.button"]:has-text("Accept"):not([disabled])'
       state: "visible"
       timeout: 10000
     on_failure: continue
 
   # ==========================================================================
-  # STEP 15: Click Accept Certificate Button
+  # STEP 15: Click Accept Button (First Dialog)
   # ==========================================================================
-  - id: step15_click_accept_certificate
-    name: "Step 15: Click Accept Certificate Button"
+  - id: step15_click_accept_button
+    name: "Step 15: Click Accept Button (First Dialog)"
     type: browser.click
     parameters:
-      selector: 'button:has-text("Accept Certificate")'
+      selector: 'button[data-component="web-ui.button"]:has-text("Accept")'
       timeout: 10000
       force: true
     on_failure: continue
 
   # ==========================================================================
-  # STEP 16: Verify Certificate Dialog Closed
+  # STEP 16: Verify First Dialog Closed
   # ==========================================================================
-  - id: step16_verify_cert_dialog_closed
-    name: "Step 16: Verify Certificate Dialog Closed"
+  - id: step16_verify_first_dialog_closed
+    name: "Step 16: Verify First Dialog Closed"
     type: browser.verify
     parameters:
-      selector: 'button:has-text("Accept Certificate")'
+      selector: 'button[data-component="web-ui.button"]:has-text("Accept")'
+      state: "hidden"
+      timeout: 10000
+    on_failure: continue
+
+  # ==========================================================================
+  # STEP 16b: Wait for Second Acceptance Dialog - License (if certificate was first)
+  # ==========================================================================
+  - id: step16b_wait_for_second_dialog
+    name: "Step 16b: Wait for Second Acceptance Dialog (if present)"
+    type: browser.verify
+    parameters:
+      selector: 'text=I accept'
+      state: "visible"
+      timeout: 10000
+    on_failure: continue
+
+  # ==========================================================================
+  # STEP 16c: Click License Checkbox (second dialog)
+  # ==========================================================================
+  - id: step16c_click_license_checkbox_second
+    name: "Step 16c: Click 'I accept' for license (second dialog)"
+    type: browser.click
+    parameters:
+      selector: 'label:has-text("I accept"):not(:has-text("certificate"))'
+      timeout: 5000
+    on_failure: continue
+
+  # ==========================================================================
+  # STEP 16d: Verify Accept Button is Enabled (Second Dialog)
+  # ==========================================================================
+  - id: step16d_verify_accept_button_enabled_second
+    name: "Step 16d: Verify Accept Button is Enabled (Second Dialog)"
+    type: browser.verify
+    parameters:
+      selector: 'button[data-component="web-ui.button"]:has-text("Accept"):not([disabled])'
+      state: "visible"
+      timeout: 10000
+    on_failure: continue
+
+  # ==========================================================================
+  # STEP 16e: Click Accept Button (Second Dialog)
+  # ==========================================================================
+  - id: step16e_click_accept_button_second
+    name: "Step 16e: Click Accept Button (Second Dialog)"
+    type: browser.click
+    parameters:
+      selector: 'button[data-component="web-ui.button"]:has-text("Accept")'
+      timeout: 10000
+      force: true
+    on_failure: continue
+
+  # ==========================================================================
+  # STEP 16f: Verify Second Dialog Closed
+  # ==========================================================================
+  - id: step16f_verify_second_dialog_closed
+    name: "Step 16f: Verify Second Dialog Closed"
+    type: browser.verify
+    parameters:
+      selector: 'button[data-component="web-ui.button"]:has-text("Accept")'
       state: "hidden"
       timeout: 10000
     on_failure: continue
