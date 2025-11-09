@@ -50,6 +50,22 @@ from ignition_toolkit.playbook.executors.ai_executor import (
     AIGenerateHandler,
     AIValidateHandler,
 )
+from ignition_toolkit.playbook.executors.perspective_executor import (
+    PerspectiveDiscoverPageHandler,
+    PerspectiveExtractMetadataHandler,
+    PerspectiveExecuteTestManifestHandler,
+    PerspectiveVerifyNavigationHandler,
+    PerspectiveVerifyDockHandler,
+)
+from ignition_toolkit.playbook.executors.ai_fat_executor import (
+    AIAnalyzePageStructureHandler,
+    AIGenerateTestCasesHandler,
+    AIVerifyVisualConsistencyHandler,
+)
+from ignition_toolkit.playbook.executors.fat_executor import (
+    FATGenerateReportHandler,
+    FATExportReportHandler,
+)
 
 __all__ = [
     "StepHandler",
@@ -93,4 +109,17 @@ __all__ = [
     "AIGenerateHandler",
     "AIValidateHandler",
     "AIAnalyzeHandler",
+    # Perspective FAT
+    "PerspectiveDiscoverPageHandler",
+    "PerspectiveExtractMetadataHandler",
+    "PerspectiveExecuteTestManifestHandler",
+    "PerspectiveVerifyNavigationHandler",
+    "PerspectiveVerifyDockHandler",
+    # AI FAT
+    "AIAnalyzePageStructureHandler",
+    "AIGenerateTestCasesHandler",
+    "AIVerifyVisualConsistencyHandler",
+    # FAT Reporting
+    "FATGenerateReportHandler",
+    "FATExportReportHandler",
 ]

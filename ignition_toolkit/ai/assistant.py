@@ -235,3 +235,439 @@ Please analyze the situation and provide specific recommendations to fix the iss
                 confidence=0.0,
                 metadata={"error": str(e)},
             )
+
+    async def analyze_page_for_fat(
+        self,
+        screenshot_b64: str,
+        components: list[dict[str, Any]],
+        context: str
+    ) -> AIResponse:
+        """
+        Analyze Perspective page for FAT testing
+
+        Args:
+            screenshot_b64: Base64-encoded screenshot
+            components: List of discovered components
+            context: Additional context about the page
+
+        Returns:
+            AIResponse with component predictions and visual assessment
+        """
+        logger.info(f"AI: Analyze page for FAT - {len(components)} components")
+
+        if not self._client:
+            return AIResponse(
+                success=False,
+                content="AI assistant not available. Please set ANTHROPIC_API_KEY environment variable.",
+                confidence=0.0,
+                metadata={"error": "no_api_key"},
+            )
+
+        try:
+            system_prompt = """You are an expert Perspective SCADA application tester for Factory Acceptance Testing (FAT).
+
+Your task: Analyze a Perspective page screenshot and component inventory to:
+1. Predict expected behavior for each interactive element
+2. Assess visual clarity and consistency
+3. Identify potential issues or concerns
+
+For each component, predict:
+- What should happen when clicked/interacted with
+- How to verify it worked correctly
+- Any visual concerns (clarity, consistency, accessibility)
+
+Return your analysis as structured JSON with this format:
+{
+  "components": [
+    {
+      "id": "component-id",
+      "predicted_behavior": "What should happen",
+      "verification": "How to verify",
+      "visual_assessment": "Visual quality assessment",
+      "concerns": ["List of concerns if any"]
+    }
+  ],
+  "overall_assessment": "Overall page quality assessment",
+  "recommendations": ["List of testing recommendations"]
+}
+
+Be specific and actionable in your predictions."""
+
+            import json
+            components_json = json.dumps(components[:20], indent=2)  # Limit to first 20 for token efficiency
+
+            user_message = f"""**Context:** {context}
+
+**Components Found:** {len(components)} interactive elements
+
+**Component Details (first 20):**
+```json
+{components_json}
+```
+
+Please analyze the screenshot and provide structured predictions for testing these components."""
+
+            # Call Claude API with vision
+            response = self._client.messages.create(
+                model=self.model,
+                max_tokens=4096,
+                system=system_prompt,
+                messages=[{
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "image",
+                            "source": {
+                                "type": "base64",
+                                "media_type": "image/png",
+                                "data": screenshot_b64
+                            }
+                        },
+                        {
+                            "type": "text",
+                            "text": user_message
+                        }
+                    ]
+                }]
+            )
+
+            response_text = (
+                response.content[0].text if response.content else "{}"
+            )
+
+            # Try to parse as JSON
+            try:
+                import json
+                predictions = json.loads(response_text)
+            except json.JSONDecodeError:
+                # If not valid JSON, wrap in structure
+                predictions = {"raw_response": response_text}
+
+            return AIResponse(
+                success=True,
+                content=response_text,
+                confidence=0.9,
+                metadata={
+                    "model": self.model,
+                    "predictions": predictions,
+                    "component_count": len(components),
+                    "usage": {
+                        "input_tokens": (
+                            response.usage.input_tokens if hasattr(response, "usage") else 0
+                        ),
+                        "output_tokens": (
+                            response.usage.output_tokens if hasattr(response, "usage") else 0
+                        ),
+                    },
+                },
+            )
+
+        except Exception as e:
+            logger.error(f"AI page analysis error: {e}", exc_info=True)
+            return AIResponse(
+                success=False,
+                content=f"Error calling AI service: {str(e)}",
+                confidence=0.0,
+                metadata={"error": str(e)},
+            )
+
+    async def generate_fat_test_cases(
+        self,
+        components: list[dict[str, Any]],
+        analysis: dict[str, Any] | None = None,
+        mode: str = "comprehensive"
+    ) -> AIResponse:
+        """
+        Generate FAT test cases from component analysis
+
+        Args:
+            components: List of components to test
+            analysis: Previous AI analysis (optional)
+            mode: Test mode - "comprehensive", "smoke", or "critical_path"
+
+        Returns:
+            AIResponse with test plan
+        """
+        logger.info(f"AI: Generate FAT test cases - {len(components)} components, mode: {mode}")
+
+        if not self._client:
+            # Fallback: Generate basic test plan without AI
+            logger.warning("AI not available - generating basic test plan")
+            basic_plan = self._generate_basic_test_plan(components, mode)
+            return AIResponse(
+                success=True,
+                content="Basic test plan generated (AI not available)",
+                confidence=0.5,
+                metadata={"test_plan": basic_plan, "fallback": True},
+            )
+
+        try:
+            system_prompt = """You are an expert test engineer creating Factory Acceptance Test (FAT) plans for Perspective SCADA applications.
+
+Your task: Generate a comprehensive test plan for the provided components.
+
+For each component, create test cases with:
+- component_id: Component identifier
+- selector: CSS selector to target the element
+- action: What action to perform (click, fill, etc.)
+- expected: Expected outcome
+- verify: How to verify success
+- priority: high, medium, or low
+
+Return as structured JSON:
+{
+  "test_plan": [
+    {
+      "component_id": "btn-start",
+      "selector": "#btn-start",
+      "action": "click",
+      "expected": "Navigate to production view",
+      "verify": "URL contains '/production' and page loads",
+      "priority": "high"
+    }
+  ],
+  "test_summary": {
+    "total_tests": 10,
+    "high_priority": 5,
+    "medium_priority": 3,
+    "low_priority": 2
+  }
+}
+
+Prioritize based on mode: {mode}
+- comprehensive: Test everything thoroughly
+- smoke: Focus on critical functionality only
+- critical_path: Test main user workflows"""
+
+            import json
+            components_json = json.dumps(components[:30], indent=2)
+            analysis_json = json.dumps(analysis, indent=2) if analysis else "None"
+
+            user_message = f"""**Test Mode:** {mode}
+
+**Components to Test:**
+```json
+{components_json}
+```
+
+**Previous Analysis:**
+```json
+{analysis_json}
+```
+
+Generate a structured test plan for FAT testing."""
+
+            response = self._client.messages.create(
+                model=self.model,
+                max_tokens=4096,
+                system=system_prompt,
+                messages=[{"role": "user", "content": user_message}]
+            )
+
+            response_text = response.content[0].text if response.content else "{}"
+
+            # Parse JSON response
+            try:
+                import json
+                test_plan_data = json.loads(response_text)
+                test_plan = test_plan_data.get("test_plan", [])
+            except json.JSONDecodeError:
+                logger.warning("AI response not valid JSON, using fallback")
+                test_plan = self._generate_basic_test_plan(components, mode)
+
+            return AIResponse(
+                success=True,
+                content=response_text,
+                confidence=0.9,
+                metadata={
+                    "model": self.model,
+                    "test_plan": test_plan,
+                    "mode": mode,
+                    "usage": {
+                        "input_tokens": (
+                            response.usage.input_tokens if hasattr(response, "usage") else 0
+                        ),
+                        "output_tokens": (
+                            response.usage.output_tokens if hasattr(response, "usage") else 0
+                        ),
+                    },
+                },
+            )
+
+        except Exception as e:
+            logger.error(f"AI test generation error: {e}", exc_info=True)
+            # Fallback to basic test plan
+            basic_plan = self._generate_basic_test_plan(components, mode)
+            return AIResponse(
+                success=False,
+                content=f"Error calling AI service, using fallback: {str(e)}",
+                confidence=0.5,
+                metadata={"test_plan": basic_plan, "error": str(e), "fallback": True},
+            )
+
+    def _generate_basic_test_plan(
+        self,
+        components: list[dict[str, Any]],
+        mode: str = "comprehensive"
+    ) -> list[dict[str, Any]]:
+        """
+        Generate basic test plan without AI (fallback)
+
+        Args:
+            components: Components to test
+            mode: Test mode
+
+        Returns:
+            Basic test plan
+        """
+        test_plan = []
+
+        for component in components:
+            component_type = component.get("type", "unknown")
+            component_id = component.get("id", "unknown")
+            selector = component.get("selector", "")
+
+            # Skip if in smoke mode and component is low priority
+            if mode == "smoke" and component_type not in ["button", "link"]:
+                continue
+
+            # Generate basic test based on type
+            if component_type == "button":
+                test_plan.append({
+                    "component_id": component_id,
+                    "selector": selector,
+                    "action": "click",
+                    "expected": "Navigation or state change",
+                    "verify": "No JavaScript errors",
+                    "priority": "high"
+                })
+            elif component_type == "input":
+                test_plan.append({
+                    "component_id": component_id,
+                    "selector": selector,
+                    "action": "fill",
+                    "value": "Test123",
+                    "expected": "Input accepts text",
+                    "verify": "Value updated",
+                    "priority": "medium"
+                })
+            elif component_type == "link":
+                test_plan.append({
+                    "component_id": component_id,
+                    "selector": selector,
+                    "action": "click",
+                    "expected": "Navigation",
+                    "verify": "URL changed",
+                    "priority": "high"
+                })
+
+        return test_plan
+
+    async def verify_visual_consistency(
+        self,
+        screenshot_b64: str,
+        guidelines: list[str]
+    ) -> AIResponse:
+        """
+        Verify visual consistency against guidelines using AI vision
+
+        Args:
+            screenshot_b64: Base64-encoded screenshot
+            guidelines: List of visual guidelines to check
+
+        Returns:
+            AIResponse with visual assessment
+        """
+        logger.info(f"AI: Verify visual consistency - {len(guidelines)} guidelines")
+
+        if not self._client:
+            return AIResponse(
+                success=False,
+                content="AI assistant not available for visual verification.",
+                confidence=0.0,
+                metadata={"error": "no_api_key"},
+            )
+
+        try:
+            guidelines_text = "\n".join([f"- {g}" for g in guidelines])
+
+            system_prompt = """You are an expert UI/UX designer reviewing Perspective SCADA interfaces for visual consistency and quality.
+
+Your task: Analyze the screenshot against the provided visual guidelines and identify any violations or concerns.
+
+Return as structured JSON:
+{
+  "compliance": {
+    "passed": ["Guidelines that are met"],
+    "failed": ["Guidelines that are violated"],
+    "warnings": ["Potential issues to review"]
+  },
+  "issues_count": 5,
+  "overall_assessment": "Overall visual quality assessment",
+  "recommendations": ["Specific recommendations for improvements"]
+}"""
+
+            user_message = f"""**Visual Guidelines to Check:**
+{guidelines_text}
+
+Please analyze the screenshot and report on compliance with these guidelines."""
+
+            response = self._client.messages.create(
+                model=self.model,
+                max_tokens=2048,
+                system=system_prompt,
+                messages=[{
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "image",
+                            "source": {
+                                "type": "base64",
+                                "media_type": "image/png",
+                                "data": screenshot_b64
+                            }
+                        },
+                        {
+                            "type": "text",
+                            "text": user_message
+                        }
+                    ]
+                }]
+            )
+
+            response_text = response.content[0].text if response.content else "{}"
+
+            # Parse JSON
+            try:
+                import json
+                report = json.loads(response_text)
+            except json.JSONDecodeError:
+                report = {"raw_response": response_text}
+
+            return AIResponse(
+                success=True,
+                content=response_text,
+                confidence=0.85,
+                metadata={
+                    "model": self.model,
+                    "report": report,
+                    "guidelines_count": len(guidelines),
+                    "usage": {
+                        "input_tokens": (
+                            response.usage.input_tokens if hasattr(response, "usage") else 0
+                        ),
+                        "output_tokens": (
+                            response.usage.output_tokens if hasattr(response, "usage") else 0
+                        ),
+                    },
+                },
+            )
+
+        except Exception as e:
+            logger.error(f"AI visual verification error: {e}", exc_info=True)
+            return AIResponse(
+                success=False,
+                content=f"Error calling AI service: {str(e)}",
+                confidence=0.0,
+                metadata={"error": str(e)},
+            )
