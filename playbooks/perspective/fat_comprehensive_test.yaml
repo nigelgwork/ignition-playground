@@ -1,0 +1,222 @@
+name: "Perspective FAT - Comprehensive Component Testing"
+version: "1.0"
+description: "Automated Factory Acceptance Testing for Perspective applications - discovers components, generates test plan, executes tests, and generates professional FAT report"
+domain: perspective
+verified: false
+
+parameters:
+  - name: perspective_url
+    type: string
+    required: true
+    description: "Perspective session URL to test (e.g., http://localhost:8088/data/perspective/client/YourProject)"
+
+  - name: project_name
+    type: string
+    required: true
+    description: "Project name for FAT report"
+
+  - name: tester_name
+    type: string
+    required: true
+    description: "Name of person conducting the FAT"
+
+  - name: client_name
+    type: string
+    required: false
+    default: ""
+    description: "Client name for FAT report (optional)"
+
+  - name: test_mode
+    type: string
+    required: false
+    default: "comprehensive"
+    description: "Test mode: comprehensive (all components), smoke (critical only), or critical_path (workflows)"
+
+  - name: enable_visual_verification
+    type: boolean
+    required: false
+    default: false
+    description: "Enable AI visual consistency verification (requires AI API key)"
+
+steps:
+  # ==========================================================================
+  # PHASE 1: NAVIGATION & INITIAL CAPTURE
+  # ==========================================================================
+  - id: step1_navigate
+    name: "Step 1: Navigate to Perspective Page"
+    type: browser.navigate
+    parameters:
+      url: "{{ parameter.perspective_url }}"
+      wait_until: "networkidle"
+    timeout: 30
+
+  - id: step2_initial_screenshot
+    name: "Step 2: Capture Initial Screenshot"
+    type: browser.screenshot
+    parameters:
+      name: "fat_initial_state"
+      full_page: true
+
+  # ==========================================================================
+  # PHASE 2: COMPONENT DISCOVERY
+  # ==========================================================================
+  - id: step3_discover_components
+    name: "Step 3: Discover Interactive Components"
+    type: perspective.discover_page
+    parameters:
+      selector: "body"
+      types:
+        - button
+        - input
+        - link
+        - dropdown
+        - toggle
+      exclude_selectors:
+        - ".ia_header__logo"
+        - "[data-test-ignore='true']"
+
+  - id: step4_log_discovery
+    name: "Step 4: Log Discovery Results"
+    type: utility.log
+    parameters:
+      message: "Discovered {{ step.step3_discover_components.count }} interactive components for FAT testing"
+      level: "info"
+
+  - id: step5_extract_metadata
+    name: "Step 5: Extract Component Metadata"
+    type: perspective.extract_component_metadata
+    parameters:
+      components: "{{ step.step3_discover_components.inventory }}"
+
+  # ==========================================================================
+  # PHASE 3: AI ANALYSIS (Optional - gracefully skips if AI not available)
+  # ==========================================================================
+  - id: step6_ai_analyze
+    name: "Step 6: AI Page Analysis"
+    type: ai.analyze_page_structure
+    parameters:
+      screenshot: "{{ step.step2_initial_screenshot.screenshot }}"
+      components: "{{ step.step5_extract_metadata.enriched_inventory }}"
+      context: "Factory Acceptance Test for {{ parameter.project_name }} - analyzing {{ parameter.perspective_url }}"
+    on_failure: continue
+
+  - id: step7_ai_generate_tests
+    name: "Step 7: AI Test Plan Generation"
+    type: ai.generate_test_cases
+    parameters:
+      components: "{{ step.step5_extract_metadata.enriched_inventory }}"
+      analysis: "{{ step.step6_ai_analyze.predictions }}"
+      mode: "{{ parameter.test_mode }}"
+    on_failure: continue
+
+  - id: step8_log_test_plan
+    name: "Step 8: Log Test Plan"
+    type: utility.log
+    parameters:
+      message: "Generated {{ step.step7_ai_generate_tests.test_count }} test cases (mode: {{ parameter.test_mode }})"
+      level: "info"
+
+  # ==========================================================================
+  # PHASE 4: TEST EXECUTION
+  # ==========================================================================
+  - id: step9_execute_tests
+    name: "Step 9: Execute Component Tests"
+    type: perspective.execute_test_manifest
+    parameters:
+      manifest: "{{ step.step7_ai_generate_tests.test_plan }}"
+      capture_screenshots: true
+      on_failure: "continue"
+      return_to_baseline: true
+      baseline_url: "{{ parameter.perspective_url }}"
+    timeout: 600
+
+  - id: step10_log_results
+    name: "Step 10: Log Test Results"
+    type: utility.log
+    parameters:
+      message: |
+        Test Execution Complete:
+        - Total: {{ step.step9_execute_tests.total }}
+        - Passed: {{ step.step9_execute_tests.passed }}
+        - Failed: {{ step.step9_execute_tests.failed }}
+        - Skipped: {{ step.step9_execute_tests.skipped }}
+      level: "info"
+
+  # ==========================================================================
+  # PHASE 5: VISUAL VERIFICATION (Optional)
+  # ==========================================================================
+  - id: step11_final_screenshot
+    name: "Step 11: Capture Final Screenshot"
+    type: browser.screenshot
+    parameters:
+      name: "fat_final_state"
+      full_page: true
+
+  - id: step12_visual_verification
+    name: "Step 12: AI Visual Consistency Check"
+    type: ai.verify_visual_consistency
+    parameters:
+      screenshot: "{{ step.step11_final_screenshot.screenshot }}"
+      guidelines:
+        - "All text is readable with sufficient contrast"
+        - "Interactive elements are clearly identifiable"
+        - "Colors are consistent with design standards"
+        - "Layout is properly aligned and spaced"
+        - "No visual artifacts or rendering issues"
+    condition: "{{ parameter.enable_visual_verification == true }}"
+    on_failure: continue
+
+  # ==========================================================================
+  # PHASE 6: REPORT GENERATION
+  # ==========================================================================
+  - id: step13_generate_report
+    name: "Step 13: Generate FAT Report"
+    type: fat.generate_report
+    parameters:
+      test_results: "{{ step.step9_execute_tests }}"
+      visual_analysis: "{{ step.step12_visual_verification }}"
+      screenshots_dir: "./data/screenshots"
+      format: "html"
+      metadata:
+        project_name: "{{ parameter.project_name }}"
+        test_date: "{{ execution.started_at }}"
+        tester: "{{ parameter.tester_name }}"
+        client: "{{ parameter.client_name }}"
+        perspective_url: "{{ parameter.perspective_url }}"
+        test_mode: "{{ parameter.test_mode }}"
+
+  - id: step14_export_report
+    name: "Step 14: Export FAT Report"
+    type: fat.export_report
+    parameters:
+      report_id: "{{ step.step13_generate_report.report_id }}"
+      format: "html"
+      output_path: "./reports/FAT_{{ parameter.project_name }}_{{ execution.started_at }}.html"
+
+  # ==========================================================================
+  # PHASE 7: SUMMARY
+  # ==========================================================================
+  - id: step15_summary
+    name: "Step 15: FAT Test Summary"
+    type: utility.log
+    parameters:
+      message: |
+        ========================================
+        FACTORY ACCEPTANCE TEST COMPLETE
+        ========================================
+        Project: {{ parameter.project_name }}
+        URL: {{ parameter.perspective_url }}
+        Components Discovered: {{ step.step3_discover_components.count }}
+        Tests Executed: {{ step.step9_execute_tests.total }}
+        Passed: {{ step.step9_execute_tests.passed }}
+        Failed: {{ step.step9_execute_tests.failed }}
+        Visual Issues: {{ step.step12_visual_verification.issues_count }}
+        Report: {{ step.step14_export_report.output_path }}
+        ========================================
+      level: "info"
+
+metadata:
+  author: "Ignition Automation Toolkit"
+  category: "perspective"
+  tags: ["FAT", "testing", "acceptance", "automation", "AI-assisted"]
+  version: "1.0"

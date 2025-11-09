@@ -1,0 +1,100 @@
+name: "Perspective FAT - Basic Component Discovery"
+version: "1.0"
+description: "Simple FAT test - discovers components and generates basic test report (no AI required)"
+domain: perspective
+verified: false
+
+parameters:
+  - name: perspective_url
+    type: string
+    required: true
+    description: "Perspective session URL to test"
+
+  - name: project_name
+    type: string
+    required: true
+    description: "Project name for report"
+
+steps:
+  # Navigate to page
+  - id: navigate
+    name: "Navigate to Perspective Page"
+    type: browser.navigate
+    parameters:
+      url: "{{ parameter.perspective_url }}"
+      wait_until: "networkidle"
+
+  # Capture screenshot
+  - id: screenshot
+    name: "Capture Screenshot"
+    type: browser.screenshot
+    parameters:
+      name: "fat_basic_{{ parameter.project_name }}"
+      full_page: true
+
+  # Discover components
+  - id: discover
+    name: "Discover Interactive Components"
+    type: perspective.discover_page
+    parameters:
+      selector: "body"
+      types: []  # Empty = discover all types
+
+  # Extract metadata
+  - id: extract
+    name: "Extract Component Metadata"
+    type: perspective.extract_component_metadata
+    parameters:
+      components: "{{ step.discover.inventory }}"
+
+  # Generate basic test plan (without AI)
+  - id: generate_tests
+    name: "Generate Basic Test Plan"
+    type: ai.generate_test_cases
+    parameters:
+      components: "{{ step.extract.enriched_inventory }}"
+      mode: "comprehensive"
+    # This will use fallback logic if AI not available
+
+  # Execute tests
+  - id: execute
+    name: "Execute Component Tests"
+    type: perspective.execute_test_manifest
+    parameters:
+      manifest: "{{ step.generate_tests.test_plan }}"
+      capture_screenshots: true
+      on_failure: "continue"
+      return_to_baseline: true
+      baseline_url: "{{ parameter.perspective_url }}"
+    timeout: 300
+
+  # Generate report
+  - id: report
+    name: "Generate FAT Report"
+    type: fat.generate_report
+    parameters:
+      test_results: "{{ step.execute }}"
+      format: "html"
+      metadata:
+        project_name: "{{ parameter.project_name }}"
+        test_date: "{{ execution.started_at }}"
+        perspective_url: "{{ parameter.perspective_url }}"
+
+  # Summary
+  - id: summary
+    name: "Test Summary"
+    type: utility.log
+    parameters:
+      message: |
+        FAT Test Complete: {{ parameter.project_name }}
+        Components: {{ step.discover.count }}
+        Tests: {{ step.execute.total }}
+        Passed: {{ step.execute.passed }}
+        Failed: {{ step.execute.failed }}
+        Report: {{ step.report.report_path }}
+      level: "info"
+
+metadata:
+  author: "Ignition Automation Toolkit"
+  category: "perspective"
+  tags: ["FAT", "basic", "no-ai"]

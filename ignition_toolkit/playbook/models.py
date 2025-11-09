@@ -73,6 +73,22 @@ class StepType(str, Enum):
     AI_VALIDATE = "ai.validate"
     AI_ANALYZE = "ai.analyze"
 
+    # Perspective FAT testing operations
+    PERSPECTIVE_DISCOVER_PAGE = "perspective.discover_page"
+    PERSPECTIVE_EXTRACT_METADATA = "perspective.extract_component_metadata"
+    PERSPECTIVE_EXECUTE_TEST_MANIFEST = "perspective.execute_test_manifest"
+    PERSPECTIVE_VERIFY_NAVIGATION = "perspective.verify_navigation"
+    PERSPECTIVE_VERIFY_DOCK = "perspective.verify_dock_opened"
+
+    # AI FAT testing operations
+    AI_ANALYZE_PAGE_STRUCTURE = "ai.analyze_page_structure"
+    AI_GENERATE_TEST_CASES = "ai.generate_test_cases"
+    AI_VERIFY_VISUAL_CONSISTENCY = "ai.verify_visual_consistency"
+
+    # FAT reporting operations
+    FAT_GENERATE_REPORT = "fat.generate_report"
+    FAT_EXPORT_REPORT = "fat.export_report"
+
 
 class ExecutionStatus(str, Enum):
     """Status of playbook execution"""
