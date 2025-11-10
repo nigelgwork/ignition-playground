@@ -53,9 +53,9 @@ class ParameterResolver:
             step_results: Dictionary mapping step_id to step output (for {{ step.step_id.key }} references)
         """
         self.credential_vault = credential_vault
-        self.parameters = parameters or {}
-        self.variables = variables or {}
-        self.step_results = step_results or {}
+        self.parameters = parameters if parameters is not None else {}
+        self.variables = variables if variables is not None else {}
+        self.step_results = step_results if step_results is not None else {}
 
     def resolve(self, value: Any) -> Any:
         """
