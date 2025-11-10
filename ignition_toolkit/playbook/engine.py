@@ -163,17 +163,17 @@ class PlaybookEngine:
         Raises:
             PlaybookExecutionError: If execution fails
         """
-        logger.debug("execute_playbook called for playbook: {playbook.name}")
+        logger.debug(f"execute_playbook called for playbook: {playbook.name}")
 
         # Create execution state FIRST (before validation)
         # This ensures ALL executions are tracked, even validation failures
         if execution_id is None:
             execution_id = str(uuid.uuid4())
 
-        logger.debug("execution_id: {execution_id}")
+        logger.debug(f"execution_id: {execution_id}")
 
         # Pre-populate all steps with pending status so UI can show them upfront
-        logger.debug("Creating initial step results for {len(playbook.steps)} steps")
+        logger.debug(f"Creating initial step results for {len(playbook.steps)} steps")
         initial_step_results = [
             StepResult(
                 step_id=step.id,
@@ -206,7 +206,7 @@ class PlaybookEngine:
         self.state_manager.reset()
 
         # Save to database IMMEDIATELY (before validation)
-        logger.debug("Saving to database (database={self.database})")
+        logger.debug(f"Saving to database (database={self.database})")
         logger.info(f"Database object: {self.database}, Type: {type(self.database)}")
         if self.database:
             logger.info("Database exists, calling _save_execution_start")
@@ -258,7 +258,7 @@ class PlaybookEngine:
             downloads_dir = Path(download_path) if download_path else None
 
             # Create browser manager for Perspective/browser playbooks (NOT for Designer)
-            logger.debug("Checking screenshot callback (callback={self.screenshot_callback})")
+            logger.debug(f"Checking screenshot callback (callback={self.screenshot_callback})")
             has_browser_steps = any(
                 step.type.value.startswith("browser.") or step.type.value.startswith("perspective.")
                 for step in playbook.steps
@@ -268,7 +268,7 @@ class PlaybookEngine:
             # This ensures nested playbooks can use the shared browser manager
             needs_browser = playbook_domain in ("perspective", "gateway") or has_browser_steps
 
-            logger.debug("Playbook domain: {playbook_domain}, has_browser_steps: {has_browser_steps}, needs_browser: {needs_browser}")
+            logger.debug(f"Playbook domain: {playbook_domain}, has_browser_steps: {has_browser_steps}, needs_browser: {needs_browser}")
 
             if needs_browser:
                 # Create screenshot callback if available
@@ -298,7 +298,7 @@ class PlaybookEngine:
                 self._browser_manager = browser_manager  # Store reference for pause/resume
                 logger.debug("Browser initialization complete")
             else:
-                logger.debug("Skipping browser initialization (not needed for domain={playbook_domain})")
+                logger.debug(f"Skipping browser initialization (not needed for domain={playbook_domain})")
 
             # Create designer manager if playbook has designer steps
             has_designer_steps = any(step.type.value.startswith("designer.") for step in playbook.steps)
@@ -329,9 +329,9 @@ class PlaybookEngine:
 
             # Execute steps (using while loop to support skip back)
             step_index = 0
-            logger.debug("Entering step execution loop ({len(playbook.steps)} steps)")
+            logger.debug(f"Entering step execution loop ({len(playbook.steps)} steps)")
             while step_index < len(playbook.steps):
-                logger.debug("Step loop iteration: step_index={step_index}")
+                logger.debug(f"Step loop iteration: step_index={step_index}")
                 step = playbook.steps[step_index]
                 execution_state.current_step_index = step_index
 
@@ -394,7 +394,7 @@ class PlaybookEngine:
                     continue
 
                 # Execute step
-                logger.debug("Executing step {step_index + 1}/{len(playbook.steps)}: {step.name}")
+                logger.debug(f"Executing step {step_index + 1}/{len(playbook.steps)}: {step.name}")
                 logger.info(f"Executing step {step_index + 1}/{len(playbook.steps)}: {step.name}")
 
                 # Create a RUNNING step result and notify before execution
@@ -417,7 +417,7 @@ class PlaybookEngine:
                 try:
                     # Execute the step
                     step_result = await executor.execute_step(step)
-                    logger.debug("Step execution complete: {step.name} - status={step_result.status}")
+                    logger.debug(f"Step execution complete: {step.name} - status={step_result.status}")
 
                     # Find and replace the running result with the completed result
                     for i, result in enumerate(execution_state.step_results):
@@ -676,7 +676,7 @@ class PlaybookEngine:
         Args:
             execution_state: Current execution state
         """
-        logger.debug("_notify_update called: status={execution_state.status.value}, current_step={execution_state.current_step_index}, steps={len(execution_state.step_results)}")
+        logger.debug(f"_notify_update called: status={execution_state.status.value}, current_step={execution_state.current_step_index}, steps={len(execution_state.step_results)}")
 
         # DEBUG: Log detailed step statuses
         if execution_state.current_step_index is not None and execution_state.current_step_index < len(execution_state.step_results):
