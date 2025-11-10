@@ -25,6 +25,14 @@ def main() -> None:
 @click.option("--reload", is_flag=True, help="Enable auto-reload for development")
 def serve(host: str | None, port: int | None, reload: bool) -> None:
     """Start the API server and web UI"""
+    import logging
+
+    # Configure logging FIRST - set to DEBUG to see all logs including perspective handler logs
+    logging.basicConfig(
+        level=logging.DEBUG,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    )
+
     # Import settings to get defaults from .env or Settings
     from ignition_toolkit.core.config import get_settings
 
