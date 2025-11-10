@@ -257,34 +257,46 @@ class PlaybookEngine:
             download_path = parameters.get("download_path")
             downloads_dir = Path(download_path) if download_path else None
 
-            # Create browser manager ONLY for Perspective/browser playbooks (NOT for Designer)
+            # Create browser manager for Perspective/browser playbooks (NOT for Designer)
             logger.debug("Checking screenshot callback (callback={self.screenshot_callback})")
-            has_browser_steps = any(step.type.value.startswith("browser.") for step in playbook.steps)
+            has_browser_steps = any(
+                step.type.value.startswith("browser.") or step.type.value.startswith("perspective.")
+                for step in playbook.steps
+            )
             playbook_domain = playbook.metadata.get('domain')
-            # Create browser for perspective, gateway domains, or any playbook with browser steps
+            # Create browser for perspective, gateway domains, or any playbook with browser/perspective steps
             # This ensures nested playbooks can use the shared browser manager
             needs_browser = playbook_domain in ("perspective", "gateway") or has_browser_steps
 
             logger.debug("Playbook domain: {playbook_domain}, has_browser_steps: {has_browser_steps}, needs_browser: {needs_browser}")
 
-            if self.screenshot_callback and needs_browser:
-                # Create screenshot callback that includes execution_id
-                logger.debug("Creating browser manager with screenshot streaming")
-                async def screenshot_frame_callback(screenshot_b64: str):
-                    await self.screenshot_callback(execution_id, screenshot_b64)
+            if needs_browser:
+                # Create screenshot callback if available
+                screenshot_frame_callback = None
+                if self.screenshot_callback:
+                    logger.debug("Creating browser manager with screenshot streaming")
+                    async def screenshot_frame_callback(screenshot_b64: str):
+                        await self.screenshot_callback(execution_id, screenshot_b64)
+                else:
+                    logger.debug("Creating browser manager without screenshot streaming")
 
                 browser_manager = BrowserManager(
-                    headless=True,  # Headless mode with screenshot streaming for embedded view
+                    headless=True,
                     screenshot_callback=screenshot_frame_callback,
                     downloads_dir=downloads_dir,
                 )
                 logger.debug("Starting browser manager")
                 await browser_manager.start()
-                logger.debug("Starting screenshot streaming")
-                await browser_manager.start_screenshot_streaming()
+
+                if screenshot_frame_callback:
+                    logger.debug("Starting screenshot streaming")
+                    await browser_manager.start_screenshot_streaming()
+                    logger.info(f"Browser screenshot streaming started for execution {execution_id}")
+                else:
+                    logger.info(f"Browser started without streaming for execution {execution_id}")
+
                 self._browser_manager = browser_manager  # Store reference for pause/resume
                 logger.debug("Browser initialization complete")
-                logger.info(f"Browser screenshot streaming started for execution {execution_id}")
             else:
                 logger.debug("Skipping browser initialization (not needed for domain={playbook_domain})")
 
