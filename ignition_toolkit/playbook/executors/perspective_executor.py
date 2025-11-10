@@ -26,26 +26,43 @@ class PerspectiveDiscoverPageHandler(StepHandler):
         self.manager = manager
 
     async def execute(self, params: dict[str, Any]) -> dict[str, Any]:
+        logger.info(f"PerspectiveDiscoverPageHandler.execute() called with params: {params}")
+        logger.info(f"Browser manager instance: {self.manager}")
+
         selector = params.get("selector", "body")
         types = params.get("types", [])
         exclude_selectors = params.get("exclude_selectors", [])
 
+        logger.info(f"Discovery parameters - selector: {selector}, types: {types}, exclude: {exclude_selectors}")
+
         # Load discovery script
         script_path = Path(__file__).parent.parent.parent / "browser" / "component_discovery.js"
+        logger.info(f"Component discovery script path: {script_path}")
 
         if not script_path.exists():
+            logger.error(f"Component discovery script NOT FOUND at: {script_path}")
             raise StepExecutionError(
                 "perspective",
                 f"Component discovery script not found: {script_path}"
             )
 
+        logger.info("Reading component discovery script...")
         with open(script_path, "r") as f:
             discovery_script = f.read()
+        logger.info(f"Discovery script loaded ({len(discovery_script)} characters)")
 
+        logger.info("Getting browser page...")
         page = await self.manager.get_page()
+        logger.info(f"Browser page obtained: {page}")
 
         # Inject discovery script
-        await page.evaluate(discovery_script)
+        logger.info("Injecting discovery script into page...")
+        try:
+            inject_result = await page.evaluate(discovery_script)
+            logger.info(f"Discovery script injected successfully. Result: {inject_result}")
+        except Exception as e:
+            logger.error(f"Failed to inject discovery script: {e}")
+            raise StepExecutionError("perspective", f"Failed to inject discovery script: {e}")
 
         # Execute discovery
         options = {
@@ -53,28 +70,39 @@ class PerspectiveDiscoverPageHandler(StepHandler):
             "excludeSelectors": exclude_selectors
         }
 
-        result = await page.evaluate(
-            f"discoverPerspectiveComponents('{selector}', {json.dumps(options)})"
-        )
+        logger.info(f"Executing discoverPerspectiveComponents with selector='{selector}', options={options}")
+        try:
+            result = await page.evaluate(
+                f"discoverPerspectiveComponents('{selector}', {json.dumps(options)})"
+            )
+            logger.info(f"Discovery executed. Result: {result}")
+        except Exception as e:
+            logger.error(f"Failed to execute discovery: {e}")
+            raise StepExecutionError("perspective", f"Failed to execute discovery: {e}")
 
         if not result.get("success"):
+            error_msg = result.get('error', 'Unknown error')
+            logger.error(f"Component discovery reported failure: {error_msg}")
             raise StepExecutionError(
                 "perspective",
-                f"Component discovery failed: {result.get('error', 'Unknown error')}"
+                f"Component discovery failed: {error_msg}"
             )
 
+        component_count = result.get('count', 0)
         logger.info(
-            f"Discovered {result.get('count', 0)} components "
+            f"Discovered {component_count} components "
             f"(types: {types or 'all'})"
         )
 
-        return {
+        output = {
             "status": "discovered",
-            "count": result.get("count", 0),
+            "count": component_count,
             "inventory": result.get("components", []),
             "timestamp": result.get("timestamp"),
             "root_selector": selector
         }
+        logger.info(f"Returning discovery output: count={component_count}, inventory_length={len(output['inventory'])}")
+        return output
 
 
 class PerspectiveExtractMetadataHandler(StepHandler):
