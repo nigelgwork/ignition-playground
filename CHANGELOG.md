@@ -7,6 +7,52 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [Unreleased]
+
+### ✨ New Features
+
+#### Execution Results Export
+Export full execution results as JSON files for analysis, sharing, or archival.
+
+- **Download button** - New download icon in execution details sidebar
+- **JSON format** - Full execution data including step results, timings, and outputs
+- **Auto-naming** - Files named `execution_{id}_{playbook_name}.json`
+- **One-click export** - No API calls needed, instant download
+
+**Files Modified:**
+- `frontend/src/pages/Executions.tsx:317-328` - Added download handler
+- `frontend/src/pages/Executions.tsx:577-586` - Added download button to UI
+
+#### Final Step Output Display
+View the most recent step output directly in the execution list without opening full details.
+
+- **Last step output** - Automatically shows output from the last step with data
+- **Inline display** - JSON output rendered in collapsible execution row
+- **Smart detection** - Skips empty steps to show meaningful data
+- **Scrollable viewer** - Max height 500px with overflow scroll
+
+**Files Modified:**
+- `frontend/src/pages/Executions.tsx:331-342` - Added helper to find last output step
+- `frontend/src/pages/Executions.tsx:636-669` - Added output display component
+
+#### Windows Shortcuts for WSL2
+Launch Ignition Toolkit from Windows Desktop with one-click shortcuts.
+
+- **Batch scripts** - Start/stop server directly or via systemd
+- **Browser launcher** - Open web UI at http://localhost:5000
+- **Desktop integration** - Create shortcuts via drag-and-drop
+- **Complete guide** - README with troubleshooting and setup instructions
+
+**New Files:**
+- `windows-shortcuts/Start-Ignition-Toolkit.bat` - Direct server start (foreground)
+- `windows-shortcuts/Start-Ignition-Toolkit.ps1` - PowerShell version
+- `windows-shortcuts/Start-Ignition-Toolkit-Systemd.bat` - Background service start
+- `windows-shortcuts/Stop-Ignition-Toolkit-Systemd.bat` - Stop service
+- `windows-shortcuts/Open-Ignition-Toolkit-Browser.bat` - Open web UI
+- `windows-shortcuts/README.md` - Setup guide and troubleshooting
+
+---
+
 ## [4.1.1] - 2025-11-04
 
 ### ✨ New Features

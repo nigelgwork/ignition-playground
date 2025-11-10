@@ -47,6 +47,7 @@ import {
   Cancel as SkippedIcon,
   Delete as DeleteIcon,
   Refresh as RefreshIcon,
+  Download as DownloadIcon,
 } from '@mui/icons-material';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
@@ -312,6 +313,34 @@ export function Executions() {
     setSnackbarOpen(true);
   };
 
+  // Helper function to download execution results as JSON
+  const handleDownloadResults = (execution: ExecutionStatusResponse) => {
+    const dataStr = JSON.stringify(execution, null, 2);
+    const dataBlob = new Blob([dataStr], { type: 'application/json' });
+    const url = URL.createObjectURL(dataBlob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `execution_${execution.execution_id}_${execution.playbook_name.replace(/\s+/g, '_')}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  // Helper function to find the last step with meaningful output
+  const getLastStepWithOutput = (stepResults: any[] | undefined) => {
+    if (!stepResults || stepResults.length === 0) return null;
+
+    // Find the last step that has output data
+    for (let i = stepResults.length - 1; i >= 0; i--) {
+      const step = stepResults[i];
+      if (step.output && Object.keys(step.output).length > 0) {
+        return { step, index: i };
+      }
+    }
+    return null;
+  };
+
   return (
     <Box sx={{ width: '100%', maxWidth: '100%' }}>
       <Typography variant="h4" gutterBottom>
@@ -544,53 +573,101 @@ export function Executions() {
                           <Typography variant="h6" component="div">
                             Step Details
                           </Typography>
-                          <Typography variant="caption" color="text.secondary" sx={{ fontFamily: 'monospace' }}>
-                            ID: {execution.execution_id}
-                          </Typography>
+                          <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                            <Tooltip title="Download full execution results as JSON">
+                              <IconButton
+                                size="small"
+                                color="primary"
+                                onClick={() => handleDownloadResults(execution)}
+                                aria-label="Download results"
+                              >
+                                <DownloadIcon fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                            <Typography variant="caption" color="text.secondary" sx={{ fontFamily: 'monospace' }}>
+                              ID: {execution.execution_id}
+                            </Typography>
+                          </Box>
                         </Box>
                         {execution.step_results && execution.step_results.length > 0 ? (
-                          <List dense>
-                            {execution.step_results.map((step, index) => (
-                              <ListItem key={step.step_id || index}>
-                                <Box sx={{ mr: 2 }}>{getStepStatusIcon(step.status)}</Box>
-                                <ListItemText
-                                  primary={`${index + 1}. ${step.step_name || 'Unnamed Step'}`}
-                                  secondary={
-                                    <>
-                                      <Typography component="span" variant="body2" color="text.primary">
-                                        Status: {step.status.toUpperCase()}
-                                      </Typography>
-                                      {step.started_at && (
-                                        <>
-                                          {' • '}
-                                          Started: {formatTimestamp(step.started_at)}
-                                        </>
-                                      )}
-                                      {step.completed_at && (
-                                        <>
-                                          {' • '}
-                                          Completed: {formatTimestamp(step.completed_at)}
-                                        </>
-                                      )}
-                                      {step.error && (
-                                        <>
-                                          <br />
-                                          <Typography component="span" variant="body2" color="error">
-                                            Error: {step.error}
-                                          </Typography>
-                                        </>
-                                      )}
-                                    </>
-                                  }
-                                />
-                                <Chip
-                                  label={step.status}
-                                  size="small"
-                                  color={getStatusColor(step.status)}
-                                />
-                              </ListItem>
-                            ))}
-                          </List>
+                          <>
+                            <List dense>
+                              {execution.step_results.map((step, index) => (
+                                <ListItem key={step.step_id || index}>
+                                  <Box sx={{ mr: 2 }}>{getStepStatusIcon(step.status)}</Box>
+                                  <ListItemText
+                                    primary={`${index + 1}. ${step.step_name || 'Unnamed Step'}`}
+                                    secondary={
+                                      <>
+                                        <Typography component="span" variant="body2" color="text.primary">
+                                          Status: {step.status.toUpperCase()}
+                                        </Typography>
+                                        {step.started_at && (
+                                          <>
+                                            {' • '}
+                                            Started: {formatTimestamp(step.started_at)}
+                                          </>
+                                        )}
+                                        {step.completed_at && (
+                                          <>
+                                            {' • '}
+                                            Completed: {formatTimestamp(step.completed_at)}
+                                          </>
+                                        )}
+                                        {step.error && (
+                                          <>
+                                            <br />
+                                            <Typography component="span" variant="body2" color="error">
+                                              Error: {step.error}
+                                            </Typography>
+                                          </>
+                                        )}
+                                      </>
+                                    }
+                                  />
+                                  <Chip
+                                    label={step.status}
+                                    size="small"
+                                    color={getStatusColor(step.status)}
+                                  />
+                                </ListItem>
+                              ))}
+                            </List>
+                            {(() => {
+                              const lastStepWithOutput = getLastStepWithOutput(execution.step_results);
+                              if (!lastStepWithOutput) return null;
+
+                              return (
+                                <Box sx={{ mt: 2 }}>
+                                  <Typography variant="subtitle2" color="text.primary" sx={{ mb: 1 }}>
+                                    Final Step Output:
+                                  </Typography>
+                                  <Paper
+                                    variant="outlined"
+                                    sx={{
+                                      p: 2,
+                                      bgcolor: 'background.default',
+                                      maxHeight: '500px',
+                                      overflow: 'auto'
+                                    }}
+                                  >
+                                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
+                                      From Step {lastStepWithOutput.index + 1}: {lastStepWithOutput.step.step_name}
+                                    </Typography>
+                                    <pre style={{
+                                      margin: 0,
+                                      fontFamily: 'monospace',
+                                      fontSize: '0.8rem',
+                                      whiteSpace: 'pre-wrap',
+                                      wordBreak: 'break-word'
+                                    }}>
+                                      {JSON.stringify(lastStepWithOutput.step.output, null, 2)}
+                                    </pre>
+                                  </Paper>
+                                </Box>
+                              );
+                            })()}
+                          </>
                         ) : (
                           <Typography variant="body2" color="text.secondary">
                             No step details available
