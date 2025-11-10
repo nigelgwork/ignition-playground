@@ -40,7 +40,7 @@ parameters:
 
 steps:
   # ==========================================================================
-  # PHASE 1: NAVIGATION & INITIAL CAPTURE
+  # STEP 1: Navigate to Perspective Page
   # ==========================================================================
   - id: step1_navigate
     name: "Step 1: Navigate to Perspective Page"
@@ -50,6 +50,9 @@ steps:
       wait_until: "networkidle"
     timeout: 30
 
+  # ==========================================================================
+  # STEP 2: Capture Initial Screenshot
+  # ==========================================================================
   - id: step2_initial_screenshot
     name: "Step 2: Capture Initial Screenshot"
     type: browser.screenshot
@@ -58,7 +61,7 @@ steps:
       full_page: true
 
   # ==========================================================================
-  # PHASE 2: COMPONENT DISCOVERY
+  # STEP 3: Discover Interactive Components
   # ==========================================================================
   - id: step3_discover_components
     name: "Step 3: Discover Interactive Components"
@@ -75,6 +78,9 @@ steps:
         - ".ia_header__logo"
         - "[data-test-ignore='true']"
 
+  # ==========================================================================
+  # STEP 4: Log Discovery Results
+  # ==========================================================================
   - id: step4_log_discovery
     name: "Step 4: Log Discovery Results"
     type: utility.log
@@ -82,6 +88,9 @@ steps:
       message: "Discovered {{ step.step3_discover_components.count }} interactive components for FAT testing"
       level: "info"
 
+  # ==========================================================================
+  # STEP 5: Extract Component Metadata
+  # ==========================================================================
   - id: step5_extract_metadata
     name: "Step 5: Extract Component Metadata"
     type: perspective.extract_component_metadata
@@ -89,7 +98,7 @@ steps:
       components: "{{ step.step3_discover_components.inventory }}"
 
   # ==========================================================================
-  # PHASE 3: AI ANALYSIS (Optional - gracefully skips if AI not available)
+  # STEP 6: AI Page Analysis (Optional - skips if AI not available)
   # ==========================================================================
   - id: step6_ai_analyze
     name: "Step 6: AI Page Analysis"
@@ -100,6 +109,9 @@ steps:
       context: "Factory Acceptance Test for {{ parameter.project_name }} - analyzing {{ parameter.perspective_url }}"
     on_failure: continue
 
+  # ==========================================================================
+  # STEP 7: AI Test Plan Generation (Optional - skips if AI not available)
+  # ==========================================================================
   - id: step7_ai_generate_tests
     name: "Step 7: AI Test Plan Generation"
     type: ai.generate_test_cases
@@ -109,6 +121,9 @@ steps:
       mode: "{{ parameter.test_mode }}"
     on_failure: continue
 
+  # ==========================================================================
+  # STEP 8: Log Test Plan
+  # ==========================================================================
   - id: step8_log_test_plan
     name: "Step 8: Log Test Plan"
     type: utility.log
@@ -117,7 +132,7 @@ steps:
       level: "info"
 
   # ==========================================================================
-  # PHASE 4: TEST EXECUTION
+  # STEP 9: Execute Component Tests
   # ==========================================================================
   - id: step9_execute_tests
     name: "Step 9: Execute Component Tests"
@@ -130,6 +145,9 @@ steps:
       baseline_url: "{{ parameter.perspective_url }}"
     timeout: 600
 
+  # ==========================================================================
+  # STEP 10: Log Test Results
+  # ==========================================================================
   - id: step10_log_results
     name: "Step 10: Log Test Results"
     type: utility.log
@@ -143,7 +161,7 @@ steps:
       level: "info"
 
   # ==========================================================================
-  # PHASE 5: VISUAL VERIFICATION (Optional)
+  # STEP 11: Capture Final Screenshot
   # ==========================================================================
   - id: step11_final_screenshot
     name: "Step 11: Capture Final Screenshot"
@@ -152,6 +170,9 @@ steps:
       name: "fat_final_state"
       full_page: true
 
+  # ==========================================================================
+  # STEP 12: AI Visual Consistency Check (Optional)
+  # ==========================================================================
   - id: step12_visual_verification
     name: "Step 12: AI Visual Consistency Check"
     type: ai.verify_visual_consistency
@@ -167,7 +188,7 @@ steps:
     on_failure: continue
 
   # ==========================================================================
-  # PHASE 6: REPORT GENERATION
+  # STEP 13: Generate FAT Report
   # ==========================================================================
   - id: step13_generate_report
     name: "Step 13: Generate FAT Report"
@@ -185,6 +206,9 @@ steps:
         perspective_url: "{{ parameter.perspective_url }}"
         test_mode: "{{ parameter.test_mode }}"
 
+  # ==========================================================================
+  # STEP 14: Export FAT Report
+  # ==========================================================================
   - id: step14_export_report
     name: "Step 14: Export FAT Report"
     type: fat.export_report
@@ -194,7 +218,7 @@ steps:
       output_path: "./reports/FAT_{{ parameter.project_name }}_{{ execution.started_at }}.html"
 
   # ==========================================================================
-  # PHASE 7: SUMMARY
+  # STEP 15: FAT Test Summary
   # ==========================================================================
   - id: step15_summary
     name: "Step 15: FAT Test Summary"
