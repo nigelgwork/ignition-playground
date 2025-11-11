@@ -78,6 +78,10 @@ frontend/build/
 # Playbook exports (user-generated)
 exports/
 
+# User-duplicated playbooks (should not be committed)
+playbooks/**/*_copy*.yaml
+playbooks/**/*.backup.*.yaml
+
 # CI/CD workflows (local testing only - DO NOT PUSH TO GITHUB)
 .github/workflows/
 .gitlab-ci.yml
