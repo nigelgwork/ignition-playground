@@ -141,7 +141,7 @@ class ExecutionStatusResponse(BaseModel):
     status: str
     started_at: datetime
     completed_at: datetime | None
-    current_step_index: int
+    current_step_index: int | None
     total_steps: int
     error: str | None
     debug_mode: bool = False
