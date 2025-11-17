@@ -30,6 +30,9 @@ from ignition_toolkit.playbook.executors import (
     BrowserNavigateHandler,
     BrowserScreenshotHandler,
     BrowserVerifyHandler,
+    BrowserVerifyTextHandler,
+    BrowserVerifyAttributeHandler,
+    BrowserVerifyStateHandler,
     BrowserWaitHandler,
     DesignerCloseHandler,
     DesignerLaunchHandler,
@@ -156,6 +159,9 @@ class StepExecutor:
             handlers[StepType.BROWSER_SCREENSHOT] = BrowserScreenshotHandler(self.browser_manager)
             handlers[StepType.BROWSER_WAIT] = BrowserWaitHandler(self.browser_manager)
             handlers[StepType.BROWSER_VERIFY] = BrowserVerifyHandler(self.browser_manager)
+            handlers[StepType.BROWSER_VERIFY_TEXT] = BrowserVerifyTextHandler(self.browser_manager)
+            handlers[StepType.BROWSER_VERIFY_ATTRIBUTE] = BrowserVerifyAttributeHandler(self.browser_manager)
+            handlers[StepType.BROWSER_VERIFY_STATE] = BrowserVerifyStateHandler(self.browser_manager)
 
         # Designer handlers
         if self.designer_manager:

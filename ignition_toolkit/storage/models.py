@@ -335,3 +335,115 @@ class FATComponentTestModel(Base):
             "duration_ms": self.duration_ms,
             "tested_at": self.tested_at.isoformat() if self.tested_at else None,
         }
+
+
+class TestSuiteModel(Base):
+    """
+    Stores test suite executions
+
+    Groups multiple playbook executions together as a test suite
+    for comprehensive testing and re-run failed tests capability.
+    """
+
+    __tablename__ = "test_suites"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    suite_name = Column(String(255), nullable=False)  # User-friendly suite name
+    page_url = Column(String(500), nullable=True)  # Page being tested
+    status = Column(String(50), nullable=False)  # pending, running, completed, failed
+    total_playbooks = Column(Integer, nullable=False, default=0)
+    completed_playbooks = Column(Integer, nullable=False, default=0)
+    passed_playbooks = Column(Integer, nullable=False, default=0)
+    failed_playbooks = Column(Integer, nullable=False, default=0)
+    total_components_tested = Column(Integer, nullable=False, default=0)
+    passed_tests = Column(Integer, nullable=False, default=0)
+    failed_tests = Column(Integer, nullable=False, default=0)
+    skipped_tests = Column(Integer, nullable=False, default=0)
+    started_at = Column(DateTime, default=utcnow, nullable=False)
+    completed_at = Column(DateTime, nullable=True)
+    suite_metadata = Column(JSON, nullable=True)  # Additional metadata
+
+    # Relationships
+    suite_executions = relationship(
+        "TestSuiteExecutionModel", back_populates="suite", cascade="all, delete-orphan"
+    )
+
+    # Indexes for performance
+    __table_args__ = (
+        Index("idx_test_suites_status", "status"),
+        Index("idx_test_suites_started_at", "started_at"),
+        Index("idx_test_suites_suite_name", "suite_name"),
+    )
+
+    def to_dict(self) -> dict:
+        """Convert to dictionary"""
+        return {
+            "id": self.id,
+            "suite_name": self.suite_name,
+            "page_url": self.page_url,
+            "status": self.status,
+            "total_playbooks": self.total_playbooks,
+            "completed_playbooks": self.completed_playbooks,
+            "passed_playbooks": self.passed_playbooks,
+            "failed_playbooks": self.failed_playbooks,
+            "total_components_tested": self.total_components_tested,
+            "passed_tests": self.passed_tests,
+            "failed_tests": self.failed_tests,
+            "skipped_tests": self.skipped_tests,
+            "started_at": self.started_at.isoformat() if self.started_at else None,
+            "completed_at": self.completed_at.isoformat() if self.completed_at else None,
+            "suite_metadata": self.suite_metadata,
+            "suite_executions": [se.to_dict() for se in self.suite_executions],
+        }
+
+
+class TestSuiteExecutionModel(Base):
+    """
+    Links test suite to individual playbook executions
+
+    Tracks which playbook executions are part of which test suite
+    and stores execution-specific test results for re-run capability.
+    """
+
+    __tablename__ = "test_suite_executions"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    suite_id = Column(Integer, ForeignKey("test_suites.id"), nullable=False)
+    execution_id = Column(Integer, ForeignKey("executions.id"), nullable=False)
+    playbook_name = Column(String(255), nullable=False)  # Denormalized for easier queries
+    playbook_type = Column(
+        String(100), nullable=True
+    )  # button_tests, input_tests, dock_tests, visual_tests
+    status = Column(String(50), nullable=False)  # completed, failed
+    passed_tests = Column(Integer, nullable=False, default=0)
+    failed_tests = Column(Integer, nullable=False, default=0)
+    skipped_tests = Column(Integer, nullable=False, default=0)
+    execution_order = Column(Integer, nullable=False, default=0)  # Order within suite
+    failed_component_ids = Column(JSON, nullable=True)  # List of failed component IDs for re-run
+
+    # Relationships
+    suite = relationship("TestSuiteModel", back_populates="suite_executions")
+    execution = relationship("ExecutionModel")
+
+    # Indexes for performance
+    __table_args__ = (
+        Index("idx_test_suite_executions_suite_id", "suite_id"),
+        Index("idx_test_suite_executions_execution_id", "execution_id"),
+        Index("idx_test_suite_executions_status", "status"),
+    )
+
+    def to_dict(self) -> dict:
+        """Convert to dictionary"""
+        return {
+            "id": self.id,
+            "suite_id": self.suite_id,
+            "execution_id": self.execution_id,
+            "playbook_name": self.playbook_name,
+            "playbook_type": self.playbook_type,
+            "status": self.status,
+            "passed_tests": self.passed_tests,
+            "failed_tests": self.failed_tests,
+            "skipped_tests": self.skipped_tests,
+            "execution_order": self.execution_order,
+            "failed_component_ids": self.failed_component_ids,
+        }

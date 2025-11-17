@@ -94,6 +94,72 @@ function SortablePlaybookCard({ playbook, onConfigure, onExecute, onExport, onVi
   );
 }
 
+// Sortable accordion wrapper for category reordering
+function SortableAccordion({
+  categoryId,
+  expanded,
+  onChange,
+  dragEnabled,
+  title,
+  children
+}: {
+  categoryId: string;
+  expanded: boolean;
+  onChange: (event: React.SyntheticEvent, isExpanded: boolean) => void;
+  dragEnabled: boolean;
+  title: string;
+  children: React.ReactNode;
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: categoryId, disabled: !dragEnabled });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <div ref={setNodeRef} style={style}>
+      <Accordion expanded={expanded} onChange={onChange}>
+        <AccordionSummary
+          expandIcon={<ExpandMoreIcon />}
+          sx={{
+            minHeight: '32px !important',
+            '& .MuiAccordionSummary-content': { my: '6px !important', display: 'flex', alignItems: 'center', gap: 1 }
+          }}
+        >
+          {dragEnabled && (
+            <Box
+              {...attributes}
+              {...listeners}
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                cursor: 'grab',
+                mr: 1,
+                '&:active': { cursor: 'grabbing' }
+              }}
+            >
+              <DragIcon fontSize="small" />
+            </Box>
+          )}
+          <Typography variant="h6" sx={{ fontSize: '1.1rem' }}>{title}</Typography>
+        </AccordionSummary>
+        <AccordionDetails>
+          {children}
+        </AccordionDetails>
+      </Accordion>
+    </div>
+  );
+}
+
 // Load custom order from localStorage
 function getPlaybookOrder(category: string): string[] {
   const stored = localStorage.getItem(`playbook_order_${category}`);
@@ -103,6 +169,28 @@ function getPlaybookOrder(category: string): string[] {
 // Save custom order to localStorage
 function savePlaybookOrder(category: string, order: string[]) {
   localStorage.setItem(`playbook_order_${category}`, JSON.stringify(order));
+}
+
+// Load category order from localStorage
+function getCategoryOrder(): string[] {
+  const stored = localStorage.getItem('category_order');
+  return stored ? JSON.parse(stored) : ['gateway', 'designer', 'perspective'];
+}
+
+// Save category order to localStorage
+function saveCategoryOrder(order: string[]) {
+  localStorage.setItem('category_order', JSON.stringify(order));
+}
+
+// Load category expanded state from localStorage
+function getCategoryExpandedState(): Record<string, boolean> {
+  const stored = localStorage.getItem('category_expanded');
+  return stored ? JSON.parse(stored) : { gateway: true, designer: true, perspective: true };
+}
+
+// Save category expanded state to localStorage
+function saveCategoryExpandedState(state: Record<string, boolean>) {
+  localStorage.setItem('category_expanded', JSON.stringify(state));
 }
 
 // Apply saved order to playbooks
@@ -202,6 +290,10 @@ export function Playbooks() {
   const [newPlaybookName, setNewPlaybookName] = useState('');
   const [newPlaybookDescription, setNewPlaybookDescription] = useState('');
   const [newPlaybookDomain, setNewPlaybookDomain] = useState<'gateway' | 'perspective' | 'designer'>('gateway');
+
+  // Category order and expanded state
+  const [categoryOrder, setCategoryOrder] = useState<string[]>(getCategoryOrder());
+  const [categoryExpanded, setCategoryExpanded] = useState<Record<string, boolean>>(getCategoryExpandedState());
 
   // Fetch playbooks
   const { data: playbooks = [], isLoading, error } = useQuery<PlaybookInfo[]>({
@@ -395,6 +487,31 @@ export function Playbooks() {
       setPerspectivePlaybooks(newOrder);
       savePlaybookOrder('perspective', newOrder.map(p => p.path));
     }
+  };
+
+  // Handle category reordering
+  const handleCategoryDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (over && active.id !== over.id) {
+      const oldIndex = categoryOrder.indexOf(active.id as string);
+      const newIndex = categoryOrder.indexOf(over.id as string);
+      const newOrder = arrayMove(categoryOrder, oldIndex, newIndex);
+      setCategoryOrder(newOrder);
+      saveCategoryOrder(newOrder);
+    }
+  };
+
+  // Handle category expand/collapse
+  const handleCategoryExpandChange = (categoryId: string) => (
+    _event: React.SyntheticEvent,
+    isExpanded: boolean
+  ) => {
+    const newExpandedState = {
+      ...categoryExpanded,
+      [categoryId]: isExpanded,
+    };
+    setCategoryExpanded(newExpandedState);
+    saveCategoryExpandedState(newExpandedState);
   };
 
   const handleViewSteps = (playbook: PlaybookInfo) => {
@@ -621,186 +738,167 @@ metadata:
 
       {/* Organized Playbook Sections */}
       {!isLoading && !error && (
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-          {/* Gateway Section */}
-          <Accordion defaultExpanded>
-            <AccordionSummary expandIcon={<ExpandMoreIcon />} sx={{ minHeight: '32px !important', '& .MuiAccordionSummary-content': { my: '6px !important' } }}>
-              <Typography variant="h6" sx={{ fontSize: '1.1rem' }}>🔧 Gateway ({gatewayPlaybooks.length})</Typography>
-            </AccordionSummary>
-            <AccordionDetails>
-              {gatewayPlaybooks.length > 0 ? (
-                (() => {
-                  const { grouped, ungrouped } = groupPlaybooks(gatewayPlaybooks);
-                  return (
-                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                      {/* Ungrouped playbooks */}
-                      {ungrouped.length > 0 && (
-                        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleGatewayDragEnd}>
-                          <SortableContext items={ungrouped.map(p => p.path)} strategy={verticalListSortingStrategy}>
-                            <Box
-                              sx={{
-                                display: 'grid',
-                                gridTemplateColumns: {
-                                  xs: '1fr',
-                                  sm: 'repeat(2, 1fr)',
-                                  md: 'repeat(3, 1fr)',
-                                  lg: 'repeat(3, 1fr)',
-                                  xl: 'repeat(4, 1fr)',
-                                },
-                                gap: 4,
-                              }}
-                            >
-                              {ungrouped.map((playbook) => (
-                                <SortablePlaybookCard
-                                  key={playbook.path}
-                                  playbook={playbook}
-                                  onConfigure={handleConfigure}
-                                  onExecute={handleExecute}
-                                  onExport={handleExport}
-                                  onViewSteps={handleViewSteps}
-                                  dragEnabled={dragEnabled}
-                                />
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleCategoryDragEnd}>
+          <SortableContext items={categoryOrder} strategy={verticalListSortingStrategy}>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              {categoryOrder.map((categoryId) => {
+                // Category configuration
+                const categoryConfig = {
+                  gateway: {
+                    title: `🔧 Gateway (${gatewayPlaybooks.length})`,
+                    playbooks: gatewayPlaybooks,
+                    dragHandler: handleGatewayDragEnd,
+                    emptyMessage: 'No Gateway playbooks found. Add YAML playbooks to ./playbooks/gateway/',
+                  },
+                  designer: {
+                    title: `🎨 Designer (${designerPlaybooks.length})`,
+                    playbooks: designerPlaybooks,
+                    dragHandler: handleDesignerDragEnd,
+                    emptyMessage: 'No Designer playbooks found. Add YAML playbooks to ./playbooks/designer/',
+                  },
+                  perspective: {
+                    title: `📱 Perspective (${perspectivePlaybooks.length})`,
+                    playbooks: perspectivePlaybooks,
+                    dragHandler: handlePerspectiveDragEnd,
+                    emptyMessage: 'No Perspective playbooks found. Add YAML playbooks to ./playbooks/perspective/ or ./playbooks/browser/',
+                  },
+                }[categoryId];
+
+                if (!categoryConfig) return null;
+
+                return (
+                  <SortableAccordion
+                    key={categoryId}
+                    categoryId={categoryId}
+                    expanded={categoryExpanded[categoryId] ?? true}
+                    onChange={handleCategoryExpandChange(categoryId)}
+                    dragEnabled={dragEnabled}
+                    title={categoryConfig.title}
+                  >
+                    {categoryConfig.playbooks.length > 0 ? (
+                      (() => {
+                        // Special handling for gateway (has groups)
+                        if (categoryId === 'gateway') {
+                          const { grouped, ungrouped } = groupPlaybooks(categoryConfig.playbooks);
+                          return (
+                            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                              {/* Ungrouped playbooks */}
+                              {ungrouped.length > 0 && (
+                                <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={categoryConfig.dragHandler}>
+                                  <SortableContext items={ungrouped.map(p => p.path)} strategy={verticalListSortingStrategy}>
+                                    <Box
+                                      sx={{
+                                        display: 'grid',
+                                        gridTemplateColumns: {
+                                          xs: '1fr',
+                                          sm: 'repeat(2, 1fr)',
+                                          md: 'repeat(3, 1fr)',
+                                          lg: 'repeat(3, 1fr)',
+                                          xl: 'repeat(4, 1fr)',
+                                        },
+                                        gap: 4,
+                                      }}
+                                    >
+                                      {ungrouped.map((playbook) => (
+                                        <SortablePlaybookCard
+                                          key={playbook.path}
+                                          playbook={playbook}
+                                          onConfigure={handleConfigure}
+                                          onExecute={handleExecute}
+                                          onExport={handleExport}
+                                          onViewSteps={handleViewSteps}
+                                          dragEnabled={dragEnabled}
+                                        />
+                                      ))}
+                                    </Box>
+                                  </SortableContext>
+                                </DndContext>
+                              )}
+
+                              {/* Grouped playbooks */}
+                              {Object.entries(grouped).map(([groupName, groupPlaybooks]) => (
+                                <Accordion key={groupName} defaultExpanded={false} sx={{ bgcolor: 'background.paper', boxShadow: 1 }}>
+                                  <AccordionSummary expandIcon={<ExpandMoreIcon />} sx={{ minHeight: '32px !important', '& .MuiAccordionSummary-content': { my: '6px !important' } }}>
+                                    <Typography variant="subtitle1" sx={{ fontSize: '0.95rem', fontWeight: 500 }}>
+                                      📂 {groupName} ({groupPlaybooks.length})
+                                    </Typography>
+                                  </AccordionSummary>
+                                  <AccordionDetails>
+                                    <Box
+                                      sx={{
+                                        display: 'grid',
+                                        gridTemplateColumns: {
+                                          xs: '1fr',
+                                          sm: 'repeat(2, 1fr)',
+                                          md: 'repeat(3, 1fr)',
+                                          lg: 'repeat(3, 1fr)',
+                                          xl: 'repeat(4, 1fr)',
+                                        },
+                                        gap: 4,
+                                      }}
+                                    >
+                                      {groupPlaybooks.map((playbook) => (
+                                        <PlaybookCard
+                                          key={playbook.path}
+                                          playbook={playbook}
+                                          onConfigure={handleConfigure}
+                                          onExecute={handleExecute}
+                                          onExport={handleExport}
+                                          onViewSteps={handleViewSteps}
+                                        />
+                                      ))}
+                                    </Box>
+                                  </AccordionDetails>
+                                </Accordion>
                               ))}
                             </Box>
-                          </SortableContext>
-                        </DndContext>
-                      )}
+                          );
+                        }
 
-                      {/* Grouped playbooks */}
-                      {Object.entries(grouped).map(([groupName, groupPlaybooks]) => (
-                        <Accordion key={groupName} defaultExpanded={false} sx={{ bgcolor: 'background.paper', boxShadow: 1 }}>
-                          <AccordionSummary expandIcon={<ExpandMoreIcon />} sx={{ minHeight: '32px !important', '& .MuiAccordionSummary-content': { my: '6px !important' } }}>
-                            <Typography variant="subtitle1" sx={{ fontSize: '0.95rem', fontWeight: 500 }}>
-                              📂 {groupName} ({groupPlaybooks.length})
-                            </Typography>
-                          </AccordionSummary>
-                          <AccordionDetails>
-                            <Box
-                              sx={{
-                                display: 'grid',
-                                gridTemplateColumns: {
-                                  xs: '1fr',
-                                  sm: 'repeat(2, 1fr)',
-                                  md: 'repeat(3, 1fr)',
-                                  lg: 'repeat(3, 1fr)',
-                                  xl: 'repeat(4, 1fr)',
-                                },
-                                gap: 4,
-                              }}
-                            >
-                              {groupPlaybooks.map((playbook) => (
-                                <PlaybookCard
-                                  key={playbook.path}
-                                  playbook={playbook}
-                                  onConfigure={handleConfigure}
-                                  onExecute={handleExecute}
-                                  onExport={handleExport}
-                                  onViewSteps={handleViewSteps}
-                                />
-                              ))}
-                            </Box>
-                          </AccordionDetails>
-                        </Accordion>
-                      ))}
-                    </Box>
-                  );
-                })()
-              ) : (
-                <Alert severity="info">
-                  No Gateway playbooks found. Add YAML playbooks to ./playbooks/gateway/
-                </Alert>
-              )}
-            </AccordionDetails>
-          </Accordion>
-
-          {/* Designer Section - Always shown */}
-          <Accordion defaultExpanded>
-            <AccordionSummary expandIcon={<ExpandMoreIcon />} sx={{ minHeight: '32px !important', '& .MuiAccordionSummary-content': { my: '6px !important' } }}>
-              <Typography variant="h6" sx={{ fontSize: '1.1rem' }}>🎨 Designer ({designerPlaybooks.length})</Typography>
-            </AccordionSummary>
-            <AccordionDetails>
-              {designerPlaybooks.length > 0 ? (
-                <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDesignerDragEnd}>
-                  <SortableContext items={designerPlaybooks.map(p => p.path)} strategy={verticalListSortingStrategy}>
-                    <Box
-                      sx={{
-                        display: 'grid',
-                        gridTemplateColumns: {
-                          xs: '1fr',
-                          sm: 'repeat(2, 1fr)',
-                          md: 'repeat(3, 1fr)',
-                          lg: 'repeat(3, 1fr)',
-                          xl: 'repeat(4, 1fr)',
-                        },
-                        gap: 4,
-                      }}
-                    >
-                      {designerPlaybooks.map((playbook) => (
-                        <SortablePlaybookCard
-                          key={playbook.path}
-                          playbook={playbook}
-                          onConfigure={handleConfigure}
-                          onExecute={handleExecute}
-                          onExport={handleExport}
-                          onViewSteps={handleViewSteps}
-                          dragEnabled={dragEnabled}
-                        />
-                      ))}
-                    </Box>
-                  </SortableContext>
-                </DndContext>
-              ) : (
-                <Alert severity="info">
-                  No Designer playbooks found. Add YAML playbooks to ./playbooks/designer/
-                </Alert>
-              )}
-            </AccordionDetails>
-          </Accordion>
-
-          {/* Perspective Section */}
-          <Accordion defaultExpanded>
-            <AccordionSummary expandIcon={<ExpandMoreIcon />} sx={{ minHeight: '32px !important', '& .MuiAccordionSummary-content': { my: '6px !important' } }}>
-              <Typography variant="h6" sx={{ fontSize: '1.1rem' }}>📱 Perspective ({perspectivePlaybooks.length})</Typography>
-            </AccordionSummary>
-            <AccordionDetails>
-              {perspectivePlaybooks.length > 0 ? (
-                <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handlePerspectiveDragEnd}>
-                  <SortableContext items={perspectivePlaybooks.map(p => p.path)} strategy={verticalListSortingStrategy}>
-                    <Box
-                      sx={{
-                        display: 'grid',
-                        gridTemplateColumns: {
-                          xs: '1fr',
-                          sm: 'repeat(2, 1fr)',
-                          md: 'repeat(3, 1fr)',
-                          lg: 'repeat(3, 1fr)',
-                          xl: 'repeat(4, 1fr)',
-                        },
-                        gap: 4,
-                      }}
-                    >
-                      {perspectivePlaybooks.map((playbook) => (
-                        <SortablePlaybookCard
-                          key={playbook.path}
-                          playbook={playbook}
-                          onConfigure={handleConfigure}
-                          onExecute={handleExecute}
-                          onExport={handleExport}
-                          onViewSteps={handleViewSteps}
-                          dragEnabled={dragEnabled}
-                        />
-                      ))}
-                    </Box>
-                  </SortableContext>
-                </DndContext>
-              ) : (
-                <Alert severity="info">
-                  No Perspective playbooks found. Add YAML playbooks to ./playbooks/perspective/ or ./playbooks/browser/
-                </Alert>
-              )}
-            </AccordionDetails>
-          </Accordion>
-        </Box>
+                        // Standard rendering for designer and perspective
+                        return (
+                          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={categoryConfig.dragHandler}>
+                            <SortableContext items={categoryConfig.playbooks.map(p => p.path)} strategy={verticalListSortingStrategy}>
+                              <Box
+                                sx={{
+                                  display: 'grid',
+                                  gridTemplateColumns: {
+                                    xs: '1fr',
+                                    sm: 'repeat(2, 1fr)',
+                                    md: 'repeat(3, 1fr)',
+                                    lg: 'repeat(3, 1fr)',
+                                    xl: 'repeat(4, 1fr)',
+                                  },
+                                  gap: 4,
+                                }}
+                              >
+                                {categoryConfig.playbooks.map((playbook) => (
+                                  <SortablePlaybookCard
+                                    key={playbook.path}
+                                    playbook={playbook}
+                                    onConfigure={handleConfigure}
+                                    onExecute={handleExecute}
+                                    onExport={handleExport}
+                                    onViewSteps={handleViewSteps}
+                                    dragEnabled={dragEnabled}
+                                  />
+                                ))}
+                              </Box>
+                            </SortableContext>
+                          </DndContext>
+                        );
+                      })()
+                    ) : (
+                      <Alert severity="info">
+                        {categoryConfig.emptyMessage}
+                      </Alert>
+                    )}
+                  </SortableAccordion>
+                );
+              })}
+            </Box>
+          </SortableContext>
+        </DndContext>
       )}
 
       {/* Execution dialog */}

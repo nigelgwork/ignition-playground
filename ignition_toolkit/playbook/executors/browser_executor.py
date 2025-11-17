@@ -135,3 +135,193 @@ class BrowserFileUploadHandler(StepHandler):
         timeout = params.get("timeout", 30000)
         await self.manager.set_input_files(selector, file_path, timeout=timeout)
         return {"selector": selector, "file_path": file_path, "status": "uploaded"}
+
+
+class BrowserVerifyTextHandler(StepHandler):
+    """Handle browser.verify_text step"""
+
+    def __init__(self, manager: BrowserManager):
+        self.manager = manager
+
+    async def execute(self, params: dict[str, Any]) -> dict[str, Any]:
+        import re
+
+        selector = params.get("selector")
+        text = params.get("text")
+        match_type = params.get("match", "exact")  # exact, contains, regex
+        timeout = params.get("timeout", 5000)
+
+        # Get element handle
+        try:
+            page = await self.manager.get_page()
+            element = await page.wait_for_selector(selector, timeout=timeout)
+            if not element:
+                raise StepExecutionError(
+                    "browser",
+                    f"Verification failed: Element '{selector}' not found",
+                )
+
+            # Get text content
+            actual_text = await element.text_content()
+            if actual_text is None:
+                actual_text = ""
+
+            # Perform text matching based on match_type
+            matches = False
+            if match_type == "exact":
+                matches = actual_text == text
+            elif match_type == "contains":
+                matches = text in actual_text
+            elif match_type == "regex":
+                matches = bool(re.search(text, actual_text))
+            else:
+                raise StepExecutionError(
+                    "browser",
+                    f"Invalid match type '{match_type}'. Must be one of: exact, contains, regex",
+                )
+
+            if not matches:
+                raise StepExecutionError(
+                    "browser",
+                    f"Text verification failed: Expected text {match_type} match for '{text}', but found '{actual_text}'",
+                )
+
+            return {
+                "selector": selector,
+                "expected_text": text,
+                "actual_text": actual_text,
+                "match_type": match_type,
+                "status": "verified",
+                "message": f"Text verification passed: '{actual_text}' {match_type} matches '{text}'",
+            }
+
+        except Exception as e:
+            if isinstance(e, StepExecutionError):
+                raise
+            raise StepExecutionError("browser", f"Text verification failed: {str(e)}")
+
+
+class BrowserVerifyAttributeHandler(StepHandler):
+    """Handle browser.verify_attribute step"""
+
+    def __init__(self, manager: BrowserManager):
+        self.manager = manager
+
+    async def execute(self, params: dict[str, Any]) -> dict[str, Any]:
+        selector = params.get("selector")
+        attribute = params.get("attribute")
+        value = params.get("value")
+        timeout = params.get("timeout", 5000)
+
+        # Get element handle
+        try:
+            page = await self.manager.get_page()
+            element = await page.wait_for_selector(selector, timeout=timeout)
+            if not element:
+                raise StepExecutionError(
+                    "browser",
+                    f"Verification failed: Element '{selector}' not found",
+                )
+
+            # Get attribute value
+            actual_value = await element.get_attribute(attribute)
+
+            # Compare attribute value
+            if actual_value != value:
+                raise StepExecutionError(
+                    "browser",
+                    f"Attribute verification failed: Expected {attribute}='{value}', but found '{actual_value}'",
+                )
+
+            return {
+                "selector": selector,
+                "attribute": attribute,
+                "expected_value": value,
+                "actual_value": actual_value,
+                "status": "verified",
+                "message": f"Attribute verification passed: {attribute}='{actual_value}'",
+            }
+
+        except Exception as e:
+            if isinstance(e, StepExecutionError):
+                raise
+            raise StepExecutionError("browser", f"Attribute verification failed: {str(e)}")
+
+
+class BrowserVerifyStateHandler(StepHandler):
+    """Handle browser.verify_state step"""
+
+    def __init__(self, manager: BrowserManager):
+        self.manager = manager
+
+    async def execute(self, params: dict[str, Any]) -> dict[str, Any]:
+        selector = params.get("selector")
+        state = params.get("state")  # visible, hidden, enabled, disabled
+        timeout = params.get("timeout", 5000)
+
+        # Get element handle
+        try:
+            page = await self.manager.get_page()
+
+            # Different handling based on state type
+            if state == "visible":
+                element = await page.wait_for_selector(selector, state="visible", timeout=timeout)
+                if not element:
+                    raise StepExecutionError(
+                        "browser",
+                        f"State verification failed: Element '{selector}' is not visible",
+                    )
+
+            elif state == "hidden":
+                element = await page.wait_for_selector(selector, state="hidden", timeout=timeout)
+                if not element:
+                    raise StepExecutionError(
+                        "browser",
+                        f"State verification failed: Element '{selector}' is not hidden",
+                    )
+
+            elif state == "enabled":
+                element = await page.wait_for_selector(selector, timeout=timeout)
+                if not element:
+                    raise StepExecutionError(
+                        "browser",
+                        f"Verification failed: Element '{selector}' not found",
+                    )
+                is_disabled = await element.is_disabled()
+                if is_disabled:
+                    raise StepExecutionError(
+                        "browser",
+                        f"State verification failed: Element '{selector}' is disabled, expected enabled",
+                    )
+
+            elif state == "disabled":
+                element = await page.wait_for_selector(selector, timeout=timeout)
+                if not element:
+                    raise StepExecutionError(
+                        "browser",
+                        f"Verification failed: Element '{selector}' not found",
+                    )
+                is_disabled = await element.is_disabled()
+                if not is_disabled:
+                    raise StepExecutionError(
+                        "browser",
+                        f"State verification failed: Element '{selector}' is enabled, expected disabled",
+                    )
+
+            else:
+                raise StepExecutionError(
+                    "browser",
+                    f"Invalid state '{state}'. Must be one of: visible, hidden, enabled, disabled",
+                )
+
+            return {
+                "selector": selector,
+                "expected_state": state,
+                "status": "verified",
+                "message": f"State verification passed: Element '{selector}' is {state}",
+            }
+
+        except Exception as e:
+            if isinstance(e, StepExecutionError):
+                raise
+            raise StepExecutionError("browser", f"State verification failed: {str(e)}")

@@ -27,6 +27,9 @@ from ignition_toolkit.playbook.executors.browser_executor import (
     BrowserNavigateHandler,
     BrowserScreenshotHandler,
     BrowserVerifyHandler,
+    BrowserVerifyTextHandler,
+    BrowserVerifyAttributeHandler,
+    BrowserVerifyStateHandler,
     BrowserWaitHandler,
 )
 from ignition_toolkit.playbook.executors.designer_executor import (
@@ -90,6 +93,9 @@ __all__ = [
     "BrowserScreenshotHandler",
     "BrowserWaitHandler",
     "BrowserVerifyHandler",
+    "BrowserVerifyTextHandler",
+    "BrowserVerifyAttributeHandler",
+    "BrowserVerifyStateHandler",
     # Designer
     "DesignerLaunchHandler",
     "DesignerLaunchShortcutHandler",
