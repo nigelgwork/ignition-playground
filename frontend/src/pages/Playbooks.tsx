@@ -23,6 +23,7 @@ import {
   MenuItem,
   FormControl,
   InputLabel,
+  Badge,
 } from '@mui/material';
 import {
   ExpandMore as ExpandMoreIcon,
@@ -30,6 +31,8 @@ import {
   Refresh as RefreshIcon,
   DragIndicator as DragIcon,
   Add as AddIcon,
+  Store as StoreIcon,
+  SystemUpdate as UpdateIcon,
 } from '@mui/icons-material';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -53,6 +56,8 @@ import { api } from '../api/client';
 import { PlaybookCard } from '../components/PlaybookCard';
 import { PlaybookExecutionDialog } from '../components/PlaybookExecutionDialog';
 import { PlaybookStepsDialog } from '../components/PlaybookStepsDialog';
+import { PlaybookLibraryDialog } from '../components/PlaybookLibraryDialog';
+import { PlaybookUpdatesDialog } from '../components/PlaybookUpdatesDialog';
 import { useStore } from '../store';
 import type { PlaybookInfo } from '../types/api';
 
@@ -287,6 +292,9 @@ export function Playbooks() {
   const [dragEnabled, setDragEnabled] = useState(false);
   const [stepsDialogPlaybook, setStepsDialogPlaybook] = useState<PlaybookInfo | null>(null);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
+  const [libraryDialogOpen, setLibraryDialogOpen] = useState(false);
+  const [updatesDialogOpen, setUpdatesDialogOpen] = useState(false);
   const [newPlaybookName, setNewPlaybookName] = useState('');
   const [newPlaybookDescription, setNewPlaybookDescription] = useState('');
   const [newPlaybookDomain, setNewPlaybookDomain] = useState<'gateway' | 'perspective' | 'designer'>('gateway');
@@ -300,6 +308,17 @@ export function Playbooks() {
     queryKey: ['playbooks'],
     queryFn: api.playbooks.list,
     refetchInterval: 30000, // Refetch every 30 seconds
+  });
+
+  // Fetch update stats for badge
+  const { data: updateStats } = useQuery({
+    queryKey: ['playbook-update-stats'],
+    queryFn: async () => {
+      const response = await fetch(`${api.getBaseUrl()}/api/playbooks/updates/stats`);
+      if (!response.ok) return null;
+      return response.json();
+    },
+    refetchInterval: 300000, // Refetch every 5 minutes
   });
 
   // Categorize playbooks
@@ -668,9 +687,39 @@ metadata:
         </Box>
 
         <Box sx={{ display: 'flex', gap: 1 }}>
-          <Tooltip title="Create a new playbook from template">
+          <Tooltip title="Browse and install playbooks from repository">
             <Button
               variant="contained"
+              startIcon={<StoreIcon />}
+              onClick={() => setLibraryDialogOpen(true)}
+              size="small"
+              color="secondary"
+            >
+              Browse Library
+            </Button>
+          </Tooltip>
+
+          <Tooltip title="Check for playbook updates">
+            <Badge
+              badgeContent={updateStats?.total_updates_available || 0}
+              color="error"
+              invisible={!updateStats?.has_updates}
+            >
+              <Button
+                variant="outlined"
+                startIcon={<UpdateIcon />}
+                onClick={() => setUpdatesDialogOpen(true)}
+                size="small"
+                color={updateStats?.has_updates ? "warning" : "primary"}
+              >
+                Updates
+              </Button>
+            </Badge>
+          </Tooltip>
+
+          <Tooltip title="Create a new playbook from template">
+            <Button
+              variant="outlined"
               startIcon={<AddIcon />}
               onClick={() => setCreateDialogOpen(true)}
               size="small"
@@ -780,12 +829,15 @@ metadata:
                         // Special handling for gateway (has groups)
                         if (categoryId === 'gateway') {
                           const { grouped, ungrouped } = groupPlaybooks(categoryConfig.playbooks);
+                          // Collect all playbook IDs for single DndContext
+                          const allPlaybookIds = categoryConfig.playbooks.map(p => p.path);
+
                           return (
-                            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                              {/* Ungrouped playbooks */}
-                              {ungrouped.length > 0 && (
-                                <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={categoryConfig.dragHandler}>
-                                  <SortableContext items={ungrouped.map(p => p.path)} strategy={verticalListSortingStrategy}>
+                            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={categoryConfig.dragHandler}>
+                              <SortableContext items={allPlaybookIds} strategy={verticalListSortingStrategy}>
+                                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                                  {/* Ungrouped playbooks */}
+                                  {ungrouped.length > 0 && (
                                     <Box
                                       sx={{
                                         display: 'grid',
@@ -811,47 +863,60 @@ metadata:
                                         />
                                       ))}
                                     </Box>
-                                  </SortableContext>
-                                </DndContext>
-                              )}
+                                  )}
 
-                              {/* Grouped playbooks */}
-                              {Object.entries(grouped).map(([groupName, groupPlaybooks]) => (
-                                <Accordion key={groupName} defaultExpanded={false} sx={{ bgcolor: 'background.paper', boxShadow: 1 }}>
-                                  <AccordionSummary expandIcon={<ExpandMoreIcon />} sx={{ minHeight: '32px !important', '& .MuiAccordionSummary-content': { my: '6px !important' } }}>
-                                    <Typography variant="subtitle1" sx={{ fontSize: '0.95rem', fontWeight: 500 }}>
-                                      📂 {groupName} ({groupPlaybooks.length})
-                                    </Typography>
-                                  </AccordionSummary>
-                                  <AccordionDetails>
-                                    <Box
-                                      sx={{
-                                        display: 'grid',
-                                        gridTemplateColumns: {
-                                          xs: '1fr',
-                                          sm: 'repeat(2, 1fr)',
-                                          md: 'repeat(3, 1fr)',
-                                          lg: 'repeat(3, 1fr)',
-                                          xl: 'repeat(4, 1fr)',
-                                        },
-                                        gap: 4,
+                                  {/* Grouped playbooks */}
+                                  {Object.entries(grouped).map(([groupName, groupPlaybooks]) => (
+                                    <Accordion
+                                      key={groupName}
+                                      expanded={dragEnabled || (expandedGroups[groupName] !== undefined ? expandedGroups[groupName] : true)}
+                                      onChange={() => {
+                                        if (!dragEnabled) {
+                                          setExpandedGroups(prev => ({
+                                            ...prev,
+                                            [groupName]: prev[groupName] !== undefined ? !prev[groupName] : false
+                                          }));
+                                        }
                                       }}
+                                      sx={{ bgcolor: 'background.paper', boxShadow: 1 }}
                                     >
-                                      {groupPlaybooks.map((playbook) => (
-                                        <PlaybookCard
-                                          key={playbook.path}
-                                          playbook={playbook}
-                                          onConfigure={handleConfigure}
-                                          onExecute={handleExecute}
-                                          onExport={handleExport}
-                                          onViewSteps={handleViewSteps}
-                                        />
-                                      ))}
-                                    </Box>
-                                  </AccordionDetails>
-                                </Accordion>
-                              ))}
-                            </Box>
+                                      <AccordionSummary expandIcon={<ExpandMoreIcon />} sx={{ minHeight: '32px !important', '& .MuiAccordionSummary-content': { my: '6px !important' } }}>
+                                        <Typography variant="subtitle1" sx={{ fontSize: '0.95rem', fontWeight: 500 }}>
+                                          📂 {groupName} ({groupPlaybooks.length})
+                                        </Typography>
+                                      </AccordionSummary>
+                                      <AccordionDetails>
+                                        <Box
+                                          sx={{
+                                            display: 'grid',
+                                            gridTemplateColumns: {
+                                              xs: '1fr',
+                                              sm: 'repeat(2, 1fr)',
+                                              md: 'repeat(3, 1fr)',
+                                              lg: 'repeat(3, 1fr)',
+                                              xl: 'repeat(4, 1fr)',
+                                            },
+                                            gap: 4,
+                                          }}
+                                        >
+                                          {groupPlaybooks.map((playbook) => (
+                                            <SortablePlaybookCard
+                                              key={playbook.path}
+                                              playbook={playbook}
+                                              onConfigure={handleConfigure}
+                                              onExecute={handleExecute}
+                                              onExport={handleExport}
+                                              onViewSteps={handleViewSteps}
+                                              dragEnabled={dragEnabled}
+                                            />
+                                          ))}
+                                        </Box>
+                                      </AccordionDetails>
+                                    </Accordion>
+                                  ))}
+                                </Box>
+                              </SortableContext>
+                            </DndContext>
                           );
                         }
 
@@ -975,6 +1040,18 @@ metadata:
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* Playbook Library Dialog */}
+      <PlaybookLibraryDialog
+        open={libraryDialogOpen}
+        onClose={() => setLibraryDialogOpen(false)}
+      />
+
+      {/* Playbook Updates Dialog */}
+      <PlaybookUpdatesDialog
+        open={updatesDialogOpen}
+        onClose={() => setUpdatesDialogOpen(false)}
+      />
 
     </Box>
   );

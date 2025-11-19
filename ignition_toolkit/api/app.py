@@ -20,10 +20,8 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from ignition_toolkit import __version__
-from ignition_toolkit.ai import AIAssistant
 from ignition_toolkit.api.middleware import RateLimitMiddleware
 from ignition_toolkit.api.routers import health_router
-from ignition_toolkit.api.routers.ai import router as ai_router
 from ignition_toolkit.api.routers.config import router as config_router
 from ignition_toolkit.api.routers.credentials import router as credentials_router
 from ignition_toolkit.api.routers.executions import router as executions_router
@@ -67,9 +65,6 @@ app.include_router(schedules_router)
 # Register filesystem router
 app.include_router(filesystem_router)
 
-# Register AI router
-app.include_router(ai_router)
-
 # Register updates router (v4.1.0)
 app.include_router(updates_router)
 
@@ -107,9 +102,6 @@ websocket_connections: list[WebSocket] = []
 claude_code_processes: dict[str, subprocess.Popen] = (
     {}
 )  # Track Claude Code PTY processes by execution_id
-
-# AI Assistant (will use ANTHROPIC_API_KEY from environment)
-ai_assistant = AIAssistant()
 
 # Configuration
 EXECUTION_TTL_MINUTES = 30  # Keep completed executions for 30 minutes

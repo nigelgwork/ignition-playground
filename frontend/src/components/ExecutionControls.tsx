@@ -15,7 +15,6 @@ import {
 import {
   SkipNext as SkipIcon,
   Cancel as CancelIcon,
-  Psychology as AIIcon,
   PlayArrow as ResumeIcon,
   Pause as PauseIcon,
 } from '@mui/icons-material';
@@ -26,15 +25,13 @@ interface ExecutionControlsProps {
   status: string;
   disabled?: boolean;
   debugMode?: boolean;
-  onAIAssist?: () => void;
 }
 
 export function ExecutionControls({
   executionId,
   status,
   disabled = false,
-  debugMode = false,
-  onAIAssist,
+  debugMode: _debugMode = false,
 }: ExecutionControlsProps) {
   const [loading, setLoading] = useState<string | null>(null);
   const cancelInProgressRef = useRef(false);
@@ -107,21 +104,6 @@ export function ExecutionControls({
 
   return (
     <Box sx={{ display: 'flex', gap: 1 }}>
-      {/* AI Assist Button (show when paused OR in debug mode) */}
-      {(isPaused || debugMode) && onAIAssist && (
-        <Tooltip title={debugMode ? "AI assistant available in debug mode" : "Get AI help to debug this issue"}>
-          <Button
-            onClick={onAIAssist}
-            variant="contained"
-            color="secondary"
-            size="small"
-            startIcon={<AIIcon />}
-          >
-            AI
-          </Button>
-        </Tooltip>
-      )}
-
       <ButtonGroup variant="outlined" size="small">
         {/* Skip Button */}
         <Tooltip title="Skip current step">

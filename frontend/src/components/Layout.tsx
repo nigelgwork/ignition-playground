@@ -35,7 +35,6 @@ const navItems = [
   { path: '/', label: 'Playbooks' },
   { path: '/executions', label: 'Executions' },
   { path: '/credentials', label: 'Gateway Credentials' },
-  { path: '/ai', label: 'AI Credentials' },
   { path: '/about', label: 'About' },
 ];
 

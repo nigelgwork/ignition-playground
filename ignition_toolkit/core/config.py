@@ -9,12 +9,13 @@ IMPORTANT: Uses dynamic path resolution from paths.py to work from any directory
 
 from pathlib import Path
 
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from .paths import (
     get_credentials_file,
     get_database_file,
     get_frontend_dist_dir,
+    get_package_root,
     get_playwright_browsers_dir,
 )
 
@@ -68,10 +69,12 @@ class Settings(BaseSettings):
     # Filesystem browser security
     filesystem_allowed_paths: str = ""  # Colon-separated list of allowed directories
 
-    class Config:
-        env_file = ".env"
-        env_file_encoding = "utf-8"
-        case_sensitive = False
+    model_config = SettingsConfigDict(
+        env_file=str(get_package_root() / ".env"),
+        env_file_encoding="utf-8",
+        case_sensitive=False,
+        extra="ignore",
+    )
 
 
 # Singleton pattern for settings

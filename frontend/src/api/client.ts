@@ -293,6 +293,11 @@ export const api = {
         { method: 'DELETE' }
       ),
   },
+
+  /**
+   * Get the base URL for API calls
+   */
+  getBaseUrl: () => API_BASE_URL,
 };
 
 export { APIError };

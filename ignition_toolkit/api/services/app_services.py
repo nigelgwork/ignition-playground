@@ -8,7 +8,6 @@ Replaces module-level globals with proper dependency injection.
 import logging
 from dataclasses import dataclass
 
-from ignition_toolkit.ai import AIAssistant
 from ignition_toolkit.api.services.execution_service import ExecutionService
 from ignition_toolkit.api.services.websocket_manager import WebSocketManager
 from ignition_toolkit.credentials import CredentialVault
@@ -30,7 +29,6 @@ class AppServices:
     - PlaybookMetadataStore (playbook metadata)
     - CredentialVault (credential encryption)
     - Database (SQLite persistence)
-    - AIAssistant (AI operations)
     """
 
     execution_manager: ExecutionManager
@@ -39,7 +37,6 @@ class AppServices:
     metadata_store: PlaybookMetadataStore
     credential_vault: CredentialVault
     database: Database
-    ai_assistant: AIAssistant
 
     @classmethod
     def create(cls, ttl_minutes: int = 30) -> "AppServices":
@@ -59,7 +56,6 @@ class AppServices:
         metadata_store = PlaybookMetadataStore()
         credential_vault = CredentialVault()
         database = get_database()
-        ai_assistant = AIAssistant()
 
         # Create execution service with WebSocket callbacks
         execution_service = ExecutionService(
@@ -79,7 +75,6 @@ class AppServices:
             metadata_store=metadata_store,
             credential_vault=credential_vault,
             database=database,
-            ai_assistant=ai_assistant,
         )
 
     async def cleanup(self) -> None:

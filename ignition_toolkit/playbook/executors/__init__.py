@@ -48,22 +48,12 @@ from ignition_toolkit.playbook.executors.utility_executor import (
     UtilitySetVariableHandler,
     UtilitySleepHandler,
 )
-from ignition_toolkit.playbook.executors.ai_executor import (
-    AIAnalyzeHandler,
-    AIGenerateHandler,
-    AIValidateHandler,
-)
 from ignition_toolkit.playbook.executors.perspective_executor import (
     PerspectiveDiscoverPageHandler,
     PerspectiveExtractMetadataHandler,
     PerspectiveExecuteTestManifestHandler,
     PerspectiveVerifyNavigationHandler,
     PerspectiveVerifyDockHandler,
-)
-from ignition_toolkit.playbook.executors.ai_fat_executor import (
-    AIAnalyzePageStructureHandler,
-    AIGenerateTestCasesHandler,
-    AIVerifyVisualConsistencyHandler,
 )
 from ignition_toolkit.playbook.executors.fat_executor import (
     FATGenerateReportHandler,
@@ -111,20 +101,12 @@ __all__ = [
     "UtilityLogHandler",
     "UtilitySetVariableHandler",
     "UtilityPythonHandler",
-    # AI
-    "AIGenerateHandler",
-    "AIValidateHandler",
-    "AIAnalyzeHandler",
     # Perspective FAT
     "PerspectiveDiscoverPageHandler",
     "PerspectiveExtractMetadataHandler",
     "PerspectiveExecuteTestManifestHandler",
     "PerspectiveVerifyNavigationHandler",
     "PerspectiveVerifyDockHandler",
-    # AI FAT
-    "AIAnalyzePageStructureHandler",
-    "AIGenerateTestCasesHandler",
-    "AIVerifyVisualConsistencyHandler",
     # FAT Reporting
     "FATGenerateReportHandler",
     "FATExportReportHandler",

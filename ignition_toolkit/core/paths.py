@@ -59,7 +59,7 @@ def get_package_dir() -> Path:
 
 def get_playbooks_dir() -> Path:
     """
-    Get the playbooks directory.
+    Get the playbooks directory (DEPRECATED - use get_builtin_playbooks_dir instead).
 
     Returns:
         Path: Absolute path to playbooks/ directory
@@ -70,6 +70,66 @@ def get_playbooks_dir() -> Path:
         /git/ignition-playground/playbooks
     """
     return get_package_root() / "playbooks"
+
+
+def get_builtin_playbooks_dir() -> Path:
+    """
+    Get the built-in playbooks directory.
+
+    These are the playbooks bundled with the toolkit installation (read-only).
+    Contains all built-in playbooks (Gateway, Perspective, Designer).
+
+    Returns:
+        Path: Absolute path to playbooks/ directory at project root
+
+    Example:
+        >>> builtin = get_builtin_playbooks_dir()
+        >>> print(builtin)
+        /git/ignition-playground/playbooks
+    """
+    # Built-in playbooks are at project root /playbooks directory
+    return get_package_root() / "playbooks"
+
+
+def get_user_playbooks_dir() -> Path:
+    """
+    Get the user-installed playbooks directory.
+
+    This is where playbooks installed from the repository are stored (read-write).
+
+    Returns:
+        Path: Absolute path to ~/.ignition-toolkit/playbooks/ directory
+
+    Example:
+        >>> user = get_user_playbooks_dir()
+        >>> print(user)
+        /root/.ignition-toolkit/playbooks
+    """
+    user_playbooks = get_user_data_dir() / "playbooks"
+    user_playbooks.mkdir(exist_ok=True)
+    return user_playbooks
+
+
+def get_all_playbook_dirs() -> list[Path]:
+    """
+    Get all playbook directories in priority order.
+
+    User-installed playbooks take priority over built-in playbooks.
+    This allows users to override built-in playbooks by installing
+    a playbook with the same path.
+
+    Returns:
+        list[Path]: List of playbook directories in priority order
+
+    Example:
+        >>> dirs = get_all_playbook_dirs()
+        >>> print(dirs)
+        [Path('/root/.ignition-toolkit/playbooks'), Path('/git/ignition-playground/playbooks')]
+    """
+    return [
+        get_user_playbooks_dir(),  # User playbooks have priority
+        get_builtin_playbooks_dir()  # Built-in playbooks as fallback
+    ]
 
 
 def get_playbook_path(playbook_name: str) -> Path:
@@ -309,11 +369,13 @@ def ensure_directories() -> None:
     - data/screenshots/
     - data/.playwright-browsers/
     - ~/.ignition-toolkit/
+    - ~/.ignition-toolkit/playbooks/
     """
     get_data_dir()
     get_screenshots_dir()
     get_playwright_browsers_dir()
     get_user_data_dir()
+    get_user_playbooks_dir()  # Create user playbooks directory
 
 
 def get_relative_path(absolute_path: Path) -> Path | None:
@@ -349,7 +411,10 @@ ensure_directories()
 __all__ = [
     "get_package_root",
     "get_package_dir",
-    "get_playbooks_dir",
+    "get_playbooks_dir",  # Deprecated - use get_builtin_playbooks_dir
+    "get_builtin_playbooks_dir",  # NEW: Built-in playbooks
+    "get_user_playbooks_dir",  # NEW: User-installed playbooks
+    "get_all_playbook_dirs",  # NEW: All playbook directories
     "get_playbook_path",
     "get_data_dir",
     "get_screenshots_dir",

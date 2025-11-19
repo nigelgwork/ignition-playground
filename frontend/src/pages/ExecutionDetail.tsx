@@ -41,7 +41,6 @@ import { api } from '../api/client';
 import { LiveBrowserView } from '../components/LiveBrowserView';
 import { ExecutionControls } from '../components/ExecutionControls';
 import { DebugPanel } from '../components/DebugPanel';
-import { AIAssistDialog } from '../components/AIAssistDialog';
 import { PlaybookCodeViewer } from '../components/PlaybookCodeViewer';
 import { useStore } from '../store';
 import type { ExecutionStatusResponse } from '../types/api';
@@ -52,7 +51,6 @@ export function ExecutionDetail() {
   const [debugMode, setDebugMode] = useState(false);
   const [debugModeUserOverride, setDebugModeUserOverride] = useState(false);
   const [debugModeToggling, setDebugModeToggling] = useState(false);
-  const [aiDialogOpen, setAiDialogOpen] = useState(false);
   const [showDebugPanel, setShowDebugPanel] = useState(false);
   const [showCodeViewer, setShowCodeViewer] = useState(false);
   const [runtime, setRuntime] = useState<string>('0s');
@@ -332,7 +330,6 @@ export function ExecutionDetail() {
           executionId={executionId}
           status={execution.status}
           debugMode={debugMode}
-          onAIAssist={() => setAiDialogOpen(true)}
         />
       </Paper>
 
@@ -502,21 +499,6 @@ export function ExecutionDetail() {
         isDebugMode={debugMode}
         isPaused={execution.status === 'paused'}
         onClose={() => setShowCodeViewer(false)}
-      />
-
-      {/* AI Assist Dialog */}
-      <AIAssistDialog
-        open={aiDialogOpen}
-        onClose={() => setAiDialogOpen(false)}
-        executionId={executionId}
-        currentError={execution.error || undefined}
-        currentStep={
-          execution.step_results &&
-          execution.current_step_index !== undefined &&
-          execution.step_results[execution.current_step_index]
-            ? execution.step_results[execution.current_step_index].step_name
-            : undefined
-        }
       />
     </Box>
   );

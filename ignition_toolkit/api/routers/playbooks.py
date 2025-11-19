@@ -15,7 +15,12 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, validator
 
 from ignition_toolkit.api.routers.models import ParameterInfo, PlaybookInfo, StepInfo
-from ignition_toolkit.core.paths import get_playbooks_dir
+from ignition_toolkit.core.paths import (
+    get_playbooks_dir,
+    get_all_playbook_dirs,
+    get_builtin_playbooks_dir,
+    get_user_playbooks_dir,
+)
 from ignition_toolkit.playbook.loader import PlaybookLoader
 
 logger = logging.getLogger(__name__)
@@ -204,81 +209,442 @@ def get_relative_playbook_path(path_str: str) -> str:
 
 @router.get("", response_model=list[PlaybookInfo])
 async def list_playbooks():
-    """List all available playbooks"""
+    """
+    List all available playbooks from all sources.
+
+    Scans both built-in and user-installed playbook directories.
+    User playbooks take priority over built-in playbooks with the same path.
+    """
     metadata_store = get_metadata_store()
-    playbooks_dir = get_playbooks_dir()
-    if not playbooks_dir.exists():
-        return []
 
+    # Get all playbook directories (user has priority)
+    playbook_dirs = get_all_playbook_dirs()
+    builtin_dir = get_builtin_playbooks_dir()
+    user_dir = get_user_playbooks_dir()
+
+    # Track seen playbook paths to handle priority (first seen wins)
+    seen_paths = set()
     playbooks = []
-    for yaml_file in playbooks_dir.rglob("*.yaml"):
-        # Skip backup files
-        if ".backup." in yaml_file.name:
+
+    for playbooks_dir in playbook_dirs:
+        if not playbooks_dir.exists():
             continue
-        try:
-            loader = PlaybookLoader()
-            playbook = loader.load_from_file(yaml_file)
 
-            # Convert parameters to ParameterInfo models
-            parameters = [
-                ParameterInfo(
-                    name=p.name,
-                    type=p.type.value,
-                    required=p.required,
-                    default=str(p.default) if p.default is not None else None,
-                    description=p.description,
+        # Determine source type
+        if playbooks_dir == builtin_dir:
+            source = "built-in"
+        elif playbooks_dir == user_dir:
+            source = "user-installed"
+        else:
+            source = "unknown"
+
+        for yaml_file in playbooks_dir.rglob("*.yaml"):
+            # Skip backup files
+            if ".backup." in yaml_file.name:
+                continue
+
+            try:
+                loader = PlaybookLoader()
+                playbook = loader.load_from_file(yaml_file)
+
+                # Calculate relative path for deduplication
+                # Use path relative to the playbooks_dir (e.g., "gateway/module_upgrade.yaml")
+                relative_path = str(yaml_file.relative_to(playbooks_dir))
+
+                # Skip if we've already seen this playbook path (user overrides built-in)
+                if relative_path in seen_paths:
+                    logger.debug(f"Skipping {relative_path} from {source} (already loaded from higher priority source)")
+                    continue
+
+                seen_paths.add(relative_path)
+
+                # Convert parameters to ParameterInfo models
+                parameters = [
+                    ParameterInfo(
+                        name=p.name,
+                        type=p.type.value,
+                        required=p.required,
+                        default=str(p.default) if p.default is not None else None,
+                        description=p.description,
+                    )
+                    for p in playbook.parameters
+                ]
+
+                # Convert steps to StepInfo models
+                steps = [
+                    StepInfo(
+                        id=s.id,
+                        name=s.name,
+                        type=s.type.value,
+                        timeout=s.timeout,
+                        retry_count=s.retry_count,
+                    )
+                    for s in playbook.steps
+                ]
+
+                # Get metadata for this playbook
+                meta = metadata_store.get_metadata(relative_path)
+
+                # Prefer YAML verified status over database for portability
+                yaml_verified = playbook.metadata.get("verified")
+                verified_status = yaml_verified if yaml_verified is not None else meta.verified
+
+                # Determine origin if not already set
+                if meta.origin == "unknown":
+                    meta.origin = source
+                    metadata_store.update_metadata(relative_path, meta)
+
+                playbooks.append(
+                    PlaybookInfo(
+                        name=playbook.name,
+                        path=relative_path,  # Use relative path instead of absolute
+                        version=playbook.version,
+                        description=playbook.description,
+                        parameter_count=len(playbook.parameters),
+                        step_count=len(playbook.steps),
+                        parameters=parameters,
+                        steps=steps,
+                        domain=playbook.metadata.get("domain"),  # Extract domain from metadata
+                        group=playbook.metadata.get("group"),  # Extract group for UI organization
+                        revision=meta.revision,
+                        verified=verified_status,  # Prefer YAML over database
+                        enabled=meta.enabled,
+                        last_modified=meta.last_modified,
+                        verified_at=meta.verified_at,
+                        # PORTABILITY v4: Include origin tracking
+                        origin=meta.origin,
+                        duplicated_from=meta.duplicated_from,
+                        created_at=meta.created_at,
+                    )
                 )
-                for p in playbook.parameters
-            ]
-
-            # Convert steps to StepInfo models
-            steps = [
-                StepInfo(
-                    id=s.id,
-                    name=s.name,
-                    type=s.type.value,
-                    timeout=s.timeout,
-                    retry_count=s.retry_count,
-                )
-                for s in playbook.steps
-            ]
-
-            # Get metadata for this playbook
-            relative_path = str(yaml_file.relative_to(playbooks_dir))
-            meta = metadata_store.get_metadata(relative_path)
-
-            # Prefer YAML verified status over database for portability
-            yaml_verified = playbook.metadata.get("verified")
-            verified_status = yaml_verified if yaml_verified is not None else meta.verified
-
-            playbooks.append(
-                PlaybookInfo(
-                    name=playbook.name,
-                    path=relative_path,  # Use relative path instead of absolute
-                    version=playbook.version,
-                    description=playbook.description,
-                    parameter_count=len(playbook.parameters),
-                    step_count=len(playbook.steps),
-                    parameters=parameters,
-                    steps=steps,
-                    domain=playbook.metadata.get("domain"),  # Extract domain from metadata
-                    group=playbook.metadata.get("group"),  # Extract group for UI organization
-                    revision=meta.revision,
-                    verified=verified_status,  # Prefer YAML over database
-                    enabled=meta.enabled,
-                    last_modified=meta.last_modified,
-                    verified_at=meta.verified_at,
-                    # PORTABILITY v4: Include origin tracking
-                    origin=meta.origin,
-                    duplicated_from=meta.duplicated_from,
-                    created_at=meta.created_at,
-                )
-            )
-        except Exception as e:
-            logger.warning(f"Failed to load playbook {yaml_file}: {e}")
-            continue
+            except Exception as e:
+                logger.warning(f"Failed to load playbook {yaml_file}: {e}")
+                continue
 
     return playbooks
+
+# ============================================================================
+# Playbook Library Routes (v5.0 - Plugin Architecture)
+# ============================================================================
+
+
+@router.get("/browse")
+async def browse_available_playbooks(force_refresh: bool = False):
+    """
+    Browse playbooks available in the central repository
+
+    Args:
+        force_refresh: Force refresh from GitHub (ignore cache)
+
+    Returns:
+        List of available playbooks with metadata
+    """
+    try:
+        from ignition_toolkit.playbook.registry import PlaybookRegistry
+
+        registry = PlaybookRegistry()
+        registry.load()
+
+        # Fetch available playbooks from GitHub
+        await registry.fetch_available_playbooks(force_refresh=force_refresh)
+
+        # Get playbooks that are not installed
+        available = registry.get_available_playbooks(include_installed=False)
+
+        # Convert to response format
+        playbooks = [
+            {
+                "playbook_path": pb.playbook_path,
+                "version": pb.version,
+                "domain": pb.domain,
+                "verified": pb.verified,
+                "verified_by": pb.verified_by,
+                "description": pb.description,
+                "author": pb.author,
+                "tags": pb.tags,
+                "group": pb.group,
+                "size_bytes": pb.size_bytes,
+                "dependencies": pb.dependencies,
+                "release_notes": pb.release_notes,
+            }
+            for pb in available
+        ]
+
+        return {
+            "status": "success",
+            "count": len(playbooks),
+            "playbooks": playbooks,
+            "last_fetched": registry.last_fetched,
+        }
+
+    except Exception as e:
+        logger.exception(f"Error browsing available playbooks: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+class PlaybookInstallRequest(BaseModel):
+    """Request to install a playbook"""
+    playbook_path: str  # e.g., "gateway/module_upgrade"
+    version: str = "latest"
+    verify_checksum: bool = True
+
+
+@router.post("/install")
+async def install_playbook(request: PlaybookInstallRequest):
+    """
+    Install a playbook from the repository
+
+    Downloads the playbook, verifies checksum, and installs to user directory.
+    """
+    try:
+        from ignition_toolkit.playbook.installer import PlaybookInstaller, PlaybookInstallError
+
+        installer = PlaybookInstaller()
+
+        # Install playbook
+        installed_path = await installer.install_playbook(
+            playbook_path=request.playbook_path,
+            version=request.version,
+            verify_checksum=request.verify_checksum
+        )
+
+        return {
+            "status": "success",
+            "message": f"Playbook {request.playbook_path} installed successfully",
+            "playbook_path": request.playbook_path,
+            "installed_at": str(installed_path),
+        }
+
+    except PlaybookInstallError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.exception(f"Error installing playbook: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.delete("/{playbook_path:path}/uninstall")
+async def uninstall_playbook(playbook_path: str, force: bool = False):
+    """
+    Uninstall a playbook
+
+    Args:
+        playbook_path: Playbook path (e.g., "gateway/module_upgrade")
+        force: Force uninstall even if built-in (dangerous!)
+    """
+    try:
+        from ignition_toolkit.playbook.installer import PlaybookInstaller, PlaybookInstallError
+
+        installer = PlaybookInstaller()
+
+        # Uninstall playbook
+        success = await installer.uninstall_playbook(
+            playbook_path=playbook_path,
+            force=force
+        )
+
+        if not success:
+            raise HTTPException(status_code=404, detail=f"Playbook {playbook_path} not found")
+
+        return {
+            "status": "success",
+            "message": f"Playbook {playbook_path} uninstalled successfully",
+            "playbook_path": playbook_path,
+        }
+
+    except PlaybookInstallError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception(f"Error uninstalling playbook: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/{playbook_path:path}/update")
+async def update_playbook_to_latest(playbook_path: str):
+    """
+    Update a playbook to the latest version
+
+    Args:
+        playbook_path: Playbook path (e.g., "gateway/module_upgrade")
+    """
+    try:
+        from ignition_toolkit.playbook.installer import PlaybookInstaller, PlaybookInstallError
+
+        installer = PlaybookInstaller()
+
+        # Update playbook
+        updated_path = await installer.update_playbook(playbook_path=playbook_path)
+
+        return {
+            "status": "success",
+            "message": f"Playbook {playbook_path} updated successfully",
+            "playbook_path": playbook_path,
+            "installed_at": str(updated_path),
+        }
+
+    except PlaybookInstallError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.exception(f"Error updating playbook: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/updates")
+async def check_for_updates(force_refresh: bool = False):
+    """
+    Check for available playbook updates
+
+    Compares installed playbooks against available versions in the repository.
+
+    Args:
+        force_refresh: Force refresh from GitHub (ignore cache)
+
+    Returns:
+        Update check results with detailed information for each update
+    """
+    try:
+        from ignition_toolkit.playbook.update_checker import PlaybookUpdateChecker
+
+        checker = PlaybookUpdateChecker()
+
+        # Refresh available playbooks if requested
+        if force_refresh:
+            await checker.refresh(force=True)
+
+        # Check for updates
+        result = checker.check_for_updates()
+
+        # Convert updates to response format
+        updates = [
+            {
+                "playbook_path": update.playbook_path,
+                "current_version": update.current_version,
+                "latest_version": update.latest_version,
+                "description": update.description,
+                "release_notes": update.release_notes,
+                "domain": update.domain,
+                "verified": update.verified,
+                "verified_by": update.verified_by,
+                "size_bytes": update.size_bytes,
+                "author": update.author,
+                "tags": update.tags,
+                "is_major_update": update.is_major_update,
+                "version_diff": update.version_diff,
+                "download_url": update.download_url,
+                "checksum": update.checksum,
+            }
+            for update in result.updates
+        ]
+
+        return {
+            "status": "success",
+            "checked_at": result.checked_at,
+            "total_playbooks": result.total_playbooks,
+            "updates_available": result.updates_available,
+            "has_updates": result.has_updates,
+            "last_fetched": result.last_fetched,
+            "updates": updates,
+            "major_updates": len(result.major_updates),
+            "minor_updates": len(result.minor_updates),
+        }
+
+    except Exception as e:
+        logger.exception(f"Error checking for updates: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/updates/stats")
+async def get_update_stats():
+    """
+    Get update statistics
+
+    Returns summary statistics about available updates.
+    """
+    try:
+        from ignition_toolkit.playbook.update_checker import PlaybookUpdateChecker
+
+        checker = PlaybookUpdateChecker()
+        result = checker.check_for_updates()
+
+        # Group updates by domain
+        updates_by_domain = {}
+        for update in result.updates:
+            domain = update.domain
+            if domain not in updates_by_domain:
+                updates_by_domain[domain] = []
+            updates_by_domain[domain].append(update)
+
+        # Get verified updates
+        verified_updates = checker.get_verified_updates()
+
+        return {
+            "status": "success",
+            "checked_at": result.checked_at,
+            "total_installed": result.total_playbooks,
+            "total_updates_available": result.updates_available,
+            "has_updates": result.has_updates,
+            "major_updates": len(result.major_updates),
+            "minor_updates": len(result.minor_updates),
+            "verified_updates": len(verified_updates),
+            "updates_by_domain": {
+                domain: len(updates)
+                for domain, updates in updates_by_domain.items()
+            },
+            "last_fetched": result.last_fetched,
+        }
+
+    except Exception as e:
+        logger.exception(f"Error getting update stats: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/updates/{playbook_path:path}")
+async def check_playbook_update(playbook_path: str):
+    """
+    Check for update for a specific playbook
+
+    Args:
+        playbook_path: Playbook path (e.g., "gateway/module_upgrade")
+
+    Returns:
+        Update information if available, or null if no update
+    """
+    try:
+        from ignition_toolkit.playbook.update_checker import PlaybookUpdateChecker
+
+        checker = PlaybookUpdateChecker()
+        update = checker.get_update(playbook_path)
+
+        if not update:
+            return {
+                "status": "success",
+                "has_update": False,
+                "playbook_path": playbook_path,
+                "message": "No update available",
+            }
+
+        return {
+            "status": "success",
+            "has_update": True,
+            "playbook_path": update.playbook_path,
+            "current_version": update.current_version,
+            "latest_version": update.latest_version,
+            "description": update.description,
+            "release_notes": update.release_notes,
+            "domain": update.domain,
+            "verified": update.verified,
+            "verified_by": update.verified_by,
+            "size_bytes": update.size_bytes,
+            "author": update.author,
+            "tags": update.tags,
+            "is_major_update": update.is_major_update,
+            "version_diff": update.version_diff,
+        }
+
+    except Exception as e:
+        logger.exception(f"Error checking update for {playbook_path}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/{playbook_path:path}", response_model=PlaybookInfo)
@@ -878,3 +1244,5 @@ async def create_playbook(request: PlaybookImportRequest):
     Same as import but intended for creating new playbooks from scratch
     """
     return await import_playbook(request)
+
+

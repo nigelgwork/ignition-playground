@@ -11,7 +11,6 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from ignition_toolkit.ai import AIAssistant
 from ignition_toolkit.browser import BrowserManager
 from ignition_toolkit.designer import DesignerManager
 from ignition_toolkit.gateway import GatewayClient
@@ -21,9 +20,6 @@ from ignition_toolkit.playbook.parameters import ParameterResolver
 
 # Import step handlers
 from ignition_toolkit.playbook.executors import (
-    AIAnalyzeHandler,
-    AIGenerateHandler,
-    AIValidateHandler,
     BrowserClickHandler,
     BrowserFillHandler,
     BrowserFileUploadHandler,
@@ -65,10 +61,6 @@ from ignition_toolkit.playbook.executors import (
     PerspectiveExecuteTestManifestHandler,
     PerspectiveVerifyNavigationHandler,
     PerspectiveVerifyDockHandler,
-    # AI FAT handlers
-    AIAnalyzePageStructureHandler,
-    AIGenerateTestCasesHandler,
-    AIVerifyVisualConsistencyHandler,
     # FAT reporting handlers
     FATGenerateReportHandler,
     FATExportReportHandler,
@@ -93,7 +85,6 @@ class StepExecutor:
         gateway_client: GatewayClient | None = None,
         browser_manager: BrowserManager | None = None,
         designer_manager: DesignerManager | None = None,
-        ai_assistant: AIAssistant | None = None,
         parameter_resolver: ParameterResolver | None = None,
         base_path: Path | None = None,
         state_manager: Any | None = None,  # StateManager type hint causes circular import
@@ -106,7 +97,6 @@ class StepExecutor:
             gateway_client: Gateway client for gateway operations
             browser_manager: Browser manager for browser operations
             designer_manager: Designer manager for designer operations
-            ai_assistant: AI assistant for AI operations
             parameter_resolver: Parameter resolver for resolving references
             base_path: Base path for resolving relative file paths
             state_manager: State manager for pause/resume and debug mode
@@ -115,7 +105,6 @@ class StepExecutor:
         self.gateway_client = gateway_client
         self.browser_manager = browser_manager
         self.designer_manager = designer_manager
-        self.ai_assistant = ai_assistant
         self.parameter_resolver = parameter_resolver
         self.base_path = base_path or Path.cwd()
         self.state_manager = state_manager
@@ -182,11 +171,6 @@ class StepExecutor:
         handlers[StepType.SET_VARIABLE] = UtilitySetVariableHandler()
         handlers[StepType.PYTHON] = UtilityPythonHandler(self.parameter_resolver)
 
-        # AI handlers
-        handlers[StepType.AI_GENERATE] = AIGenerateHandler(self.ai_assistant)
-        handlers[StepType.AI_VALIDATE] = AIValidateHandler(self.ai_assistant)
-        handlers[StepType.AI_ANALYZE] = AIAnalyzeHandler(self.ai_assistant)
-
         # Perspective FAT handlers (require browser manager)
         if self.browser_manager:
             handlers[StepType.PERSPECTIVE_DISCOVER_PAGE] = PerspectiveDiscoverPageHandler(self.browser_manager)
@@ -194,11 +178,6 @@ class StepExecutor:
             handlers[StepType.PERSPECTIVE_EXECUTE_TEST_MANIFEST] = PerspectiveExecuteTestManifestHandler(self.browser_manager)
             handlers[StepType.PERSPECTIVE_VERIFY_NAVIGATION] = PerspectiveVerifyNavigationHandler(self.browser_manager)
             handlers[StepType.PERSPECTIVE_VERIFY_DOCK] = PerspectiveVerifyDockHandler(self.browser_manager)
-
-        # AI FAT handlers (require AI assistant and/or browser manager)
-        handlers[StepType.AI_ANALYZE_PAGE_STRUCTURE] = AIAnalyzePageStructureHandler(self.ai_assistant, self.browser_manager)
-        handlers[StepType.AI_GENERATE_TEST_CASES] = AIGenerateTestCasesHandler(self.ai_assistant)
-        handlers[StepType.AI_VERIFY_VISUAL_CONSISTENCY] = AIVerifyVisualConsistencyHandler(self.ai_assistant, self.browser_manager)
 
         # FAT reporting handlers (always available)
         handlers[StepType.FAT_GENERATE_REPORT] = FATGenerateReportHandler()

@@ -1,23 +1,46 @@
 # Ignition Automation Toolkit
 
-> Lightweight, transferable automation platform for Ignition SCADA Gateway operations
+> Lightweight, transferable automation platform for Ignition SCADA Gateway operations with plugin-based playbook library
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-4.1.0-blue.svg)](VERSION)
+[![Version](https://img.shields.io/badge/version-5.0.0-blue.svg)](VERSION)
 
 ## 🎯 Overview
 
-A modern, Docker-free automation toolkit for Ignition SCADA with complete playbook-driven workflows:
+A modern, Docker-free automation toolkit for Ignition SCADA with **plugin architecture** and playbook marketplace:
 
+- **🔌 Plugin Architecture**: Browse, install, and update playbooks from central repository (NEW in v5.0)
+- **📦 Playbook Library**: 24+ verified playbooks for Gateway, Perspective, and Designer automation
+- **🔄 Automatic Updates**: Check for playbook updates with one-click installation
 - **Gateway Automation**: REST API client for modules, projects, system operations
-- **Playbook System**: YAML-based reusable workflows with 15+ step types
+- **Playbook System**: YAML-based reusable workflows with 35+ step types
 - **Real-Time Control**: Pause, resume, skip steps during execution via WebSocket
-- **Browser Automation**: Playwright integration for web-based operations
+- **Browser Automation**: Playwright integration for Perspective and web-based operations
+- **Designer Integration**: Linux Designer automation with keyboard/mouse control
 - **Secure Credentials**: Fernet-encrypted local storage, never committed to git
 - **Import/Export**: Share playbooks as JSON with colleagues
-- **AI-Ready**: Integration scaffolding for AI-assisted testing steps
 - **Web UI**: Modern dark-theme interface with Warp terminal colors
+
+## ⚡ What's New in v5.0
+
+**Major Changes:**
+- **🔌 Plugin Architecture**: Playbooks are now installable plugins from a central repository
+- **📦 Playbook Library UI**: Browse and install 24+ verified playbooks with search and filtering
+- **🔄 Update System**: Automatic checking for playbook updates with visual notifications
+- **🔐 Enhanced Security**: SHA256 checksum verification for all playbook downloads
+- **🏗️ Restructured Directories**: 6 base playbooks built-in, others installable on-demand
+- **❌ AI Features Removed**: Temporarily removed (will return as optional plugin in future release)
+
+**Migration Required:** See [MIGRATION_V5.md](docs/MIGRATION_V5.md) for upgrade guide
+
+## 📚 Documentation Quick Links
+
+- **[Playbook Library Guide](docs/PLAYBOOK_LIBRARY.md)** - Browse, install, and update playbooks
+- **[Migration Guide (v5.0)](docs/MIGRATION_V5.md)** - Upgrade from v4.x to v5.0
+- **[Getting Started](docs/getting_started.md)** - First-time setup and tutorials
+- **[Playbook Syntax Reference](docs/playbook_syntax.md)** - Writing custom playbooks
+- **[Architecture Documentation](ARCHITECTURE.md)** - Design decisions and ADRs
 
 ## 🚀 Quick Start
 
