@@ -53,6 +53,100 @@ Launch Ignition Toolkit from Windows Desktop with one-click shortcuts.
 
 ---
 
+## [5.1.0] - 2025-11-21
+
+### 🧹 Code Quality & Architecture Improvements
+
+This release focuses on comprehensive cleanup, security hardening, and architectural improvements.
+
+#### Phase 1: Documentation & Security (Critical Fixes)
+
+**Version Synchronization:**
+- Fixed version mismatch across 13+ files (4.1.0 → 5.0.0)
+- Updated CHANGELOG.md with comprehensive v5.0.0 entry
+- Synchronized VERSION, README, CLAUDE.md, PROJECT_GOALS, ARCHITECTURE, ROADMAP
+
+**Security Hardening:**
+- Fixed file permissions: `.env` (644 → 600), database (600 with directory 700)
+- Removed hardcoded `websocket_api_key` in config.py
+- Implemented auto-generated secure tokens using `secrets.token_urlsafe(32)`
+- Added security warning UI for `utility.python` steps (code injection risk)
+- Fixed broken documentation links
+- Resolved AI feature conflicts (marked as temporarily removed)
+
+#### Phase 2: Dependency Updates
+
+**Package Updates:**
+- Updated 48 npm packages (0 vulnerabilities remaining)
+- Updated 6 Python packages: fastapi, click, ruff, mypy, APScheduler, starlette (security fix)
+- Ran pip-audit: 0 vulnerabilities detected
+
+#### Phase 3: Code Quality Quick Wins
+
+**Debug Logging Cleanup:**
+- Reduced debug logs in engine.py: 38 → 9 logs (77% reduction)
+- Reviewed and validated bare exception handlers
+
+**Service Layer Extraction:**
+- Created `ExecutionResponseBuilder` service (180 lines)
+  - Extracted response building logic from executions router
+  - Centralized conversion: ExecutionState → API response
+  - Methods: `from_engine()`, `from_database()`, `from_engine_or_database()`
+- Updated executions.py to use new service: 1,072 → 952 lines (11% reduction)
+
+**React Hooks:**
+- Created `usePlaybookOrder.ts` custom hook (120 lines)
+  - `usePlaybookOrder()` - Playbook display order management
+  - `useCategoryOrder()` - Category order management
+  - `useCategoryExpanded()` - Category expand/collapse state
+  - `useGroupExpanded()` - Group expand/collapse state
+  - All with localStorage persistence
+
+**Engine Refactoring:**
+- Added `_prepare_parameters()` helper method (37 lines)
+- Added `_setup_resource_managers()` helper method (65 lines)
+- Simplified main `execute_playbook()` flow
+
+#### Phase 4: Structural Excellence
+
+**Router Modularization:**
+- Split monolithic `playbooks.py` router (1,248 lines) into 5 focused modules:
+  - `playbook_crud.py` (457 lines) - List, get, update, metadata, edit operations
+  - `playbook_library.py` (334 lines) - Browse, install, uninstall, update, check updates
+  - `playbook_lifecycle.py` (367 lines) - Delete, duplicate, export, import, create
+  - `playbook_metadata.py` (139 lines) - Verify, unverify, enable, disable
+  - `playbooks.py` (90 lines) - Main router aggregator
+- Benefits:
+  - Each module < 500 lines (maintainable)
+  - Clear separation of concerns
+  - Easier testing and modification
+  - 21 routes successfully registered
+  - All functionality preserved
+
+### 📊 Summary Statistics
+
+**Files Created:** 6
+- `ignition_toolkit/api/services/execution_response_builder.py`
+- `frontend/src/hooks/usePlaybookOrder.ts`
+- `ignition_toolkit/api/routers/playbook_crud.py`
+- `ignition_toolkit/api/routers/playbook_library.py`
+- `ignition_toolkit/api/routers/playbook_lifecycle.py`
+- `ignition_toolkit/api/routers/playbook_metadata.py`
+
+**Lines Reduced:**
+- executions.py: 1,072 → 952 lines (-120 lines, 11% reduction)
+- engine.py: 38 → 9 debug logs (77% reduction)
+
+**Security Fixes:** 4 CRITICAL
+- File permissions hardened
+- Hardcoded credentials removed
+- Auto-generated secure tokens
+- Code injection warnings added
+
+**Dependencies Updated:** 54 packages (0 vulnerabilities)
+
+---
+
 ## [5.0.0] - 2025-11-19
 
 ### 🎉 Major Release - Plugin Architecture & Playbook Library
