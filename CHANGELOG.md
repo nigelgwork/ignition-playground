@@ -53,6 +53,60 @@ Launch Ignition Toolkit from Windows Desktop with one-click shortcuts.
 
 ---
 
+## [5.0.0] - 2025-11-19
+
+### 🎉 Major Release - Plugin Architecture & Playbook Library
+
+#### Plugin-Based Playbook Library
+Transform how you discover, install, and manage playbooks with the new plugin system.
+
+- **Browse playbook library** - Visual card-based browser with 24+ verified playbooks
+- **One-click install** - Install playbooks directly from the UI
+- **Automatic updates** - Check for and install playbook updates with changelog
+- **SHA256 verification** - Cryptographic verification of all installed playbooks
+- **Central repository** - Playbooks hosted on GitHub with version tracking
+- **Install status** - Clear visual indicators for built-in vs. user-installed playbooks
+
+**Features:**
+- Library browser with search and filtering
+- Install/uninstall playbooks via API
+- Automatic update notifications
+- Version tracking and changelog display
+- Playbook metadata (author, version, description)
+
+#### Self-Update System
+Built-in update mechanism for the toolkit itself.
+
+- **Check for updates** - Detect new versions from GitHub Releases
+- **One-click update** - Download and install updates from the UI
+- **Automatic backup** - Creates backup before updating
+- **Rollback capability** - Restore previous version if update fails
+- **Changelog integration** - View changes before updating
+
+#### Breaking Changes
+
+- **AI features temporarily removed** - AI assistant and AI-injectable steps removed (will return as optional plugin in future release)
+- **Playbook reorganization** - Reduced base playbooks to 6 essential playbooks (Gateway Login, Backup, Module Install/Uninstall/Upgrade, Restart). All other playbooks now installable via library.
+- **Migration required** - Existing installations should backup custom playbooks before upgrading
+
+**Files Added:**
+- `ignition_toolkit/api/routers/updates.py` - Update system endpoints
+- `frontend/src/pages/PlaybookLibrary.tsx` - Library browser UI
+- Playbook metadata system with SHA256 checksums
+
+**Files Modified:**
+- Major refactoring across API layer for plugin support
+- Frontend updated for library browsing and installation
+- Database schema extended for playbook tracking
+
+### 📚 Documentation
+
+- Updated architecture documentation for plugin system
+- Added playbook library user guide
+- Updated migration guides
+
+---
+
 ## [4.1.1] - 2025-11-04
 
 ### ✨ New Features

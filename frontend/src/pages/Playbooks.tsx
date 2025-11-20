@@ -198,6 +198,17 @@ function saveCategoryExpandedState(state: Record<string, boolean>) {
   localStorage.setItem('category_expanded', JSON.stringify(state));
 }
 
+// Load group expanded state from localStorage
+function getGroupExpandedState(): Record<string, boolean> {
+  const stored = localStorage.getItem('group_expanded');
+  return stored ? JSON.parse(stored) : {};
+}
+
+// Save group expanded state to localStorage
+function saveGroupExpandedState(state: Record<string, boolean>) {
+  localStorage.setItem('group_expanded', JSON.stringify(state));
+}
+
 // Apply saved order to playbooks
 function applyOrder(playbooks: PlaybookInfo[], category: string): PlaybookInfo[] {
   const savedOrder = getPlaybookOrder(category);
@@ -292,7 +303,7 @@ export function Playbooks() {
   const [dragEnabled, setDragEnabled] = useState(false);
   const [stepsDialogPlaybook, setStepsDialogPlaybook] = useState<PlaybookInfo | null>(null);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
-  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
+  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>(getGroupExpandedState());
   const [libraryDialogOpen, setLibraryDialogOpen] = useState(false);
   const [updatesDialogOpen, setUpdatesDialogOpen] = useState(false);
   const [newPlaybookName, setNewPlaybookName] = useState('');
@@ -573,6 +584,36 @@ export function Playbooks() {
             if (!data.yaml_content || !data.name || !data.domain) {
               alert('Invalid export file: missing required fields (yaml_content, name, domain)');
               return;
+            }
+
+            // Security check: Warn about utility.python steps (potential code injection)
+            const hasUtilityPython = data.yaml_content.includes('type: utility.python');
+            if (hasUtilityPython) {
+              const securityWarning = window.confirm(
+                `⚠️ SECURITY WARNING ⚠️\n\n` +
+                `This playbook contains Python code execution steps (utility.python).\n\n` +
+                `Python steps can execute arbitrary code with full system access, including:\n` +
+                `• Reading/modifying files\n` +
+                `• Accessing credentials\n` +
+                `• Network operations\n` +
+                `• System commands\n\n` +
+                `Only import playbooks from trusted sources!\n\n` +
+                `Do you want to review the playbook code before importing?`
+              );
+
+              if (securityWarning) {
+                // Show YAML content for review
+                const reviewConfirm = window.confirm(
+                  `Playbook YAML Content:\n\n${data.yaml_content.substring(0, 1000)}...\n\n` +
+                  `(Full content shown in browser console)\n\n` +
+                  `Continue with import?`
+                );
+                console.log('=== PLAYBOOK CODE REVIEW ===');
+                console.log(data.yaml_content);
+                console.log('=== END PLAYBOOK CODE ===');
+
+                if (!reviewConfirm) return;
+              }
             }
 
             // Confirm import
@@ -869,13 +910,17 @@ metadata:
                                   {Object.entries(grouped).map(([groupName, groupPlaybooks]) => (
                                     <Accordion
                                       key={groupName}
-                                      expanded={dragEnabled || (expandedGroups[groupName] !== undefined ? expandedGroups[groupName] : true)}
+                                      expanded={dragEnabled || (expandedGroups[groupName] !== undefined ? expandedGroups[groupName] : false)}
                                       onChange={() => {
                                         if (!dragEnabled) {
-                                          setExpandedGroups(prev => ({
-                                            ...prev,
-                                            [groupName]: prev[groupName] !== undefined ? !prev[groupName] : false
-                                          }));
+                                          setExpandedGroups(prev => {
+                                            const newState = {
+                                              ...prev,
+                                              [groupName]: prev[groupName] !== undefined ? !prev[groupName] : true
+                                            };
+                                            saveGroupExpandedState(newState);
+                                            return newState;
+                                          });
                                         }
                                       }}
                                       sx={{ bgcolor: 'background.paper', boxShadow: 1 }}

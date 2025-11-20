@@ -7,6 +7,8 @@ with environment variable support.
 IMPORTANT: Uses dynamic path resolution from paths.py to work from any directory.
 """
 
+import logging
+import secrets
 from pathlib import Path
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -18,6 +20,8 @@ from .paths import (
     get_package_root,
     get_playwright_browsers_dir,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class Settings(BaseSettings):
@@ -41,7 +45,19 @@ class Settings(BaseSettings):
     api_port: int = 5000
     api_workers: int = 1
     cors_origins: list[str] = ["*"]
-    websocket_api_key: str = "dev-key-change-in-production"
+    websocket_api_key: str = ""  # Will be auto-generated if not set
+
+    def __init__(self, **kwargs):
+        """Initialize settings and generate secure API key if not provided"""
+        super().__init__(**kwargs)
+
+        # Generate secure random API key if not set or if using old default
+        if not self.websocket_api_key or self.websocket_api_key == "dev-key-change-in-production":
+            self.websocket_api_key = secrets.token_urlsafe(32)
+            logger.warning(
+                "WEBSOCKET_API_KEY not set in environment - generated random key. "
+                "Set WEBSOCKET_API_KEY in .env for production to persist across restarts."
+            )
 
     # Environment
     environment: str = "production"

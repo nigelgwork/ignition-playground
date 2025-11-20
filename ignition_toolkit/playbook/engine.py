@@ -131,6 +131,111 @@ class PlaybookEngine:
         """
         return self._current_playbook
 
+    def _prepare_parameters(
+        self, playbook: Playbook, parameters: dict[str, Any]
+    ) -> tuple[ParameterResolver, dict[str, dict[str, Any]]]:
+        """
+        Validate and prepare parameters for execution
+
+        Args:
+            playbook: Playbook being executed
+            parameters: User-provided parameter values
+
+        Returns:
+            Tuple of (ParameterResolver, step_results_dict)
+        """
+        # Validate parameters
+        self._validate_parameters(playbook, parameters)
+
+        # Preprocess credential-type parameters
+        parameters = self._preprocess_credential_parameters(playbook, parameters)
+
+        # Create step_results dictionary for tracking step outputs
+        step_results_dict: dict[str, dict[str, Any]] = {}
+
+        # Apply default values for missing optional parameters
+        complete_parameters = parameters.copy()
+        for param in playbook.parameters:
+            if param.name not in complete_parameters and param.default is not None:
+                complete_parameters[param.name] = param.default
+
+        # Create parameter resolver
+        resolver = ParameterResolver(
+            credential_vault=self.credential_vault,
+            parameters=complete_parameters,
+            variables=self._current_execution.variables if self._current_execution else {},
+            step_results=step_results_dict,
+        )
+
+        return resolver, step_results_dict
+
+    async def _setup_resource_managers(
+        self, playbook: Playbook, parameters: dict[str, Any], execution_id: str
+    ) -> tuple[BrowserManager | None, "DesignerManager | None"]:
+        """
+        Set up browser and designer managers if needed
+
+        Args:
+            playbook: Playbook being executed
+            parameters: Execution parameters
+            execution_id: Execution ID for logging
+
+        Returns:
+            Tuple of (browser_manager, designer_manager)
+        """
+        browser_manager = None
+        designer_manager = None
+
+        # Extract download_path parameter if present
+        download_path = parameters.get("download_path")
+        downloads_dir = Path(download_path) if download_path else None
+
+        # Set up browser manager if needed
+        has_browser_steps = any(
+            step.type.value.startswith("browser.") or step.type.value.startswith("perspective.")
+            for step in playbook.steps
+        )
+        playbook_domain = playbook.metadata.get('domain')
+        needs_browser = playbook_domain in ("perspective", "gateway") or has_browser_steps
+
+        if needs_browser:
+            screenshot_frame_callback = None
+            if self.screenshot_callback:
+                async def screenshot_frame_callback(screenshot_b64: str):
+                    await self.screenshot_callback(execution_id, screenshot_b64)
+
+            browser_manager = BrowserManager(
+                headless=True,
+                screenshot_callback=screenshot_frame_callback,
+                downloads_dir=downloads_dir,
+            )
+            await browser_manager.start()
+
+            if screenshot_frame_callback:
+                await browser_manager.start_screenshot_streaming()
+                logger.info(f"Browser screenshot streaming started for execution {execution_id}")
+            else:
+                logger.info(f"Browser started without streaming for execution {execution_id}")
+
+            self._browser_manager = browser_manager
+        else:
+            logger.debug(f"Skipping browser initialization (not needed for domain={playbook_domain})")
+
+        # Set up designer manager if needed
+        has_designer_steps = any(step.type.value.startswith("designer.") for step in playbook.steps)
+        if has_designer_steps:
+            designer_install_path = parameters.get("designer_install_path")
+            install_path = Path(designer_install_path) if designer_install_path else None
+
+            designer_manager = DesignerManager(
+                install_path=install_path,
+                downloads_dir=downloads_dir,
+            )
+            await designer_manager.start()
+            logger.info(f"Designer manager started for execution {execution_id}")
+
+        return browser_manager, designer_manager
+
     def enable_debug(self, execution_id: str) -> None:
         """
         Enable debug mode for an execution (auto-pause after each step)
@@ -163,17 +268,12 @@ class PlaybookEngine:
         Raises:
             PlaybookExecutionError: If execution fails
         """
-        logger.debug(f"execute_playbook called for playbook: {playbook.name}")
-
         # Create execution state FIRST (before validation)
         # This ensures ALL executions are tracked, even validation failures
         if execution_id is None:
             execution_id = str(uuid.uuid4())
 
-        logger.debug(f"execution_id: {execution_id}")
-
         # Pre-populate all steps with pending status so UI can show them upfront
-        logger.debug(f"Creating initial step results for {len(playbook.steps)} steps")
         initial_step_results = [
             StepResult(
                 step_id=step.id,
@@ -186,7 +286,6 @@ class PlaybookEngine:
             for step in playbook.steps
         ]
 
-        logger.debug("Creating execution state")
         execution_state = ExecutionState(
             execution_id=execution_id,
             playbook_name=playbook.name,
@@ -202,17 +301,11 @@ class PlaybookEngine:
         self._playbook_path = playbook_path  # Store path for code editing
 
         # Reset state manager
-        logger.debug("Resetting state manager")
         self.state_manager.reset()
 
         # Save to database IMMEDIATELY (before validation)
-        logger.debug(f"Saving to database (database={self.database})")
-        logger.info(f"Database object: {self.database}, Type: {type(self.database)}")
         if self.database:
-            logger.info("Database exists, calling _save_execution_start")
-            logger.debug("Calling _save_execution_start")
             await self._save_execution_start(execution_state, playbook, parameters)
-            logger.debug("_save_execution_start completed")
         else:
             logger.warning("No database configured - execution will not be saved")
 
@@ -220,32 +313,24 @@ class PlaybookEngine:
         browser_manager = None
         designer_manager = None
 
-        logger.debug("Entering try block")
         try:
             # Validate parameters (can fail, but state already saved)
-            logger.debug("Validating parameters")
             self._validate_parameters(playbook, parameters)
-            logger.debug("Parameter validation complete")
 
             # Preprocess credential-type parameters
             # Convert credential names (strings) to Credential objects
-            logger.debug("Preprocessing credential parameters")
             parameters = self._preprocess_credential_parameters(playbook, parameters)
-            logger.debug("Credential parameter preprocessing complete")
 
             # Create step_results dictionary for tracking step outputs (shared by reference)
             step_results_dict: dict[str, dict[str, Any]] = {}
 
             # Apply default values for missing optional parameters
-            logger.debug("Applying default values for optional parameters")
             complete_parameters = parameters.copy()
             for param in playbook.parameters:
                 if param.name not in complete_parameters and param.default is not None:
                     complete_parameters[param.name] = param.default
-                    logger.debug(f"Applied default value for '{param.name}': {param.default}")
 
             # Create parameter resolver
-            logger.debug("Creating parameter resolver")
             resolver = ParameterResolver(
                 credential_vault=self.credential_vault,
                 parameters=complete_parameters,
@@ -258,7 +343,6 @@ class PlaybookEngine:
             downloads_dir = Path(download_path) if download_path else None
 
             # Create browser manager for Perspective/browser playbooks (NOT for Designer)
-            logger.debug(f"Checking screenshot callback (callback={self.screenshot_callback})")
             has_browser_steps = any(
                 step.type.value.startswith("browser.") or step.type.value.startswith("perspective.")
                 for step in playbook.steps
@@ -285,18 +369,15 @@ class PlaybookEngine:
                     screenshot_callback=screenshot_frame_callback,
                     downloads_dir=downloads_dir,
                 )
-                logger.debug("Starting browser manager")
                 await browser_manager.start()
 
                 if screenshot_frame_callback:
-                    logger.debug("Starting screenshot streaming")
                     await browser_manager.start_screenshot_streaming()
                     logger.info(f"Browser screenshot streaming started for execution {execution_id}")
                 else:
                     logger.info(f"Browser started without streaming for execution {execution_id}")
 
                 self._browser_manager = browser_manager  # Store reference for pause/resume
-                logger.debug("Browser initialization complete")
             else:
                 logger.debug(f"Skipping browser initialization (not needed for domain={playbook_domain})")
 
@@ -315,7 +396,6 @@ class PlaybookEngine:
                 logger.info(f"Designer manager started for execution {execution_id}")
 
             # Create step executor
-            logger.debug("Creating step executor")
             executor = StepExecutor(
                 gateway_client=self.gateway_client,
                 browser_manager=browser_manager,
@@ -325,21 +405,17 @@ class PlaybookEngine:
                 state_manager=self.state_manager,
                 parent_engine=self,  # Pass self for nested execution updates
             )
-            logger.debug("Step executor created")
 
             # Execute steps (using while loop to support skip back)
             step_index = 0
             logger.debug(f"Entering step execution loop ({len(playbook.steps)} steps)")
             while step_index < len(playbook.steps):
-                logger.debug(f"Step loop iteration: step_index={step_index}")
                 step = playbook.steps[step_index]
                 execution_state.current_step_index = step_index
 
                 # Check control signals
-                logger.debug("Checking control signals")
                 try:
                     await self.state_manager.check_control_signal()
-                    logger.debug("Control signal check passed")
 
                     # If execution was paused and has now resumed, update status to RUNNING
                     if execution_state.status == ExecutionStatus.PAUSED:
@@ -676,25 +752,14 @@ class PlaybookEngine:
         Args:
             execution_state: Current execution state
         """
-        logger.debug(f"_notify_update called: status={execution_state.status.value}, current_step={execution_state.current_step_index}, steps={len(execution_state.step_results)}")
-
-        # DEBUG: Log detailed step statuses
-        if execution_state.current_step_index is not None and execution_state.current_step_index < len(execution_state.step_results):
-            current_step = execution_state.step_results[execution_state.current_step_index]
-            logger.info(f"[DEBUG] Notifying - Current step index={execution_state.current_step_index}, step_id={current_step.step_id}, status={current_step.status.value}")
-
         if self._update_callback:
             try:
                 if asyncio.iscoroutinefunction(self._update_callback):
                     await self._update_callback(execution_state)
-                    logger.debug("Update callback completed")
                 else:
                     self._update_callback(execution_state)
-                    logger.debug("Update callback completed (sync)")
             except Exception as e:
                 logger.exception(f"Error in update callback: {e}")
-        else:
-            logger.debug("No update callback registered!")
 
     async def _save_execution_start(
         self, execution_state: ExecutionState, playbook: Playbook, parameters: dict[str, Any]

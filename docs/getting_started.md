@@ -163,9 +163,9 @@ Open browser to http://localhost:5000
 ## Next Steps
 
 - [Playbook Syntax](playbook_syntax.md) - Learn to write playbooks
-- [Gateway API](gateway_api.md) - Gateway operations reference
-- [Browser Automation](browser_automation.md) - Web automation guide
-- [Credentials](credentials.md) - Credential management
+- [Running Playbooks](RUNNING_PLAYBOOKS.md) - Execution guide
+- [Playbook Library](PLAYBOOK_LIBRARY.md) - Browse and install playbooks
+- [Playbook Best Practices](PLAYBOOK_BEST_PRACTICES.md) - Writing good playbooks
 
 ## Common Tasks
 

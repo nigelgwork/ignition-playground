@@ -19,6 +19,7 @@ from ignition_toolkit.api.routers.models import (
     ExecutionStatusResponse,
     StepResultResponse,
 )
+from ignition_toolkit.api.services.execution_response_builder import ExecutionResponseBuilder
 from ignition_toolkit.playbook.engine import PlaybookEngine
 from ignition_toolkit.playbook.models import ExecutionState, StepResult
 from ignition_toolkit.storage import get_database
@@ -153,128 +154,7 @@ def get_execution_manager():
 # ============================================================================
 # Helper Functions
 # ============================================================================
-
-
-def _convert_step_results_to_response(
-    step_results: list[StepResult]
-) -> list[StepResultResponse]:
-    """
-    Convert internal StepResult objects to API response format
-
-    Args:
-        step_results: List of StepResult domain objects
-
-    Returns:
-        List of StepResultResponse objects for API serialization
-    """
-    return [
-        StepResultResponse(
-            step_id=result.step_id,
-            step_name=result.step_name,
-            status=result.status.value if hasattr(result.status, 'value') else result.status,
-            error=result.error,
-            started_at=result.started_at,
-            completed_at=result.completed_at,
-            output=result.output,
-        )
-        for result in step_results
-    ]
-
-
-def _create_execution_status_from_engine(
-    execution_id: str,
-    engine: PlaybookEngine,
-    state: ExecutionState,
-) -> ExecutionStatusResponse:
-    """
-    Create ExecutionStatusResponse from live engine state
-
-    Args:
-        execution_id: Unique execution identifier
-        engine: Active PlaybookEngine instance
-        state: Current execution state from engine
-
-    Returns:
-        ExecutionStatusResponse for API serialization
-    """
-    step_results = _convert_step_results_to_response(state.step_results)
-
-    # Extract domain from execution state (preferred) or playbook metadata (fallback)
-    domain = state.domain
-    current_playbook = engine.get_current_playbook()
-    if domain is None and current_playbook:
-        domain = current_playbook.metadata.get("domain")
-
-    return ExecutionStatusResponse(
-        execution_id=execution_id,
-        playbook_name=state.playbook_name,
-        status=state.status.value,
-        started_at=state.started_at,
-        completed_at=state.completed_at,
-        current_step_index=state.current_step_index,
-        total_steps=len(current_playbook.steps) if current_playbook else 0,
-        error=state.error,
-        debug_mode=engine.state_manager.is_debug_mode_enabled(),
-        step_results=step_results,
-        domain=domain,
-    )
-
-
-def _create_execution_status_from_db(
-    db_exec: ExecutionModel,
-    step_results: list[StepResultResponse],
-) -> ExecutionStatusResponse:
-    """
-    Create ExecutionStatusResponse from database model
-
-    Args:
-        db_exec: ExecutionModel from database
-        step_results: Pre-converted step results
-
-    Returns:
-        ExecutionStatusResponse for API serialization
-    """
-    # Get total_steps from metadata (stored when execution starts)
-    total_steps = db_exec.execution_metadata.get("total_steps", len(step_results)) if db_exec.execution_metadata else len(step_results)
-
-    # Calculate current_step_index:
-    # Engine uses 0-based indexing: when executing step 1, current_step_index = 0
-    # After completing N steps, the engine is at step_index = N (executing step N+1)
-    if db_exec.status in ["running", "paused"]:
-        # Currently executing or paused: show the step being executed
-        # If N steps completed, engine is on step_index = N
-        # BUT: if all steps are done (N >= total), cap at total-1 to avoid "Step 11 of 10"
-        completed_count = len(step_results)
-        if completed_count >= total_steps:
-            # All steps done but status not yet updated to completed
-            current_step_index = total_steps - 1 if total_steps > 0 else 0
-        else:
-            current_step_index = completed_count
-    elif db_exec.status == "completed":
-        # All steps completed - current_step_index is the last step (total - 1)
-        current_step_index = total_steps - 1 if total_steps > 0 else 0
-    else:
-        # pending, failed, cancelled - show last completed step or None
-        current_step_index = len(step_results) - 1 if step_results else None
-
-    # Extract domain from execution metadata
-    domain = db_exec.execution_metadata.get("domain") if db_exec.execution_metadata else None
-
-    return ExecutionStatusResponse(
-        execution_id=db_exec.execution_id,
-        playbook_name=db_exec.playbook_name,
-        status=db_exec.status,
-        started_at=db_exec.started_at,
-        completed_at=db_exec.completed_at,
-        current_step_index=current_step_index,
-        total_steps=total_steps,
-        error=db_exec.error_message,
-        debug_mode=db_exec.execution_metadata.get("debug_mode", False) if db_exec.execution_metadata else False,
-        step_results=step_results,
-        domain=domain,
-    )
-
-
+# Note: Helper functions moved to services/execution_response_builder.py
 # ============================================================================
 # Pydantic Models (shared models imported from models.py)
 # ============================================================================
@@ -633,7 +513,7 @@ async def list_executions(limit: int = DEFAULT_EXECUTION_LIST_LIMIT, status: str
         if not state:
             continue
 
-        executions.append(_create_execution_status_from_engine(exec_id, engine, state))
+        executions.append(ExecutionResponseBuilder.from_engine(exec_id, engine))
 
     # Add recent completed executions from database
     try:
@@ -663,7 +543,7 @@ async def list_executions(limit: int = DEFAULT_EXECUTION_LIST_LIMIT, status: str
                     for step in db_exec.step_results
                 ]
 
-                executions.append(_create_execution_status_from_db(db_exec, step_results))
+                executions.append(ExecutionResponseBuilder.from_database(db_exec))
     except Exception as e:
         logger.exception(f"Error loading executions from database: {e}")
 
@@ -681,7 +561,7 @@ async def get_execution_status(execution_id: str):
 
         if state:
             # Engine has active state, return it
-            return _create_execution_status_from_engine(execution_id, engine, state)
+            return ExecutionResponseBuilder.from_engine(execution_id, engine)
 
     # Try to load from database
     db = get_database()

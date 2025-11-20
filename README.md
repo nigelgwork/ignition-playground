@@ -8,7 +8,7 @@
 
 ## 🎯 Overview
 
-A modern, Docker-free automation toolkit for Ignition SCADA with **plugin architecture** and playbook marketplace:
+A modern automation toolkit for Ignition SCADA with **plugin architecture** and playbook marketplace (native Python installation, Docker optional):
 
 - **🔌 Plugin Architecture**: Browse, install, and update playbooks from central repository (NEW in v5.0)
 - **📦 Playbook Library**: 24+ verified playbooks for Gateway, Perspective, and Designer automation
@@ -143,7 +143,9 @@ python tasks.py init
 
 Access the web UI at **http://localhost:5000**
 
-#### Option 3: Docker Deployment
+#### Option 3: Docker Deployment (Optional)
+
+> **Note**: Native Python installation (Option 1 or 2) is the recommended approach for simpler setup and better performance. Docker is provided as an optional deployment method for containerized environments.
 
 ```bash
 # Clone and build
@@ -304,7 +306,7 @@ ignition-playground/
 │   └── archive/               # Historical documentation
 ├── .claude/                   # Claude Code instructions
 ├── CHANGELOG.md               # Version history
-├── VERSION                    # Current version (4.1.0)
+├── VERSION                    # Current version (5.0.0)
 └── pyproject.toml             # Package configuration
 ```
 
@@ -413,7 +415,7 @@ Package the toolkit for transfer to another machine:
 # Create portable archive (excludes venv, node_modules, credentials)
 python scripts/create_portable.py
 
-# Output: ignition-toolkit-portable-v4.0.0.tar.gz (~50MB)
+# Output: ignition-toolkit-portable-v5.0.0.tar.gz (~50MB)
 # Includes: source code, playbooks, built frontend, documentation
 ```
 
@@ -437,8 +439,8 @@ Extract and run on a new machine:
 
 ```bash
 # Extract archive
-tar -xzf ignition-toolkit-portable-v4.0.0.tar.gz
-cd ignition-toolkit-v4.0.0
+tar -xzf ignition-toolkit-portable-v5.0.0.tar.gz
+cd ignition-toolkit-v5.0.0
 
 # Install dependencies
 python -m venv venv
@@ -714,7 +716,7 @@ MIT License - see [LICENSE](LICENSE) file
 
 ## 📊 Project Status
 
-**Current Version:** 4.1.0 (November 2, 2025)
+**Current Version:** 5.0.0 (November 19, 2025)
 **Status:** ✅ Production Ready
 **Test Coverage:** 46+ automated tests across all components
 
