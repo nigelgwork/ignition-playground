@@ -4,7 +4,7 @@
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-5.0.0-blue.svg)](VERSION)
+[![Version](https://img.shields.io/badge/version-5.1.0-blue.svg)](VERSION)
 
 ## 🎯 Overview
 
@@ -21,6 +21,17 @@ A modern automation toolkit for Ignition SCADA with **plugin architecture** and 
 - **Secure Credentials**: Fernet-encrypted local storage, never committed to git
 - **Import/Export**: Share playbooks as JSON with colleagues
 - **Web UI**: Modern dark-theme interface with Warp terminal colors
+
+## ⚡ What's New in v5.1
+
+**Quality & Architecture Improvements (November 21, 2025):**
+- **🧹 Code Quality**: 77% reduction in debug logging, comprehensive code cleanup
+- **🔐 Security Hardening**: 4 CRITICAL fixes (file permissions, auto-generated tokens, removed hardcoded credentials)
+- **📦 Dependency Updates**: 54 packages updated, 0 vulnerabilities remaining
+- **🏗️ Router Modularization**: Split 1,248-line router into 5 focused modules (<500 lines each)
+- **🛠️ Service Layer**: Extracted response builders and React hooks for better separation of concerns
+
+See [CHANGELOG.md](CHANGELOG.md) for full v5.1 details.
 
 ## ⚡ What's New in v5.0
 
@@ -306,7 +317,7 @@ ignition-playground/
 │   └── archive/               # Historical documentation
 ├── .claude/                   # Claude Code instructions
 ├── CHANGELOG.md               # Version history
-├── VERSION                    # Current version (5.0.0)
+├── VERSION                    # Current version (5.1.0)
 └── pyproject.toml             # Package configuration
 ```
 
@@ -415,7 +426,7 @@ Package the toolkit for transfer to another machine:
 # Create portable archive (excludes venv, node_modules, credentials)
 python scripts/create_portable.py
 
-# Output: ignition-toolkit-portable-v5.0.0.tar.gz (~50MB)
+# Output: ignition-toolkit-portable-v5.1.0.tar.gz (~50MB)
 # Includes: source code, playbooks, built frontend, documentation
 ```
 
@@ -439,8 +450,8 @@ Extract and run on a new machine:
 
 ```bash
 # Extract archive
-tar -xzf ignition-toolkit-portable-v5.0.0.tar.gz
-cd ignition-toolkit-v5.0.0
+tar -xzf ignition-toolkit-portable-v5.1.0.tar.gz
+cd ignition-toolkit-v5.1.0
 
 # Install dependencies
 python -m venv venv
@@ -716,7 +727,7 @@ MIT License - see [LICENSE](LICENSE) file
 
 ## 📊 Project Status
 
-**Current Version:** 5.0.0 (November 19, 2025)
+**Current Version:** 5.1.0 (November 21, 2025)
 **Status:** ✅ Production Ready
 **Test Coverage:** 46+ automated tests across all components
 

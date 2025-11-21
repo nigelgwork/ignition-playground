@@ -187,13 +187,13 @@ steps:
         print(f"Gateway online after {attempt} attempts ({attempt * wait_seconds}s)")
 
   # ==========================================================================
-  # STEP 13: Wait After Gateway Online
+  # STEP 13: Wait After Gateway Online (Extended for Auth System Initialization)
   # ==========================================================================
   - id: step11_wait_after_online
-    name: "Step 11: Wait After Gateway Online"
+    name: "Step 11: Wait After Gateway Online (15s for auth initialization)"
     type: utility.sleep
     parameters:
-      seconds: 2
+      seconds: 15
 
   # ==========================================================================
   # STEP 14: Verify Home Page Access (No Login Required)
@@ -244,4 +244,5 @@ steps:
         print(f"Attempts to Come Online: {get_variable('attempts_needed')}")
         print(f"")
         print(f"Gateway has been restarted successfully and is now accessible")
+        print(f"Waited 15s after online for authentication system initialization")
         print("=" * 80)
