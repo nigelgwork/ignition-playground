@@ -24,7 +24,8 @@ logger = logging.getLogger(__name__)
 
 # GitHub repository settings
 DEFAULT_REPO = "nigelgwork/ignition-playground"
-DEFAULT_INDEX_URL = f"https://github.com/{DEFAULT_REPO}/releases/latest/download/playbooks-index.json"
+# Use GitHub API for more reliable access (raw.githubusercontent can have cache delays)
+DEFAULT_INDEX_URL = f"https://api.github.com/repos/{DEFAULT_REPO}/contents/playbooks-index.json"
 
 
 @dataclass
@@ -270,10 +271,10 @@ class PlaybookRegistry:
         force_refresh: bool = False
     ) -> dict[str, AvailablePlaybook]:
         """
-        Fetch available playbooks from GitHub Releases
+        Fetch available playbooks from GitHub
 
         Args:
-            index_url: URL to playbooks-index.json
+            index_url: URL to playbooks-index.json (GitHub API or raw URL)
             force_refresh: Force refresh even if recently fetched
 
         Returns:
@@ -288,9 +289,20 @@ class PlaybookRegistry:
             logger.info(f"Fetching playbook index from: {index_url}")
 
             async with httpx.AsyncClient(timeout=30.0) as client:
-                response = await client.get(index_url)
+                # Add Accept header for GitHub API
+                headers = {"Accept": "application/vnd.github.v3+json"}
+                response = await client.get(index_url, headers=headers)
                 response.raise_for_status()
-                data = response.json()
+                api_response = response.json()
+
+            # Handle GitHub API response (base64-encoded content)
+            if "content" in api_response and "encoding" in api_response:
+                import base64
+                content = base64.b64decode(api_response["content"]).decode("utf-8")
+                data = json.loads(content)
+            else:
+                # Direct JSON response (e.g., from raw URL)
+                data = api_response
 
             # Parse playbooks from index
             playbooks_data = data.get("playbooks", {})
