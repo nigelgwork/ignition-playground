@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ignition-toolkit"
-version = "5.1.0"  # Updated: 2025-11-21 - Code quality improvements, security hardening, router modularization
+version = "5.1.1"  # Updated: 2025-11-21 - Code quality improvements, security hardening, router modularization
 description = "Lightweight automation toolkit for Ignition SCADA Gateway operations with plugin-based playbook library"
 readme = "README.md"
 requires-python = ">=3.10"
