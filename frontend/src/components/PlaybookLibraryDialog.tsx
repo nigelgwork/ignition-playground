@@ -61,6 +61,7 @@ interface BrowseResponse {
   count: number;
   playbooks: AvailablePlaybook[];
   last_fetched?: string;
+  message?: string;
 }
 
 interface PlaybookLibraryDialogProps {
@@ -80,11 +81,13 @@ export function PlaybookLibraryDialog({ open, onClose }: PlaybookLibraryDialogPr
     queryFn: async () => {
       const response = await fetch(`${api.getBaseUrl()}/api/playbooks/browse`);
       if (!response.ok) {
-        throw new Error('Failed to fetch playbook library');
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.detail || 'Failed to fetch playbook library');
       }
       return response.json();
     },
     enabled: open, // Only fetch when dialog is open
+    retry: 1, // Only retry once to avoid excessive waiting
   });
 
   // Install mutation
@@ -225,7 +228,7 @@ export function PlaybookLibraryDialog({ open, onClose }: PlaybookLibraryDialogPr
         {!isLoading && !error && filteredPlaybooks.length === 0 && (
           <Alert severity="info">
             {data?.playbooks.length === 0
-              ? 'No playbooks available in the repository.'
+              ? (data?.message || 'The playbook library is not yet available. You can create and duplicate playbooks locally.')
               : 'No playbooks match your search criteria.'}
           </Alert>
         )}

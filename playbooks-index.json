@@ -1,0 +1,223 @@
+{
+  "version": "1.0",
+  "generated_at": "2025-11-26T10:19:23.815547+00:00",
+  "repository": "nigelgwork/ignition-playground",
+  "playbooks": {
+    "gateway/gateway_login": {
+      "version": "2.0",
+      "domain": "gateway",
+      "verified": true,
+      "verified_by": "Ignition Toolkit Team",
+      "description": "Login to Ignition Gateway with credentials",
+      "author": "Ignition Toolkit",
+      "tags": [
+        "gateway",
+        "official"
+      ],
+      "group": "Gateway (Base Playbooks)",
+      "size_bytes": 2682,
+      "dependencies": [],
+      "download_url": "https://raw.githubusercontent.com/nigelgwork/ignition-playground/master/playbooks/gateway/gateway_login.yaml",
+      "checksum": "733859849e08861a1017ae1f750ac2f67accd5dc23525050a13863e532ba8e0d",
+      "release_notes": "Initial release of Gateway Login"
+    },
+    "gateway/gateway_restart": {
+      "version": "2.0",
+      "domain": "gateway",
+      "verified": true,
+      "verified_by": "Ignition Toolkit Team",
+      "description": "Restart Ignition Gateway from restart notification bar (assumes already logged in)",
+      "author": "Ignition Toolkit",
+      "tags": [
+        "gateway",
+        "official"
+      ],
+      "group": "Gateway (Base Playbooks)",
+      "size_bytes": 10305,
+      "dependencies": [],
+      "download_url": "https://raw.githubusercontent.com/nigelgwork/ignition-playground/master/playbooks/gateway/gateway_restart.yaml",
+      "checksum": "9b1c969a97cc2996ec0db44a0ba1e2863f036de97a4df913b54cbc38452949ef",
+      "release_notes": "Initial release of Gateway Restart"
+    },
+    "gateway/backup_gateway": {
+      "version": "5.0",
+      "domain": "gateway",
+      "verified": true,
+      "verified_by": "Ignition Toolkit Team",
+      "description": "Download a Gateway backup file",
+      "author": "Ignition Toolkit",
+      "tags": [
+        "gateway",
+        "official"
+      ],
+      "group": "Gateway (Base Playbooks)",
+      "size_bytes": 2113,
+      "dependencies": [],
+      "download_url": "https://raw.githubusercontent.com/nigelgwork/ignition-playground/master/playbooks/gateway/backup_gateway.yaml",
+      "checksum": "50596a7bea7db9bbef4cc7f779d942d78b7a723183ec9a90ea08dd94eaadc636",
+      "release_notes": "Initial release of Gateway Backup"
+    },
+    "gateway/module_install": {
+      "version": "4.0-ui",
+      "domain": "gateway",
+      "verified": true,
+      "verified_by": "Ignition Toolkit Team",
+      "description": "Install a new module - Upload, Install, and Restart",
+      "author": "Ignition Toolkit",
+      "tags": [
+        "gateway",
+        "official"
+      ],
+      "group": "Gateway (Base Playbooks)",
+      "size_bytes": 16010,
+      "dependencies": [],
+      "download_url": "https://raw.githubusercontent.com/nigelgwork/ignition-playground/master/playbooks/gateway/module_install.yaml",
+      "checksum": "0ed999276ea378e96e0a7f07811998701c738bedaa13fb297f6a09c5cd002d96",
+      "release_notes": "Initial release of Module Install"
+    },
+    "gateway/module_uninstall": {
+      "version": "4.0-ui",
+      "domain": "gateway",
+      "verified": true,
+      "verified_by": "Ignition Toolkit Team",
+      "description": "Uninstall an existing module",
+      "author": "Ignition Toolkit",
+      "tags": [
+        "gateway",
+        "official"
+      ],
+      "group": "Gateway (Base Playbooks)",
+      "size_bytes": 6959,
+      "dependencies": [],
+      "download_url": "https://raw.githubusercontent.com/nigelgwork/ignition-playground/master/playbooks/gateway/module_uninstall.yaml",
+      "checksum": "786c7a864d51dc89b3d9994329c819b1c9b2d38ae2df0aa304e5497fcd6b6395",
+      "release_notes": "Initial release of Module Uninstall"
+    },
+    "gateway/reset_trial": {
+      "version": "3.0",
+      "domain": "gateway",
+      "verified": true,
+      "verified_by": "Ignition Toolkit Team",
+      "description": "Reset Gateway trial license",
+      "author": "Ignition Toolkit",
+      "tags": [
+        "gateway",
+        "official"
+      ],
+      "group": "",
+      "size_bytes": 2827,
+      "dependencies": [],
+      "download_url": "https://raw.githubusercontent.com/nigelgwork/ignition-playground/master/playbooks/gateway/reset_trial.yaml",
+      "checksum": "9ed11469fcf59bd663d9657671e61fc9e865723a7e38b3dc369e9dacb2ec90aa",
+      "release_notes": "Initial release of Gateway Trial Reset"
+    },
+    "designer/launch_designer_linux": {
+      "version": "1.0",
+      "domain": "designer",
+      "verified": true,
+      "verified_by": "Ignition Toolkit Team",
+      "description": "Launch Ignition Designer application on Linux using xdotool and X11 automation",
+      "author": "Ignition Toolkit",
+      "tags": [
+        "designer",
+        "official"
+      ],
+      "group": "",
+      "size_bytes": 6359,
+      "dependencies": [],
+      "download_url": "https://raw.githubusercontent.com/nigelgwork/ignition-playground/master/playbooks/designer/launch_designer_linux.yaml",
+      "checksum": "5c7d2664231508af24b4fffcd235a056479bf5ca2545363ea060c2143617d553",
+      "release_notes": "Initial release of Launch Designer via Shortcut (Linux)"
+    },
+    "designer/launch_designer_shortcut": {
+      "version": "1.0",
+      "domain": "designer",
+      "verified": true,
+      "verified_by": "Ignition Toolkit Team",
+      "description": "Launch Ignition Designer application",
+      "author": "Ignition Toolkit",
+      "tags": [
+        "designer",
+        "official"
+      ],
+      "group": "",
+      "size_bytes": 7285,
+      "dependencies": [],
+      "download_url": "https://raw.githubusercontent.com/nigelgwork/ignition-playground/master/playbooks/designer/launch_designer_shortcut.yaml",
+      "checksum": "d3645d0050e033f954a4da4368e4c483498acf15f60f128dd62ad450d1d5c414",
+      "release_notes": "Initial release of Launch Designer via Shortcut"
+    },
+    "perspective/test_buttons": {
+      "version": "1.0",
+      "domain": "perspective",
+      "verified": false,
+      "verified_by": "Ignition Toolkit Team",
+      "description": "Systematically test all buttons on a Perspective page - click and verify expected behavior",
+      "author": "Ignition Toolkit",
+      "tags": [
+        "perspective",
+        "official"
+      ],
+      "group": "",
+      "size_bytes": 13855,
+      "dependencies": [],
+      "download_url": "https://raw.githubusercontent.com/nigelgwork/ignition-playground/master/playbooks/perspective/test_buttons.yaml",
+      "checksum": "94c94dcd45ac2ec76f959ace8276c06e7d6ca966fd96d871b8287221df9569c8",
+      "release_notes": "Initial release of Test All Buttons"
+    },
+    "perspective/test_docks": {
+      "version": "1.0",
+      "domain": "perspective",
+      "verified": false,
+      "verified_by": "Ignition Toolkit Team",
+      "description": "Systematically test components that open docked windows, popups, or modals",
+      "author": "Ignition Toolkit",
+      "tags": [
+        "perspective",
+        "official"
+      ],
+      "group": "",
+      "size_bytes": 13284,
+      "dependencies": [],
+      "download_url": "https://raw.githubusercontent.com/nigelgwork/ignition-playground/master/playbooks/perspective/test_docks.yaml",
+      "checksum": "ba2487c4e59b426b7cb9537ff1800853b5dc9ce5ffdf9b7568a4f96e1d15d517",
+      "release_notes": "Initial release of Test Dock/Popup Behavior"
+    },
+    "perspective/test_inputs": {
+      "version": "1.0",
+      "domain": "perspective",
+      "verified": false,
+      "verified_by": "Ignition Toolkit Team",
+      "description": "Systematically test all input fields and setpoints on a Perspective page - fill, verify, and validate",
+      "author": "Ignition Toolkit",
+      "tags": [
+        "perspective",
+        "official"
+      ],
+      "group": "",
+      "size_bytes": 12233,
+      "dependencies": [],
+      "download_url": "https://raw.githubusercontent.com/nigelgwork/ignition-playground/master/playbooks/perspective/test_inputs.yaml",
+      "checksum": "70b7f11467e093884deb59bf6edb6be1ae116fba4b98f0a3dfcaace2bd4902ab",
+      "release_notes": "Initial release of Test All Inputs"
+    },
+    "perspective/test_suite_master": {
+      "version": "1.0",
+      "domain": "perspective",
+      "verified": false,
+      "verified_by": "Ignition Toolkit Team",
+      "description": "Comprehensive test suite that runs all specialized perspective tests and compiles results",
+      "author": "Ignition Toolkit",
+      "tags": [
+        "perspective",
+        "official"
+      ],
+      "group": "",
+      "size_bytes": 17880,
+      "dependencies": [],
+      "download_url": "https://raw.githubusercontent.com/nigelgwork/ignition-playground/master/playbooks/perspective/test_suite_master.yaml",
+      "checksum": "21dacf2aae837cdd86f9e2d92b36f8dce16d9230b0c6466301d933ecbf857a02",
+      "release_notes": "Initial release of Perspective Test Suite - Master Orchestrator"
+    }
+  }
+}

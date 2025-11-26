@@ -168,7 +168,7 @@ async def duplicate_playbook(playbook_path: str, new_name: str | None = None):
 
     Args:
         playbook_path: Source playbook path (relative to playbooks dir)
-        new_name: Optional new playbook name (defaults to source_name_copy)
+        new_name: Optional new playbook name for the duplicate (user-provided)
 
     Returns:
         dict: New playbook info with path and metadata
@@ -192,14 +192,22 @@ async def duplicate_playbook(playbook_path: str, new_name: str | None = None):
         source_suffix = source_path.suffix  # .yaml or .yml
 
         if new_name:
+            # User provided a name - use it directly
             new_stem = new_name.replace(source_suffix, "")  # Remove extension if included
+            # Sanitize: convert to snake_case
+            new_stem = re.sub(r'[^a-zA-Z0-9_]', '_', new_stem.lower())
+            new_stem = re.sub(r'_+', '_', new_stem).strip('_')
         else:
-            new_stem = f"{source_stem}_copy"
+            # No name provided - extract base name (remove existing _copy suffixes)
+            base_stem = re.sub(r'(_copy)+(_\d+)?$', '', source_stem)
+            new_stem = f"{base_stem}_copy"
 
         new_path = source_parent / f"{new_stem}{source_suffix}"
         counter = 1
         while new_path.exists():
-            new_path = source_parent / f"{new_stem}_{counter}{source_suffix}"
+            # Use base_stem if we generated it, otherwise use new_stem
+            stem_for_counter = new_stem.rstrip('0123456789_') if new_name else re.sub(r'(_copy)+(_\d+)?$', '', source_stem) + "_copy"
+            new_path = source_parent / f"{stem_for_counter}_{counter}{source_suffix}"
             counter += 1
 
         shutil.copy2(source_path, new_path)

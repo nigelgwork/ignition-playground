@@ -47,6 +47,8 @@ import {
   Delete as DeleteIcon,
   Schedule as ScheduleIcon,
   ContentCopy as DuplicateIcon,
+  CheckCircle as ConfiguredIcon,
+  RadioButtonUnchecked as NotConfiguredIcon,
 } from '@mui/icons-material';
 import type { PlaybookInfo } from '../types/api';
 import { useStore } from '../store';
@@ -94,9 +96,59 @@ export function PlaybookCard({ playbook, onConfigure, onExecute, onExport, onVie
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editedName, setEditedName] = useState(playbook.name);
   const [editedDescription, setEditedDescription] = useState(playbook.description);
+  const [duplicateDialogOpen, setDuplicateDialogOpen] = useState(false);
+  const [duplicateName, setDuplicateName] = useState('');
   const selectedCredential = useStore((state) => state.selectedCredential);
 
   const isDisabled = !playbook.enabled;
+
+  // Check if required parameters are configured
+  const areParamsConfigured = (): boolean => {
+    // If there are no parameters, consider it configured
+    if (!playbook.parameters || playbook.parameters.length === 0) {
+      return true;
+    }
+
+    // Check if a global credential is selected (covers gateway_url, username, password)
+    const hasGlobalCredential = !!selectedCredential;
+
+    // Parameters that are covered by the global credential selection
+    const credentialCoveredParams = ['gateway_url', 'username', 'password', 'user', 'pass', 'credential_name'];
+
+    // Get required parameters that need user input (exclude credential-related ones)
+    const requiredUserParams = playbook.parameters.filter(
+      p => p.required &&
+           p.default === null &&
+           !credentialCoveredParams.some(cp => p.name.toLowerCase().includes(cp.toLowerCase()))
+    );
+
+    // If we have a global credential, the credential params are covered
+    // Now check if other required params are configured
+    if (hasGlobalCredential) {
+      // No other required params? We're good!
+      if (requiredUserParams.length === 0) {
+        return true;
+      }
+
+      // Check saved config for remaining required params
+      if (savedConfig) {
+        const configuredParams = Object.keys(savedConfig.parameters);
+        const allRequiredConfigured = requiredUserParams.every(
+          p => configuredParams.includes(p.name) && savedConfig.parameters[p.name] !== ''
+        );
+        if (allRequiredConfigured) {
+          return true;
+        }
+      }
+    }
+
+    // No global credential - need to check if everything is in saved config
+    // But since credentials are stripped from saved config, without global credential
+    // we can't be fully configured
+    return false;
+  };
+
+  const paramsConfigured = areParamsConfigured();
 
   // Check for saved config updates periodically
   useEffect(() => {
@@ -199,18 +251,30 @@ export function PlaybookCard({ playbook, onConfigure, onExecute, onExport, onVie
 
   // Mutation for duplicating playbook
   const duplicateMutation = useMutation({
-    mutationFn: () => api.playbooks.duplicate(playbook.path),
+    mutationFn: (newName?: string) => api.playbooks.duplicate(playbook.path, newName),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['playbooks'] });
       setSnackbarMessage(`Playbook duplicated: ${data.new_path}`);
       setSnackbarOpen(true);
       setMenuAnchor(null);
+      setDuplicateDialogOpen(false);
+      setDuplicateName('');
     },
     onError: (error) => {
       setSnackbarMessage(`Failed to duplicate: ${(error as Error).message}`);
       setSnackbarOpen(true);
     },
   });
+
+  const handleOpenDuplicateDialog = () => {
+    setDuplicateName('');
+    setDuplicateDialogOpen(true);
+    setMenuAnchor(null);
+  };
+
+  const handleDuplicate = () => {
+    duplicateMutation.mutate(duplicateName || undefined);
+  };
 
   const handleOpenEditDialog = () => {
     setEditedName(playbook.name);
@@ -325,11 +389,15 @@ export function PlaybookCard({ playbook, onConfigure, onExecute, onExport, onVie
             variant="outlined"
           />
           {playbook.parameter_count > 0 && (
-            <Chip
-              label={`${playbook.parameter_count} params`}
-              size="small"
-              variant="outlined"
-            />
+            <Tooltip title={paramsConfigured ? 'Parameters configured' : 'Parameters need configuration'}>
+              <Chip
+                icon={paramsConfigured ? <ConfiguredIcon /> : <NotConfiguredIcon />}
+                label="params"
+                size="small"
+                color={paramsConfigured ? 'success' : 'default'}
+                variant="outlined"
+              />
+            </Tooltip>
           )}
           {playbook.verified && (
             <Chip
@@ -353,31 +421,6 @@ export function PlaybookCard({ playbook, onConfigure, onExecute, onExport, onVie
         <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
           {playbook.path.split('/').slice(-2).join('/')}
         </Typography>
-
-        {/* Saved Configuration Preview - Only shows extra parameters (not gateway URL) */}
-        {savedConfig && Object.keys(savedConfig.parameters).length > 0 && (
-          <Box sx={{ mt: 1, mb: 2, p: 1, bgcolor: 'success.dark', borderRadius: 1, border: '1px solid', borderColor: 'success.main' }}>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-              <Box sx={{ flexGrow: 1 }}>
-                <Typography variant="caption" color="success.light" fontWeight="bold">
-                  ✓ {Object.keys(savedConfig.parameters).length} parameter(s) configured
-                </Typography>
-              </Box>
-              <Tooltip title="Clear saved parameters">
-                <IconButton
-                  size="small"
-                  onClick={() => {
-                    localStorage.removeItem(`playbook_config_${playbook.path}`);
-                    setSavedConfig(null);
-                  }}
-                  sx={{ color: 'success.light', ml: 1, mt: -0.5 }}
-                >
-                  <ClearIcon fontSize="small" />
-                </IconButton>
-              </Tooltip>
-            </Box>
-          </Box>
-        )}
 
         {/* Mode Toggles - Debug and Schedule */}
         <Box sx={{ mt: 1, mb: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2 }}>
@@ -502,6 +545,22 @@ export function PlaybookCard({ playbook, onConfigure, onExecute, onExport, onVie
           Show Details
         </MenuItem>
 
+        {/* Clear Saved Config */}
+        {savedConfig && Object.keys(savedConfig.parameters).length > 0 && (
+          <MenuItem
+            onClick={() => {
+              localStorage.removeItem(`playbook_config_${playbook.path}`);
+              setSavedConfig(null);
+              setMenuAnchor(null);
+              setSnackbarMessage('Saved configuration cleared');
+              setSnackbarOpen(true);
+            }}
+          >
+            <ClearIcon fontSize="small" sx={{ mr: 1 }} />
+            Clear Saved Config
+          </MenuItem>
+        )}
+
         <Divider />
 
         {/* Edit Playbook */}
@@ -512,7 +571,7 @@ export function PlaybookCard({ playbook, onConfigure, onExecute, onExport, onVie
 
         {/* Duplicate Playbook */}
         <MenuItem
-          onClick={() => duplicateMutation.mutate()}
+          onClick={handleOpenDuplicateDialog}
           disabled={duplicateMutation.isPending}
         >
           <DuplicateIcon fontSize="small" sx={{ mr: 1 }} />
@@ -643,6 +702,50 @@ export function PlaybookCard({ playbook, onConfigure, onExecute, onExport, onVie
             disabled={updateMetadataMutation.isPending || (editedName === playbook.name && editedDescription === playbook.description)}
           >
             {updateMetadataMutation.isPending ? 'Saving...' : 'Save'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Duplicate Dialog */}
+      <Dialog
+        open={duplicateDialogOpen}
+        onClose={() => setDuplicateDialogOpen(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>Duplicate Playbook</DialogTitle>
+        <DialogContent>
+          <Box sx={{ mt: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <Typography variant="body2" color="text.secondary">
+              Creating a copy of: <strong>{playbook.name}</strong>
+            </Typography>
+            <Typography variant="caption" color="text.secondary">
+              Location: {playbook.path.split('/')[0]}/
+            </Typography>
+            <TextField
+              label="New Playbook Name"
+              value={duplicateName}
+              onChange={(e) => setDuplicateName(e.target.value)}
+              fullWidth
+              variant="outlined"
+              size="small"
+              placeholder="Leave empty for auto-generated name"
+              helperText="Enter a new name or leave empty to use auto-generated name"
+              autoFocus
+            />
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDuplicateDialogOpen(false)} startIcon={<CancelIcon />}>
+            Cancel
+          </Button>
+          <Button
+            onClick={handleDuplicate}
+            variant="contained"
+            startIcon={<DuplicateIcon />}
+            disabled={duplicateMutation.isPending}
+          >
+            {duplicateMutation.isPending ? 'Duplicating...' : 'Duplicate'}
           </Button>
         </DialogActions>
       </Dialog>

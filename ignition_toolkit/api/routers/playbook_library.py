@@ -50,7 +50,11 @@ async def browse_available_playbooks(force_refresh: bool = False):
         registry = PlaybookRegistry()
         registry.load()
 
-        await registry.fetch_available_playbooks(force_refresh=force_refresh)
+        try:
+            await registry.fetch_available_playbooks(force_refresh=force_refresh)
+        except Exception as fetch_error:
+            logger.warning(f"Could not fetch playbook library from remote: {fetch_error}")
+            # Continue with cached/empty data - don't fail the whole request
 
         available = registry.get_available_playbooks(include_installed=False)
 
@@ -77,6 +81,7 @@ async def browse_available_playbooks(force_refresh: bool = False):
             "count": len(playbooks),
             "playbooks": playbooks,
             "last_fetched": registry.last_fetched,
+            "message": "Playbook library is not yet available. Check back later or create your own playbooks." if len(playbooks) == 0 else None,
         }
 
     except Exception as e:

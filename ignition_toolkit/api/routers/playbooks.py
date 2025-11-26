@@ -49,26 +49,31 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/playbooks", tags=["playbooks"])
 
 # ============================================================================
-# CRUD Operations
+# CRUD Operations (static routes first, then catch-all)
 # ============================================================================
 
 router.add_api_route("", list_playbooks, methods=["GET"], tags=["playbooks-crud"])
-router.add_api_route("/{playbook_path:path}", get_playbook, methods=["GET"], tags=["playbooks-crud"])
 router.add_api_route("/update", update_playbook, methods=["PUT"], tags=["playbooks-crud"])
 router.add_api_route("/metadata", update_playbook_metadata, methods=["PATCH"], tags=["playbooks-crud"])
 router.add_api_route("/edit-step", edit_step, methods=["POST"], tags=["playbooks-crud"])
 
 # ============================================================================
-# Library Operations
+# Library Operations (static routes MUST come before catch-all paths)
 # ============================================================================
 
 router.add_api_route("/browse", browse_available_playbooks, methods=["GET"], tags=["playbooks-library"])
 router.add_api_route("/install", install_playbook, methods=["POST"], tags=["playbooks-library"])
-router.add_api_route("/{playbook_path:path}/uninstall", uninstall_playbook, methods=["DELETE"], tags=["playbooks-library"])
-router.add_api_route("/{playbook_path:path}/update", update_playbook_to_latest, methods=["POST"], tags=["playbooks-library"])
 router.add_api_route("/updates", check_for_updates, methods=["GET"], tags=["playbooks-library"])
 router.add_api_route("/updates/stats", get_update_stats, methods=["GET"], tags=["playbooks-library"])
 router.add_api_route("/updates/{playbook_path:path}", check_playbook_update, methods=["GET"], tags=["playbooks-library"])
+router.add_api_route("/{playbook_path:path}/uninstall", uninstall_playbook, methods=["DELETE"], tags=["playbooks-library"])
+router.add_api_route("/{playbook_path:path}/update", update_playbook_to_latest, methods=["POST"], tags=["playbooks-library"])
+
+# ============================================================================
+# CRUD - Catch-all GET route (must come after all static GET routes)
+# ============================================================================
+
+router.add_api_route("/{playbook_path:path}", get_playbook, methods=["GET"], tags=["playbooks-crud"])
 
 # ============================================================================
 # Metadata Operations
