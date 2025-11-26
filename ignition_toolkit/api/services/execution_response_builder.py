@@ -126,34 +126,59 @@ class ExecutionResponseBuilder:
         Returns:
             ExecutionStatusResponse with data from database
         """
+        # Extract values from execution_metadata (stored as JSON)
+        metadata = db_execution.execution_metadata or {}
+        total_steps = metadata.get("total_steps", len(db_execution.step_results))
+        debug_mode = metadata.get("debug_mode", False)
+        domain = metadata.get("domain")
+
+        # Calculate current_step_index from step_results
+        # Count completed/failed/skipped steps to determine progress
+        completed_count = sum(
+            1 for step in db_execution.step_results
+            if step.status in ("completed", "failed", "skipped")
+        )
+        current_step_index = completed_count - 1 if completed_count > 0 else 0
+
+        # Convert step results, extracting screenshot_path from artifacts JSON
+        step_results = []
+        for step in db_execution.step_results:
+            # Extract screenshot_path from artifacts if present
+            artifacts = step.artifacts or {}
+            screenshot_path = None
+            if isinstance(artifacts, dict):
+                # Check for single screenshot in artifacts
+                screenshot_path = artifacts.get("screenshot_path")
+                # Also check for screenshots array
+                screenshots = artifacts.get("screenshots", [])
+                if screenshots and not screenshot_path:
+                    screenshot_path = screenshots[0] if isinstance(screenshots, list) else None
+
+            step_results.append({
+                "step_id": step.step_id,
+                "step_name": step.step_name,
+                "status": step.status,
+                "output": step.output,
+                "error": step.error_message,  # Note: column is error_message, not error
+                "started_at": step.started_at,
+                "completed_at": step.completed_at,
+                "screenshot_path": screenshot_path,
+            })
+
         return ExecutionStatusResponse(
             execution_id=db_execution.execution_id,
             playbook_name=db_execution.playbook_name,
             status=db_execution.status,
             started_at=db_execution.started_at,
             completed_at=db_execution.completed_at,
-            total_steps=db_execution.total_steps,
-            current_step_index=db_execution.current_step_index,
-            step_results=ExecutionResponseBuilder.convert_step_results_to_response(
-                [
-                    {
-                        "step_id": step.step_id,
-                        "step_name": step.step_name,
-                        "status": step.status,
-                        "output": step.output,
-                        "error": step.error,
-                        "started_at": step.started_at,
-                        "completed_at": step.completed_at,
-                        "screenshot_path": step.screenshot_path,
-                    }
-                    for step in db_execution.step_results
-                ]
-            ),
-            debug_mode=db_execution.debug_mode,
-            error=db_execution.error,
-            domain=db_execution.domain,
-            playbook_path=db_execution.playbook_path,
-            nested_execution_progress=db_execution.nested_execution_progress,
+            total_steps=total_steps,
+            current_step_index=current_step_index,
+            step_results=ExecutionResponseBuilder.convert_step_results_to_response(step_results),
+            debug_mode=debug_mode,
+            error=db_execution.error_message,  # Note: column is error_message, not error
+            domain=domain,
+            playbook_path=None,  # Not stored in database, only available for active executions
+            nested_execution_progress=None,  # Not stored in database, only available for active executions
         )
 
     @staticmethod
