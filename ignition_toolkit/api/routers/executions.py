@@ -474,6 +474,7 @@ async def start_execution(request: ExecutionRequest, background_tasks: Backgroun
             credential_name=request.credential_name,
             debug_mode=request.debug_mode,
             timeout_seconds=3600,  # 1 hour
+            timeout_overrides=request.timeout_overrides,
         )
 
         # Load playbook for response (TODO: return from service)

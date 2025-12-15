@@ -112,12 +112,13 @@ class GatewayUploadModuleHandler(StepHandler):
 class GatewayWaitModuleHandler(StepHandler):
     """Handle gateway.wait_module step"""
 
-    def __init__(self, client: GatewayClient):
+    def __init__(self, client: GatewayClient, default_timeout: int = 300):
         self.client = client
+        self.default_timeout = default_timeout
 
     async def execute(self, params: dict[str, Any]) -> dict[str, Any]:
         module_name = params.get("module_name")
-        timeout = params.get("timeout", 300)
+        timeout = params.get("timeout", self.default_timeout)
         await self.client.wait_for_module_installation(module_name, timeout)
         return {"status": "installed", "module_name": module_name}
 
@@ -148,22 +149,25 @@ class GatewayGetProjectHandler(StepHandler):
 class GatewayRestartHandler(StepHandler):
     """Handle gateway.restart step"""
 
-    def __init__(self, client: GatewayClient):
+    def __init__(self, client: GatewayClient, default_timeout: int = 120):
         self.client = client
+        self.default_timeout = default_timeout
 
     async def execute(self, params: dict[str, Any]) -> dict[str, Any]:
         wait_for_ready = params.get("wait_for_ready", False)
-        await self.client.restart(wait_for_ready=wait_for_ready)
+        timeout = params.get("timeout", self.default_timeout)
+        await self.client.restart(wait_for_ready=wait_for_ready, timeout=timeout)
         return {"status": "restarted"}
 
 
 class GatewayWaitReadyHandler(StepHandler):
     """Handle gateway.wait_ready step"""
 
-    def __init__(self, client: GatewayClient):
+    def __init__(self, client: GatewayClient, default_timeout: int = 120):
         self.client = client
+        self.default_timeout = default_timeout
 
     async def execute(self, params: dict[str, Any]) -> dict[str, Any]:
-        timeout = params.get("timeout", 300)
+        timeout = params.get("timeout", self.default_timeout)
         await self.client.wait_for_ready(timeout)
         return {"status": "ready"}

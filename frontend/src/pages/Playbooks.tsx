@@ -472,6 +472,7 @@ export function Playbooks() {
         gateway_url: selectedCredential.gateway_url, // Always use global credential's gateway_url
         credential_name: selectedCredential.name, // Always use global credential
         debug_mode,
+        timeout_overrides: savedConfig.timeoutOverrides, // Include timeout overrides from saved config
       }).then(response => {
         // Navigate to execution detail page AFTER getting execution ID
         window.location.href = `/executions/${response.execution_id}`;

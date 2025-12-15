@@ -80,6 +80,7 @@ class ExecutionService:
         credential_name: str | None = None,
         debug_mode: bool = False,
         timeout_seconds: int = 3600,
+        timeout_overrides: dict[str, int] | None = None,
     ) -> str:
         """
         Start playbook execution with credential autofill
@@ -91,6 +92,10 @@ class ExecutionService:
             credential_name: Optional credential name for autofill
             debug_mode: Enable debug mode (pause on failures)
             timeout_seconds: Execution timeout (default: 1 hour)
+            timeout_overrides: Optional per-playbook timeout overrides
+                - gateway_restart: Gateway restart timeout in seconds
+                - module_install: Module installation timeout in seconds
+                - browser_operation: Browser operation timeout in milliseconds
 
         Returns:
             Execution ID (UUID string)
@@ -120,6 +125,7 @@ class ExecutionService:
             gateway_url=gateway_url,
             execution_id=execution_id,
             debug_mode=debug_mode,
+            timeout_overrides=timeout_overrides,
         )
 
         # Step 5: Initial state broadcast - SKIP (engine handles this to avoid duplicates)
@@ -160,6 +166,7 @@ class ExecutionService:
         gateway_url: str | None,
         execution_id: str,
         debug_mode: bool,
+        timeout_overrides: dict[str, int] | None = None,
     ) -> tuple[PlaybookEngine, GatewayClient | None]:
         """
         Create PlaybookEngine with all necessary dependencies and callbacks
@@ -168,6 +175,7 @@ class ExecutionService:
             gateway_url: Optional Gateway URL
             execution_id: Execution UUID
             debug_mode: Enable debug mode
+            timeout_overrides: Optional per-playbook timeout overrides
 
         Returns:
             Tuple of (engine, gateway_client)
@@ -187,6 +195,7 @@ class ExecutionService:
             credential_vault=self.credential_vault,
             database=self.database,
             screenshot_callback=screenshot_cb,
+            timeout_overrides=timeout_overrides,
         )
 
         # Set debug mode

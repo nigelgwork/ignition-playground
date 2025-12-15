@@ -72,6 +72,7 @@ class ExecutionRequest(BaseModel):
     gateway_url: str | None = None
     credential_name: str | None = None  # Name of saved credential to use
     debug_mode: bool | None = False  # Enable debug mode for this execution
+    timeout_overrides: dict[str, int] | None = None  # Per-playbook timeout overrides
 
     @validator("parameters")
     def validate_parameters(cls, v):

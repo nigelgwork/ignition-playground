@@ -89,6 +89,7 @@ class StepExecutor:
         base_path: Path | None = None,
         state_manager: Any | None = None,  # StateManager type hint causes circular import
         parent_engine: Any | None = None,  # Parent PlaybookEngine for nested execution
+        timeout_overrides: dict[str, int] | None = None,  # Per-playbook timeout overrides
     ):
         """
         Initialize step executor with handler registry
@@ -101,6 +102,7 @@ class StepExecutor:
             base_path: Base path for resolving relative file paths
             state_manager: State manager for pause/resume and debug mode
             parent_engine: Parent PlaybookEngine instance for nested execution updates
+            timeout_overrides: Optional per-playbook timeout overrides
         """
         self.gateway_client = gateway_client
         self.browser_manager = browser_manager
@@ -109,6 +111,7 @@ class StepExecutor:
         self.base_path = base_path or Path.cwd()
         self.state_manager = state_manager
         self.parent_engine = parent_engine
+        self.timeout_overrides = timeout_overrides or {}
 
         # Initialize handler registry
         self._handlers = self._create_handler_registry()
@@ -133,11 +136,20 @@ class StepExecutor:
             handlers[StepType.GATEWAY_UPLOAD_MODULE] = GatewayUploadModuleHandler(
                 self.gateway_client, self.parameter_resolver, self.base_path
             )
-            handlers[StepType.GATEWAY_WAIT_MODULE] = GatewayWaitModuleHandler(self.gateway_client)
+            handlers[StepType.GATEWAY_WAIT_MODULE] = GatewayWaitModuleHandler(
+                self.gateway_client,
+                default_timeout=self.timeout_overrides.get("module_install", 300),
+            )
             handlers[StepType.GATEWAY_LIST_PROJECTS] = GatewayListProjectsHandler(self.gateway_client)
             handlers[StepType.GATEWAY_GET_PROJECT] = GatewayGetProjectHandler(self.gateway_client)
-            handlers[StepType.GATEWAY_RESTART] = GatewayRestartHandler(self.gateway_client)
-            handlers[StepType.GATEWAY_WAIT_READY] = GatewayWaitReadyHandler(self.gateway_client)
+            handlers[StepType.GATEWAY_RESTART] = GatewayRestartHandler(
+                self.gateway_client,
+                default_timeout=self.timeout_overrides.get("gateway_restart", 120),
+            )
+            handlers[StepType.GATEWAY_WAIT_READY] = GatewayWaitReadyHandler(
+                self.gateway_client,
+                default_timeout=self.timeout_overrides.get("gateway_restart", 120),
+            )
 
         # Browser handlers
         if self.browser_manager:

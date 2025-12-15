@@ -64,6 +64,7 @@ class PlaybookEngine:
         database: Database | None = None,
         state_manager: StateManager | None = None,
         screenshot_callback: Callable[[str, str], None] | None = None,
+        timeout_overrides: dict[str, int] | None = None,
     ):
         """
         Initialize playbook engine
@@ -74,17 +75,34 @@ class PlaybookEngine:
             database: Database for execution tracking
             state_manager: State manager for pause/resume/skip
             screenshot_callback: Async callback for screenshot frames (execution_id, screenshot_b64)
+            timeout_overrides: Optional per-playbook timeout overrides
+                - gateway_restart: Gateway restart timeout in seconds (default: 120)
+                - module_install: Module installation timeout in seconds (default: 300)
+                - browser_operation: Browser operation timeout in milliseconds (default: 30000)
         """
         self.gateway_client = gateway_client
         self.credential_vault = credential_vault
         self.database = database
         self.state_manager = state_manager or StateManager()
         self.screenshot_callback = screenshot_callback
+        self.timeout_overrides = timeout_overrides or {}
         self._current_execution: ExecutionState | None = None
         self._current_playbook: Playbook | None = None
         self._playbook_path: Path | None = None
         self._update_callback: Callable[[ExecutionState], None] | None = None
         self._browser_manager: BrowserManager | None = None
+
+    def get_gateway_restart_timeout(self) -> int:
+        """Get gateway restart timeout in seconds (default: 120)"""
+        return self.timeout_overrides.get("gateway_restart", 120)
+
+    def get_module_install_timeout(self) -> int:
+        """Get module installation timeout in seconds (default: 300)"""
+        return self.timeout_overrides.get("module_install", 300)
+
+    def get_browser_operation_timeout(self) -> int:
+        """Get browser operation timeout in milliseconds (default: 30000)"""
+        return self.timeout_overrides.get("browser_operation", 30000)
 
     def set_update_callback(self, callback: Callable[[ExecutionState], None]) -> None:
         """
@@ -404,6 +422,7 @@ class PlaybookEngine:
                 base_path=base_path,
                 state_manager=self.state_manager,
                 parent_engine=self,  # Pass self for nested execution updates
+                timeout_overrides=self.timeout_overrides,
             )
 
             # Execute steps (using while loop to support skip back)

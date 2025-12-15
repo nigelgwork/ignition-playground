@@ -18,7 +18,8 @@ import { Save as SaveIcon } from '@mui/icons-material';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../api/client';
 import { ParameterInput } from './ParameterInput';
-import type { PlaybookInfo, CredentialInfo } from '../types/api';
+import { TimeoutSettings } from './TimeoutSettings';
+import type { PlaybookInfo, CredentialInfo, TimeoutOverrides } from '../types/api';
 import { useStore, type SessionCredential } from '../store';
 
 interface PlaybookExecutionDialogProps {
@@ -29,6 +30,7 @@ interface PlaybookExecutionDialogProps {
 
 interface SavedConfig {
   parameters: Record<string, string>;
+  timeoutOverrides?: TimeoutOverrides;
   savedAt: string;
 }
 
@@ -49,6 +51,7 @@ export function PlaybookExecutionDialog({
   onClose,
 }: PlaybookExecutionDialogProps) {
   const [parameters, setParameters] = useState<Record<string, string>>({});
+  const [timeoutOverrides, setTimeoutOverrides] = useState<TimeoutOverrides>({});
   const [configSaved, setConfigSaved] = useState(false);
 
   // Get global selected credential
@@ -76,8 +79,11 @@ export function PlaybookExecutionDialog({
       if (savedConfig) {
         // Load saved configuration (only parameters, not gateway_url)
         setParameters(savedConfig.parameters);
+        setTimeoutOverrides(savedConfig.timeoutOverrides || {});
         setConfigSaved(true);
       } else {
+        // Reset timeout overrides when loading defaults
+        setTimeoutOverrides({});
         // Load defaults
         const defaultParams: Record<string, string> = {};
         playbook.parameters.forEach((param) => {
@@ -122,6 +128,11 @@ export function PlaybookExecutionDialog({
     setConfigSaved(false); // Mark as unsaved when changes are made
   };
 
+  const handleTimeoutChange = (overrides: TimeoutOverrides) => {
+    setTimeoutOverrides(overrides);
+    setConfigSaved(false); // Mark as unsaved when changes are made
+  };
+
   const handleSaveConfig = () => {
     if (!playbook) return;
 
@@ -133,8 +144,12 @@ export function PlaybookExecutionDialog({
       )
     );
 
+    // Only include timeout overrides if any are set
+    const hasTimeoutOverrides = Object.values(timeoutOverrides).some(v => v !== undefined);
+
     saveConfig(playbook.path, {
       parameters: filteredParameters,
+      ...(hasTimeoutOverrides && { timeoutOverrides }),
       savedAt: new Date().toISOString(),
     });
     setConfigSaved(true);
@@ -205,6 +220,14 @@ export function PlaybookExecutionDialog({
               ))}
           </Box>
         )}
+
+        {/* Timeout Settings */}
+        <Box sx={{ mt: 2 }}>
+          <TimeoutSettings
+            timeoutOverrides={timeoutOverrides}
+            onChange={handleTimeoutChange}
+          />
+        </Box>
       </DialogContent>
 
       <DialogActions sx={{ gap: 1, flexWrap: 'wrap' }}>

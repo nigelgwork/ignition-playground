@@ -43,12 +43,19 @@ export interface PlaybookInfo {
   created_at: string | null;  // When playbook was created/added
 }
 
+export interface TimeoutOverrides {
+  gateway_restart?: number;   // seconds (default: 120)
+  module_install?: number;    // seconds (default: 300)
+  browser_operation?: number; // milliseconds (default: 30000)
+}
+
 export interface ExecutionRequest {
   playbook_path: string;
   parameters: Record<string, string>;
   gateway_url?: string;
   credential_name?: string;
   debug_mode?: boolean;
+  timeout_overrides?: TimeoutOverrides;
 }
 
 export interface ExecutionResponse {
